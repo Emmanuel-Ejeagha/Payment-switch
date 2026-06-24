@@ -1,4 +1,4 @@
-﻿using BuildingBlocks.Shared;
+﻿using BuildingBlocks.Shared.Results;
 
 namespace BuildingBlocks.Shared.Tests;
 
