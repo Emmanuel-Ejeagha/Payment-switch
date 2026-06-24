@@ -3,4 +3,8 @@
   <Folder Name="/src/BuildingBlocks/">
     <Project Path="src/BuildingBlocks/BuildingBlocks.Shared/BuildingBlocks.Shared.csproj" />
   </Folder>
+  <Folder Name="/tests/" />
+  <Folder Name="/tests/Unit/">
+    <Project Path="tests/Unit/BuildingBlocks.Shared.Tests/BuildingBlocks.Shared.Tests.csproj" />
+  </Folder>
 </Solution>
