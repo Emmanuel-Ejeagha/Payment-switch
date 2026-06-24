@@ -1,4 +1,7 @@
-﻿namespace BuildingBlocks.Shared.Tests;
+﻿using BuildingBlocks.Shared.Aggregate;
+using BuildingBlocks.Shared.Events;
+
+namespace BuildingBlocks.Shared.Tests;
 
 public class TestEntity : BaseEntity
 {

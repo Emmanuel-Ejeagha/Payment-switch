@@ -1,4 +1,4 @@
-﻿namespace BuildingBlocks.Shared;
+﻿namespace BuildingBlocks.Shared.Results;
 
 public class Result<T> : Result
 {
