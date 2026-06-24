@@ -1,4 +1,4 @@
-﻿namespace BuildingBlocks.Shared;
+﻿namespace BuildingBlocks.Shared.Aggregate;
 
 public abstract class BaseEntity : IEquatable<BaseEntity>
 {

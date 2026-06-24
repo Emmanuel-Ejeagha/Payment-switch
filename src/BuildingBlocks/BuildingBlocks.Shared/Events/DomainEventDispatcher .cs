@@ -1,6 +1,6 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 
-namespace BuildingBlocks.Shared;
+namespace BuildingBlocks.Shared.Events;
 
 public class DomainEventDispatcher : IDomainEventDispatcher
 {

@@ -1,4 +1,6 @@
-﻿namespace BuildingBlocks.Shared;
+﻿using BuildingBlocks.Shared.Events;
+
+namespace BuildingBlocks.Shared.Aggregate;
 
 public abstract class AggregateRoot : BaseEntity
 {
