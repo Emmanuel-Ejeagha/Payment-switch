@@ -1,5 +1,5 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
-using BuildingBlocks.Shared;
+using BuildingBlocks.Shared.Events;
 
 namespace BuildingBlocks.Shared.Tests;
 

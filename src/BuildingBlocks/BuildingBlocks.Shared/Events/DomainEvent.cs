@@ -1,4 +1,4 @@
-﻿namespace BuildingBlocks.Shared;
+﻿namespace BuildingBlocks.Shared.Events;
 
 public record DomainEvent
 {
