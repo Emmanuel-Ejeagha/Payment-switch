@@ -4,8 +4,8 @@ namespace Identity.Domain.Entities;
 
 public class ApiKey : BaseEntity
 {
-    public string KeyHash { get; private set; }
-    public string Environment { get; private set; }
+    public string KeyHash { get; private set; } = default!;
+    public string Environment { get; private set; } = default!;
     public DateTime CreatedAt { get; private set; }
     public DateTime? RevokedAt { get; private set; }
 
