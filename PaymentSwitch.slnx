@@ -10,6 +10,12 @@
     <Project Path="src/Services/Identity/Identity.Domain/Identity.Domain.csproj" />
     <Project Path="src/Services/Identity/Identity.Infrastructure/Identity.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/src/Services/Merchant/">
+    <Project Path="src/Services/Merchant/Merchant.API/Merchant.API.csproj" />
+    <Project Path="src/Services/Merchant/Merchant.Application/Merchant.Application.csproj" />
+    <Project Path="src/Services/Merchant/Merchant.Domain/Merchant.Domain.csproj" />
+    <Project Path="src/Services/Merchant/Merchant.Infrastructure/Merchant.Infrastructure.csproj" />
+  </Folder>
   <Folder Name="/tests/" />
   <Folder Name="/tests/Unit/">
     <Project Path="tests/Unit/BuildingBlocks.Shared.Tests/BuildingBlocks.Shared.Tests.csproj" />
