@@ -71,7 +71,7 @@ public class UserTests
         var user = CreateUser();
         var keyId = Guid.NewGuid();
         var keyHash = "abc123";
-        user.GenerateApiKey(keyId, keyHash, "live");
+        user.GenerateApiKey(keyHash, "live");
 
         Assert.Single(user.ApiKeys);
         Assert.Equal(keyHash, user.ApiKeys[0].KeyHash);
@@ -83,7 +83,7 @@ public class UserTests
     {
         var user = CreateUser();
         var keyId = Guid.NewGuid();
-        user.GenerateApiKey(keyId, "hash", "test");
+        user.GenerateApiKey("hash", "test");
         user.ClearDomainEvents();
 
         user.RevokeApiKey(keyId);
