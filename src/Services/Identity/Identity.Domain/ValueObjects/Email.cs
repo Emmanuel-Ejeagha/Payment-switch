@@ -11,7 +11,7 @@ public class Email : ValueObject
         if (string.IsNullOrWhiteSpace(value))
             throw new ArgumentException("Email cannot be empty.", nameof(value));
 
-        Value = value;
+        Value = value.ToLowerInvariant();
     }
 
     protected override IEnumerable<object?> GetEqualityComponents()
