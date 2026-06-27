@@ -19,13 +19,14 @@ public class TokenService : ITokenService
 
     public string GenerateAccessToken(User user)
     {
-        var claims = new[]
+        var claims = new List<Claim>
         {
             new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new Claim(ClaimTypes.Email, user.Email.Value),
-            new Claim(ClaimTypes.Name, user.FullName.Value),
-            new Claim(ClaimTypes.Role, string.Join(",", user.Roles))
+            new Claim(ClaimTypes.Name, user.FullName.Value)            
         };
+        claims.AddRange(user.Roles.Select(role => new Claim(ClaimTypes.Role, role)));
+
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.Secret));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);

@@ -11,7 +11,7 @@ public class ApiKey : BaseEntity
 
     private ApiKey() : base() { }
 
-    public ApiKey(Guid id, string keyHash, string environment) : base(id)
+    public ApiKey(string keyHash, string environment) : base()
     {
         KeyHash = keyHash;
         Environment = environment;

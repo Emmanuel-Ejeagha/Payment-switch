@@ -48,11 +48,11 @@ public class User : AggregateRoot
         _roles.Remove(role);
     }
 
-    public ApiKey GenerateApiKey(Guid keyId, string keyHash, string environment)
+    public ApiKey GenerateApiKey(string keyHash, string environment)
     {
-        var apiKey = new ApiKey(keyId, keyHash, environment);
+        var apiKey = new ApiKey(keyHash, environment);
         _apiKeys.Add(apiKey);
-        AddDomainEvent(new ApiKeyGeneratedDomainEvent(Id, keyId, environment));
+        AddDomainEvent(new ApiKeyGeneratedDomainEvent(Id, Guid.Empty, environment));
         return apiKey;
     }
 
