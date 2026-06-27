@@ -15,6 +15,8 @@
     <Project Path="tests/Unit/BuildingBlocks.Shared.Tests/BuildingBlocks.Shared.Tests.csproj" />
     <Project Path="tests/Unit/Identity.Application.Tests/Identity.Application.Tests.csproj" />
     <Project Path="tests/Unit/Identity.Domain.Tests/Identity.Domain.Tests.csproj" />
-    <Project Path="tests/Unit/Identity.Infrastructure.Tests/Identity.Infrastructure.Tests.csproj" />
+    <Project Path="tests/Unit/Identity.Infrastructure.Tests/Identity.Infrastructure.Tests.csproj">
+      <Build Solution="Debug|*" Project="false" />
+    </Project>
   </Folder>
 </Solution>
