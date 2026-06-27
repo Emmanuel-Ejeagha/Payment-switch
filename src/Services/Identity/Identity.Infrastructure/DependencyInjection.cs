@@ -1,4 +1,5 @@
 ﻿using Identity.Application.Interfaces;
+using Identity.Infrastructure.Messaging;
 using Identity.Infrastructure.Outbox;
 using Identity.Infrastructure.Persistence;
 using Identity.Infrastructure.Persistence.Repositories;
@@ -30,6 +31,10 @@ public static class DependencyInjection
         services.AddScoped<IPasswordHasher, PasswordHasher>();
         services.AddScoped<ITokenService, TokenService>();
         services.Configure<JwtSettings>(configuration.GetSection("Jwt"));
+
+        services.Configure<RabbitMQSettings>(configuration.GetSection("RabbitMQ"));
+        services.AddScoped<IEventBus, RabbitMQEventBus>();
+        services.AddHostedService<OutboxPublisherService>();
 
         return services;
     }
