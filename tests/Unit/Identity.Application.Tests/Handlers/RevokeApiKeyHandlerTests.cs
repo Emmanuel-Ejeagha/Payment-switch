@@ -100,7 +100,7 @@ public class RevokeApiKeyHandlerTests
     {
         var user = new User(Guid.NewGuid(), new Email("user@example.com"), new PasswordHash("hashed"), new FullName("User"));
         keyId = Guid.NewGuid();
-        user.GenerateApiKey(keyId, "hashed_key", "test");
+        user.GenerateApiKey("hashed_key", "test");
         user.ClearDomainEvents();
         return user;
     }
