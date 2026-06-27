@@ -18,4 +18,9 @@ public class OutboxMessage
         OccurredOn = DateTime.UtcNow;
         Processed = false;
     }
+
+    public void MarkAsProcessed()
+    {
+        Processed = true;
+    }
 }
