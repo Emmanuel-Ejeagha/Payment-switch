@@ -21,25 +21,25 @@ public class GenerateApiKeyHandler
         _validator = validator;
     }
 
-    public async Task<Result<ApiKeyResponse>> Handle(GenerateApiKeyCommand command, CancellationToken cancellationToken = default)
+    public async Task<Result<ApiKeyResponse>> Handle(GenerateApiKeyCommand query, CancellationToken cancellationToken = default)
     {
-        var validationResult = await _validator.ValidateAsync(command, cancellationToken);
-        if(!validationResult.IsValid)
+        var validationResult = await _validator.ValidateAsync(query, cancellationToken);
+        if (!validationResult.IsValid)
             return validationResult.Errors.Select(e => new Error(e.PropertyName, e.ErrorMessage)).ToList();
 
-        var user = await _userRepository.GetByIdAsync(command.UserId, cancellationToken);
+        var user = await _userRepository.GetByIdAsync(query.UserId, cancellationToken);
         if (user == null)
-            return IdentityErrors.UserNotFound(command.UserId);
+            return IdentityErrors.UserNotFound(query.UserId);
 
         var plainTextKey = GenerateRandomKey();
         var keyHash = HashKey(plainTextKey);
-        var keyId = Guid.NewGuid();
 
-        var apiKey = user.GenerateApiKey(keyId, keyHash, command.Environment);
+        var apiKey = user.GenerateApiKey(keyHash, query.Environment);
+        await _userRepository.AddApiKeyAsync(user, apiKey, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         await _dispatcher.DispatchAsync(user.DomainEvents, cancellationToken);
 
-        return new ApiKeyResponse(keyId, plainTextKey, command.Environment, apiKey.CreatedAt);
+        return new ApiKeyResponse(apiKey.Id, plainTextKey, query.Environment, apiKey.CreatedAt);
     }
 
     private string GenerateRandomKey() => Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N");

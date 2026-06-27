@@ -3,6 +3,7 @@ using BuildingBlocks.Shared.Results;
 using FluentValidation;
 using Identity.Application.Interfaces;
 using Identity.Domain.DomainErrors;
+using Identity.Domain.DomainEvents;
 
 namespace Identity.Application.Commands.ApiKey;
 
@@ -31,17 +32,13 @@ public class RevokeApiKeyHandler
         if (user == null)
             return IdentityErrors.UserNotFound(command.UserId);
 
-        try
-        {
-            user.RevokeApiKey(command.KeyId);
-        }
-        catch (InvalidOperationException)
-        {
+        var revoked = await _userRepository.RevokeApiKeyAsync(command.UserId, command.KeyId, cancellationToken);
+        if (!revoked)
             return IdentityErrors.ApiKeyNotFound(command.KeyId);
-        }
+        var domainEvent = new ApiKeyRevokedDomainEvent(command.UserId, command.KeyId);
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
-        await _dispatcher.DispatchAsync(user.DomainEvents, cancellationToken);
+        await _dispatcher.DispatchAsync(new DomainEvent[] { domainEvent }, cancellationToken);
         return Result.Success();
     }
 }
