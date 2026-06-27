@@ -1,6 +1,4 @@
-﻿using Identity.Domain;
-using Identity.Domain.Entities;
-using Identity.Domain.ValueObjects;
+﻿using Identity.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -44,16 +42,14 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
             rt.ToTable("RefreshTokens");
         });
 
-        builder.OwnsMany(u => u.ApiKeys, ak =>
-        {
-            ak.WithOwner().HasForeignKey("UserId");
-            ak.HasKey(k => k.Id);
-            ak.Property(k => k.KeyHash).IsRequired();
-            ak.Property(k => k.Environment).IsRequired();
-            ak.Property(k => k.CreatedAt);
-            ak.Property(k => k.RevokedAt);
-            ak.ToTable("ApiKeys");
-        });
+        builder.HasMany(u => u.ApiKeys)
+           .WithOne()
+           .HasForeignKey("UserId")
+           .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Navigation(u => u.ApiKeys)
+       .UsePropertyAccessMode(PropertyAccessMode.Field)
+       .HasField("_apiKeys");
 
         builder.Property(u => u.IsActive).IsRequired();
         builder.Ignore(u => u.DomainEvents);
