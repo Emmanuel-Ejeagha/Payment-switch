@@ -24,5 +24,6 @@
     <Project Path="tests/Unit/Identity.Infrastructure.Tests/Identity.Infrastructure.Tests.csproj">
       <Build Solution="Debug|*" Project="false" />
     </Project>
+    <Project Path="tests/Unit/Merchant.Domain.Tests/Merchant.Domain.Tests.csproj" />
   </Folder>
 </Solution>
