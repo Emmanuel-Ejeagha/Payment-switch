@@ -34,5 +34,6 @@
     <Project Path="tests/Unit/Merchant.Domain.Tests/Merchant.Domain.Tests.csproj">
       <Build Solution="Debug|*" Project="false" />
     </Project>
+    <Project Path="tests/Unit/Payment.Domain.Tests/Payment.Domain.Tests.csproj" />
   </Folder>
 </Solution>
