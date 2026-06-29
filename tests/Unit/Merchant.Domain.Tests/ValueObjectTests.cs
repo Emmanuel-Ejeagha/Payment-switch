@@ -1,5 +1,4 @@
-﻿using Merchant.Domain;
-using Merchant.Domain.ValueObjects;
+﻿using Merchant.Domain.ValueObjects;
 
 namespace Merchant.Domain.Tests;
 
