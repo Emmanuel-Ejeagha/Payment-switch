@@ -1,8 +1,4 @@
-﻿using BuildingBlocks.Shared;
-using Merchant.Domain;
-using Merchant.Domain.DomainErrors;
-using Merchant.Domain.DomainEvents;
-using Merchant.Domain.Entities;
+﻿using Merchant.Domain.DomainEvents;
 using Merchant.Domain.ValueObjects;
 using MerchantEntity = Merchant.Domain.Entities.Merchant;
 
