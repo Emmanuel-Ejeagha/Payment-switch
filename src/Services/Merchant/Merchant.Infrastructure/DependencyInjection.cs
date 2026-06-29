@@ -1,4 +1,5 @@
-﻿using Merchant.Infrastructure.Outbox;
+﻿using Merchant.Infrastructure.Messaging;
+using Merchant.Infrastructure.Outbox;
 using Merchant.Infrastructure.Persistence;
 using Merchant.Infrastructure.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -22,6 +23,9 @@ public static class DependencyInjection
 
         services.AddScoped<IMerchantRepository, MerchantRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+        services.Configure<RabbitMQSettings>(configuration.GetSection("RabbitMQ"));
+        services.AddScoped<IEventBus, RabbitMQEventBus>();
+        services.AddHostedService<OutboxPublisherService>();
 
         return services;
     }
