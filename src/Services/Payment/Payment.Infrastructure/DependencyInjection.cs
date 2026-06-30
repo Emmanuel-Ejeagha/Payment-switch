@@ -1,11 +1,12 @@
-﻿using Payment.Application.Interfaces;
+﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Payment.Application.Interfaces;
+using Payment.Infrastructure.Messaging;
 using Payment.Infrastructure.Outbox;
 using Payment.Infrastructure.Persistence;
 using Payment.Infrastructure.Persistence.Repositories;
 using Payment.Infrastructure.Services;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Payment.Infrastructure;
 
@@ -25,6 +26,10 @@ public static class DependencyInjection
         services.AddScoped<IPaymentIntentRepository, PaymentIntentRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IPaymentGatewayService, MockPaymentGatewayService>();
+
+        services.Configure<RabbitMQSettings>(configuration.GetSection("RabbitMQ"));
+        services.AddScoped<IEventBus, RabbitMQEventBus>();
+        services.AddHostedService<OutboxPublisherService>();
 
         return services;
     }
