@@ -8,6 +8,17 @@ public class PaymentMethod : ValueObject
 
     private PaymentMethod(string value) => Value = value;
 
+    public static PaymentMethod FromString(string value)
+    {
+        return value switch
+        {
+            "Card" => Card,
+            "Bank" => Bank,
+            "MobileMoney" => MobileMoney,
+            _ => throw new ArgumentException($"Invalid payment method: {value}")
+        };
+    }
+
     public static readonly PaymentMethod Card = new("Card");
     public static readonly PaymentMethod Bank = new("Bank");
     public static readonly PaymentMethod MobileMoney = new("MobileMoney");
