@@ -3,6 +3,7 @@ using Ledger.Domain.DomainEvents;
 using Ledger.Domain.Enums;
 using Ledger.Domain.ValueObjects;
 [assembly: System.Runtime.CompilerServices.InternalsVisibleTo("Ledger.Domain.Tests")]
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("Ledger.Application.Tests")]
 
 namespace Ledger.Domain.Entities;
 
