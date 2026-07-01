@@ -10,6 +10,12 @@
     <Project Path="src/Services/Identity/Identity.Domain/Identity.Domain.csproj" />
     <Project Path="src/Services/Identity/Identity.Infrastructure/Identity.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/src/Services/Ledger/">
+    <Project Path="src/Services/Ledger/Ledger.API/Ledger.API.csproj" />
+    <Project Path="src/Services/Ledger/Ledger.Application/Ledger.Application.csproj" />
+    <Project Path="src/Services/Ledger/Ledger.Domain/Ledger.Domain.csproj" />
+    <Project Path="src/Services/Ledger/Ledger.Infrastructure/Ledger.Infrastructure.csproj" />
+  </Folder>
   <Folder Name="/src/Services/Merchant/">
     <Project Path="src/Services/Merchant/Merchant.API/Merchant.API.csproj" />
     <Project Path="src/Services/Merchant/Merchant.Application/Merchant.Application.csproj" />
