@@ -3,6 +3,7 @@ using BuildingBlocks.Shared.Results;
 using Moq;
 using Notification.Application.Features.Commands.SendPendingNotification;
 using Notification.Application.Interfaces;
+using Notification.Domain.ValueObjects;
 using NotificationEntity = Notification.Domain.Entities.Notification;
 
 namespace Notification.Application.Tests.Handlers;

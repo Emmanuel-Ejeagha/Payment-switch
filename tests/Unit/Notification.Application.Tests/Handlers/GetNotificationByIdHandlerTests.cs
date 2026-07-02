@@ -1,6 +1,7 @@
 ﻿using Moq;
 using Notification.Application.Features.Queries.GetNotificationById;
 using Notification.Application.Interfaces;
+using Notification.Domain.ValueObjects;
 using NotificationEntity = Notification.Domain.Entities.Notification;
 
 namespace Notification.Application.Tests.Handlers.Queries;
@@ -25,7 +26,7 @@ public class GetNotificationByIdHandlerTests
     public async Task Handle_NotFound_ReturnsError()
     {
         var repoMock = new Mock<INotificationRepository>();
-        repoMock.Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync((Notification.Domain.Notification?)null);
+        repoMock.Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync((NotificationEntity?)null);
         var handler = new GetNotificationByIdHandler(repoMock.Object);
 
         var result = await handler.Handle(new GetNotificationByIdQuery(Guid.NewGuid()));
