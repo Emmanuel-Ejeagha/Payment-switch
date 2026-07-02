@@ -50,7 +50,7 @@
     <Project Path="tests/Unit/Merchant.Domain.Tests/Merchant.Domain.Tests.csproj">
       <Build Solution="Debug|*" Project="false" />
     </Project>
-    <Project Path="tests/Unit/Notification.Domain.Tests/Notification.Domain.Tests.csproj" />
+    <Project Path="tests/Unit/Notification.Application.Tests/Notification.Application.Tests.csproj" />
     <Project Path="tests/Unit/Payment.Application.Tests/Payment.Application.Tests.csproj">
       <Build Solution="Debug|*" Project="false" />
     </Project>
