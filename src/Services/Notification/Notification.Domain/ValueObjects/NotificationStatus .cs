@@ -8,6 +8,17 @@ public class NotificationStatus : ValueObject
 
     private NotificationStatus(string value) => Value = value;
 
+    public static NotificationStatus FromString(string value)
+    {
+        return value?.ToLowerInvariant() switch
+        {
+            "pending" => Pending,
+            "sent" => Sent,
+            "failed" => Failed,
+            _ => throw new ArgumentException($"Invalid notification status: {value}")
+        };
+    }
+
     public static readonly NotificationStatus Pending = new("pending");
     public static readonly NotificationStatus Sent = new("sent");
     public static readonly NotificationStatus Failed = new("failed");
