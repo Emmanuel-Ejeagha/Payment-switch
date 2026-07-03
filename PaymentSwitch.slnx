@@ -71,6 +71,9 @@
     <Project Path="tests/Unit/Payment.Infrastructure.Tests/Payment.Infrastructure.Tests.csproj">
       <Build Solution="Debug|*" Project="false" />
     </Project>
-    <Project Path="tests/Unit/Settlement.Domain.Tests/Settlement.Domain.Tests.csproj" />
+    <Project Path="tests/Unit/Settlement.Application.Tests/Settlement.Application.Tests.csproj" />
+    <Project Path="tests/Unit/Settlement.Domain.Tests/Settlement.Domain.Tests.csproj">
+      <Build Solution="Debug|*" Project="false" />
+    </Project>
   </Folder>
 </Solution>
