@@ -38,6 +38,7 @@ public static class DependencyInjection
 
         services.Configure<RabbitMQSettings>(configuration.GetSection("RabbitMQ"));
         services.AddScoped<IEventBus, RabbitMQEventBus>();
+        services.AddScoped<HttpClient>(_ => new HttpClient());
 
         return services;
     }
