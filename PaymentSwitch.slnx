@@ -34,6 +34,12 @@
     <Project Path="src/Services/Payment/Payment.Domain/Payment.Domain.csproj" />
     <Project Path="src/Services/Payment/Payment.Infrastructure/Payment.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/src/Services/Settlement/">
+    <Project Path="src/Services/Settlement/Settlement.API/Settlement.API.csproj" />
+    <Project Path="src/Services/Settlement/Settlement.Application/Settlement.Application.csproj" />
+    <Project Path="src/Services/Settlement/Settlement.Domain/Settlement.Domain.csproj" />
+    <Project Path="src/Services/Settlement/Settlement.Infrastructure/Settlement.Infrastructure.csproj" />
+  </Folder>
   <Folder Name="/tests/" />
   <Folder Name="/tests/Unit/">
     <Project Path="tests/Unit/BuildingBlocks.Shared.Tests/BuildingBlocks.Shared.Tests.csproj" />
