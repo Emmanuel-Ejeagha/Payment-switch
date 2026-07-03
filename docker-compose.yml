@@ -1,0 +1,187 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: paymentswitch
+      POSTGRES_PASSWORD: paymentswitch
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - paymentswitch-network
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    networks:
+      - paymentswitch-network
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - paymentswitch-network
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.58
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    networks:
+      - paymentswitch-network
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    networks:
+      - paymentswitch-network
+
+  grafana:
+    image: grafana/grafana:10.4.3
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - paymentswitch-network
+
+  identity-api:
+    build:
+      context: .
+      dockerfile: src/Services/Identity/Identity.API/Dockerfile
+    environment:
+      - ConnectionStrings__IdentityDb=Host=postgres;Database=IdentityDb;Username=paymentswitch;Password=paymentswitch
+      - Jwt__Secret=${JWT_SECRET:-your-super-secret-key-minimum-32-bytes!}
+      - Jwt__Issuer=IdentityService
+      - Jwt__Audience=PaymentSwitch
+      - RabbitMQ__HostName=rabbitmq
+      - RabbitMQ__UserName=guest
+      - RabbitMQ__Password=guest
+    depends_on:
+      - postgres
+      - rabbitmq
+    networks:
+      - paymentswitch-network
+
+  merchant-api:
+    build:
+      context: .
+      dockerfile: src/Services/Merchant/Merchant.API/Dockerfile
+    environment:
+      - ConnectionStrings__MerchantDb=Host=postgres;Database=MerchantDb;Username=paymentswitch;Password=paymentswitch
+      - Jwt__Secret=${JWT_SECRET:-your-super-secret-key-minimum-32-bytes!}
+      - Jwt__Issuer=IdentityService
+      - Jwt__Audience=PaymentSwitch
+      - RabbitMQ__HostName=rabbitmq
+      - RabbitMQ__UserName=guest
+      - RabbitMQ__Password=guest
+    depends_on:
+      - postgres
+      - rabbitmq
+    networks:
+      - paymentswitch-network
+
+  payment-api:
+    build:
+      context: .
+      dockerfile: src/Services/Payment/Payment.API/Dockerfile
+    environment:
+      - ConnectionStrings__PaymentDb=Host=postgres;Database=PaymentDb;Username=paymentswitch;Password=paymentswitch
+      - Jwt__Secret=${JWT_SECRET:-your-super-secret-key-minimum-32-bytes!}
+      - Jwt__Issuer=IdentityService
+      - Jwt__Audience=PaymentSwitch
+      - RabbitMQ__HostName=rabbitmq
+      - RabbitMQ__UserName=guest
+      - RabbitMQ__Password=guest
+    depends_on:
+      - postgres
+      - rabbitmq
+    networks:
+      - paymentswitch-network
+
+  ledger-api:
+    build:
+      context: .
+      dockerfile: src/Services/Ledger/Ledger.API/Dockerfile
+    environment:
+      - ConnectionStrings__LedgerDb=Host=postgres;Database=LedgerDb;Username=paymentswitch;Password=paymentswitch
+      - Jwt__Secret=${JWT_SECRET:-your-super-secret-key-minimum-32-bytes!}
+      - Jwt__Issuer=IdentityService
+      - Jwt__Audience=PaymentSwitch
+      - RabbitMQ__HostName=rabbitmq
+      - RabbitMQ__UserName=guest
+      - RabbitMQ__Password=guest
+    depends_on:
+      - postgres
+      - rabbitmq
+    networks:
+      - paymentswitch-network
+
+  notification-api:
+    build:
+      context: .
+      dockerfile: src/Services/Notification/Notification.API/Dockerfile
+    environment:
+      - ConnectionStrings__NotificationDb=Host=postgres;Database=NotificationDb;Username=paymentswitch;Password=paymentswitch
+      - Jwt__Secret=${JWT_SECRET:-your-super-secret-key-minimum-32-bytes!}
+      - Jwt__Issuer=IdentityService
+      - Jwt__Audience=PaymentSwitch
+      - RabbitMQ__HostName=rabbitmq
+      - RabbitMQ__UserName=guest
+      - RabbitMQ__Password=guest
+    depends_on:
+      - postgres
+      - rabbitmq
+    networks:
+      - paymentswitch-network
+
+  settlement-api:
+    build:
+      context: .
+      dockerfile: src/Services/Settlement/Settlement.API/Dockerfile
+    environment:
+      - ConnectionStrings__SettlementDb=Host=postgres;Database=SettlementDb;Username=paymentswitch;Password=paymentswitch
+      - Jwt__Secret=${JWT_SECRET}
+      - Jwt__Issuer=IdentityService
+      - Jwt__Audience=PaymentSwitch
+      - RabbitMQ__HostName=rabbitmq
+      - RabbitMQ__UserName=guest
+      - RabbitMQ__Password=guest
+    depends_on:
+      - postgres
+      - rabbitmq
+    networks:
+      - paymentswitch-network
+
+  nginx:
+    image: nginx:alpine
+    volumes:
+      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "80:80"
+    depends_on:
+      - identity-api
+      - merchant-api
+      - payment-api
+      - ledger-api
+      - notification-api
+      - settlement-api
+    networks:
+      - paymentswitch-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  rabbitmq_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  paymentswitch-network:
+    driver: bridge
