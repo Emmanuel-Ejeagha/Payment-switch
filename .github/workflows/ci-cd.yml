@@ -1,0 +1,100 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  REGISTRY: ghcr.io
+  NAMESPACE: payment-switch
+
+jobs:
+  build-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore PaymentSwitch.slnx
+
+      - name: Build solution
+        run: dotnet build PaymentSwitch.slnx --configuration Release --no-restore
+
+      - name: Run unit tests
+        run: dotnet test PaymentSwitch.slnx --configuration Release --no-build --verbosity normal
+
+  docker:
+    name: Docker Build & Push
+    needs: build-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - identity
+          - merchant
+          - payment
+          - ledger
+          - notification
+          - settlement
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: src/Services/${{ matrix.service }}/${{ matrix.service }}.API/Dockerfile
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.service }}-api:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.service }}-api:latest
+
+  deploy:
+    name: Deploy to Kubernetes
+    needs: docker
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBE_CONFIG }}" | base64 --decode > $HOME/.kube/config
+
+      - name: Update deployments with new images
+        run: |
+          services=("identity" "merchant" "payment" "ledger" "notification" "settlement")
+          for svc in "${services[@]}"; do
+            kubectl set image deployment/${svc}-api \
+              ${svc}-api=${{ env.REGISTRY }}/${{ github.repository }}/${svc}-api:${{ github.sha }} \
+              --namespace ${{ env.NAMESPACE }}
+          done
+
+      - name: Verify rollout status
+        run: |
+          kubectl rollout status deployment/identity-api --namespace ${{ env.NAMESPACE }} --timeout=120s
+          kubectl rollout status deployment/merchant-api --namespace ${{ env.NAMESPACE }} --timeout=120s
+          kubectl rollout status deployment/payment-api --namespace ${{ env.NAMESPACE }} --timeout=120s
+          kubectl rollout status deployment/ledger-api --namespace ${{ env.NAMESPACE }} --timeout=120s
+          kubectl rollout status deployment/notification-api --namespace ${{ env.NAMESPACE }} --timeout=120s
+          kubectl rollout status deployment/settlement-api --namespace ${{ env.NAMESPACE }} --timeout=120s
