@@ -1,9 +1,11 @@
+using BuildingBlocks.Shared;
 using Hangfire;
 using Hangfire.PostgreSql;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
+using OpenTelemetry.Metrics;
 using Serilog;
 using Settlement.API.Middlewares;
 using Settlement.Application;
@@ -16,6 +18,8 @@ using System.Text;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Host.UseSerilog((ctx, lc) => lc.ReadFrom.Configuration(ctx.Configuration));
+var otel = builder.AddPaymentSwitchObservability("Settlement");
+otel.WithMetrics(metrics => metrics.AddPrometheusExporter());
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -109,4 +113,7 @@ using (var serviceScope = app.Services.CreateScope())
 }
 
 app.MapControllers();
+app.MapPrometheusScrapingEndpoint();
+
+
 app.Run();

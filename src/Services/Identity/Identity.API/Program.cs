@@ -1,3 +1,4 @@
+using BuildingBlocks.Shared;
 using Identity.API.Middlewares;
 using Identity.Application;
 using Identity.Infrastructure;
@@ -6,6 +7,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
+using OpenTelemetry.Metrics;
 using Serilog;
 using System.Reflection;
 using System.Text;
@@ -13,6 +15,8 @@ using System.Text;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Host.UseSerilog((ctx, lc) => lc.ReadFrom.Configuration(ctx.Configuration));
+var otel = builder.AddPaymentSwitchObservability("Identity");
+otel.WithMetrics(metrics => metrics.AddPrometheusExporter());
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -90,5 +94,6 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapPrometheusScrapingEndpoint();
 
 app.Run();
