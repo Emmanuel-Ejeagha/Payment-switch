@@ -18,7 +18,10 @@ spec:
           image: paymentswitch-settlement:latest
           env:
             - name: ConnectionStrings__SettlementDb
-              value: "Host=postgres;Database=SettlementDb;Username=paymentswitch;Password=$(POSTGRES_PASSWORD)"
+              valueFrom:
+                secretKeyRef:
+                  name: payment-switch-secret
+                  key: SettlementDb__ConnectionString
             - name: Jwt__Secret
               valueFrom:
                 secretKeyRef:
@@ -49,11 +52,6 @@ spec:
                 configMapKeyRef:
                   name: payment-switch-config
                   key: RabbitMQ__Password
-            - name: POSTGRES_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: payment-switch-secret
-                  key: Postgres__Password
           ports:
             - containerPort: 8080
 ---

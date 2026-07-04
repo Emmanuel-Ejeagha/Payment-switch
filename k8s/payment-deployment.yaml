@@ -18,7 +18,10 @@ spec:
           image: paymentswitch-payment:latest
           env:
             - name: ConnectionStrings__PaymentDb
-              value: "Host=postgres;Database=PaymentDb;Username=paymentswitch;Password=$(POSTGRES_PASSWORD)"
+              valueFrom:
+                secretKeyRef:
+                  name: payment-switch-secret
+                  key: PaymentDb__ConnectionString
             - name: Jwt__Secret
               valueFrom:
                 secretKeyRef:
@@ -49,11 +52,6 @@ spec:
                 configMapKeyRef:
                   name: payment-switch-config
                   key: RabbitMQ__Password
-            - name: POSTGRES_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: payment-switch-secret
-                  key: Postgres__Password
           ports:
             - containerPort: 8080
 ---
