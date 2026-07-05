@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-api
+  namespace: payment-switch
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payment-api
+  template:
+    metadata:
+      labels:
+        app: payment-api
+    spec:
+      containers:
+        - name: payment-api
+          image: paymentswitch-payment:latest
+          env:
+            - name: ConnectionStrings__PaymentDb
+              valueFrom:
+                secretKeyRef:
+                  name: payment-switch-secret
+                  key: PaymentDb__ConnectionString
+            - name: Jwt__Secret
+              valueFrom:
+                secretKeyRef:
+                  name: payment-switch-secret
+                  key: Jwt__Secret
+            - name: Jwt__Issuer
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-switch-config
+                  key: Jwt__Issuer
+            - name: Jwt__Audience
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-switch-config
+                  key: Jwt__Audience
+            - name: RabbitMQ__HostName
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-switch-config
+                  key: RabbitMQ__HostName
+            - name: RabbitMQ__UserName
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-switch-config
+                  key: RabbitMQ__UserName
+            - name: RabbitMQ__Password
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-switch-config
+                  key: RabbitMQ__Password
+          ports:
+            - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: payment-api
+  namespace: payment-switch
+spec:
+  selector:
+    app: payment-api
+  ports:
+    - port: 8080
+      targetPort: 8080
