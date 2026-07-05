@@ -1,0 +1,55 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: payment-switch-ingress
+  namespace: payment-switch
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: localhost
+      http:
+        paths:
+          - path: /identity(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: identity-api
+                port:
+                  number: 8080
+          - path: /merchant(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: merchant-api
+                port:
+                  number: 8080
+          - path: /payment(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: payment-api
+                port:
+                  number: 8080
+          - path: /ledger(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: ledger-api
+                port:
+                  number: 8080
+          - path: /notification(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: notification-api
+                port:
+                  number: 8080
+          - path: /settlement(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: settlement-api
+                port:
+                  number: 8080
