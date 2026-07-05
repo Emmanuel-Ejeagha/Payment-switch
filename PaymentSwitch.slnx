@@ -1,0 +1,81 @@
+<Solution>
+  <Folder Name="/src/" />
+  <Folder Name="/src/BuildingBlocks/">
+    <Project Path="src/BuildingBlocks/BuildingBlocks.Shared/BuildingBlocks.Shared.csproj" />
+  </Folder>
+  <Folder Name="/src/Services/" />
+  <Folder Name="/src/Services/Identity/">
+    <Project Path="src/Services/Identity/Identity.API/Identity.API.csproj" />
+    <Project Path="src/Services/Identity/Identity.Application/Identity.Application.csproj" />
+    <Project Path="src/Services/Identity/Identity.Domain/Identity.Domain.csproj" />
+    <Project Path="src/Services/Identity/Identity.Infrastructure/Identity.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Services/Ledger/">
+    <Project Path="src/Services/Ledger/Ledger.API/Ledger.API.csproj" />
+    <Project Path="src/Services/Ledger/Ledger.Application/Ledger.Application.csproj" />
+    <Project Path="src/Services/Ledger/Ledger.Domain/Ledger.Domain.csproj" />
+    <Project Path="src/Services/Ledger/Ledger.Infrastructure/Ledger.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Services/Merchant/">
+    <Project Path="src/Services/Merchant/Merchant.API/Merchant.API.csproj" />
+    <Project Path="src/Services/Merchant/Merchant.Application/Merchant.Application.csproj" />
+    <Project Path="src/Services/Merchant/Merchant.Domain/Merchant.Domain.csproj" />
+    <Project Path="src/Services/Merchant/Merchant.Infrastructure/Merchant.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Services/Notification/">
+    <Project Path="src/Services/Notification/Notification.API/Notification.API.csproj" />
+    <Project Path="src/Services/Notification/Notification.Application/Notification.Application.csproj" />
+    <Project Path="src/Services/Notification/Notification.Domain/Notification.Domain.csproj" />
+    <Project Path="src/Services/Notification/Notification.Infrastructure/Notification.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Services/Payment/">
+    <Project Path="src/Services/Payment/Payment.API/Payment.API.csproj" />
+    <Project Path="src/Services/Payment/Payment.Application/Payment.Application.csproj" />
+    <Project Path="src/Services/Payment/Payment.Domain/Payment.Domain.csproj" />
+    <Project Path="src/Services/Payment/Payment.Infrastructure/Payment.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Services/Settlement/">
+    <Project Path="src/Services/Settlement/Settlement.API/Settlement.API.csproj" />
+    <Project Path="src/Services/Settlement/Settlement.Application/Settlement.Application.csproj" />
+    <Project Path="src/Services/Settlement/Settlement.Domain/Settlement.Domain.csproj" />
+    <Project Path="src/Services/Settlement/Settlement.Infrastructure/Settlement.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/" />
+  <Folder Name="/tests/Unit/">
+    <Project Path="tests/Unit/BuildingBlocks.Shared.Tests/BuildingBlocks.Shared.Tests.csproj" />
+    <Project Path="tests/Unit/Identity.Application.Tests/Identity.Application.Tests.csproj" />
+    <Project Path="tests/Unit/Identity.Domain.Tests/Identity.Domain.Tests.csproj" />
+    <Project Path="tests/Unit/Identity.Infrastructure.Tests/Identity.Infrastructure.Tests.csproj">
+      <Build Solution="Debug|*" Project="false" />
+    </Project>
+    <Project Path="tests/Unit/Ledger.Application.Tests/Ledger.Application.Tests.csproj" />
+    <Project Path="tests/Unit/Ledger.Domain.Tests/Ledger.Domain.Tests.csproj">
+      <Build Solution="Debug|*" Project="false" />
+    </Project>
+    <Project Path="tests/Unit/Merchant.Application.Tests/Merchant.Application.Tests.csproj" />
+    <Project Path="tests/Unit/Merchant.Domain.Tests/Merchant.Domain.Tests.csproj">
+      <Build Solution="Debug|*" Project="false" />
+    </Project>
+    <Project Path="tests/Unit/Notification.Application.Tests/Notification.Application.Tests.csproj">
+      <Build Solution="Debug|*" Project="false" />
+    </Project>
+    <Project Path="tests/Unit/Notification.Domain.Tests/Notification.Domain.Tests.csproj">
+      <Build Solution="Debug|*" Project="false" />
+    </Project>
+    <Project Path="tests/Unit/Payment.Application.Tests/Payment.Application.Tests.csproj">
+      <Build Solution="Debug|*" Project="false" />
+    </Project>
+    <Project Path="tests/Unit/Payment.Domain.Tests/Payment.Domain.Tests.csproj">
+      <Build Solution="Debug|*" Project="false" />
+    </Project>
+    <Project Path="tests/Unit/Payment.Infrastructure.Tests/Payment.Infrastructure.Tests.csproj">
+      <Build Solution="Debug|*" Project="false" />
+    </Project>
+    <Project Path="tests/Unit/Settlement.Application.Tests/Settlement.Application.Tests.csproj">
+      <Build Solution="Debug|*" Project="false" />
+    </Project>
+    <Project Path="tests/Unit/Settlement.Domain.Tests/Settlement.Domain.Tests.csproj">
+      <Build Solution="Debug|*" Project="false" />
+    </Project>
+  </Folder>
+</Solution>
