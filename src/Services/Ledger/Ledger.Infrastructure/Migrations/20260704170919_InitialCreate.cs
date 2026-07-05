@@ -12,6 +12,22 @@ namespace Ledger.Infrastructure.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
+                name: "InboxMessages",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    MessageId = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    EventType = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    Payload = table.Column<string>(type: "jsonb", nullable: false),
+                    OccurredOn = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    ProcessedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_InboxMessages", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "LedgerAccounts",
                 columns: table => new
                 {
@@ -67,6 +83,12 @@ namespace Ledger.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateIndex(
+                name: "IX_InboxMessages_MessageId",
+                table: "InboxMessages",
+                column: "MessageId",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_JournalEntries_LedgerAccountId",
                 table: "JournalEntries",
                 column: "LedgerAccountId");
@@ -75,6 +97,9 @@ namespace Ledger.Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropTable(
+                name: "InboxMessages");
+
             migrationBuilder.DropTable(
                 name: "JournalEntries");
 
