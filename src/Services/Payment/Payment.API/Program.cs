@@ -24,6 +24,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
     var xmlFilename = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    c.AddServer(new OpenApiServer { Url = "/payment" });
     c.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, xmlFilename));
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "Payment API", Version = "v1" });
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme

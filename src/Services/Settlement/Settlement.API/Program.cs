@@ -27,6 +27,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
     var xmlFilename = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    c.AddServer(new OpenApiServer { Url = "/settlement" });
     c.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, xmlFilename));
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "Settlement API", Version = "v1" });
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
