@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: payment-switch-config
+  namespace: payment-switch
+data:
+  Jwt__Issuer: "IdentityService"
+  Jwt__Audience: "PaymentSwitch"
+  RabbitMQ__HostName: "rabbitmq"
+  RabbitMQ__UserName: "guest"
+  RabbitMQ__Password: "guest"
+
+  Postgres__Host: "postgres"
+  Postgres__Username: "paymentswitch"
+  Postgres__Password: "paymentswitch"
