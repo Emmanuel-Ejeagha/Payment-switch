@@ -1,0 +1,22 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: identity
+    static_configs:
+      - targets: ["identity-api:8080"]
+  - job_name: merchant
+    static_configs:
+      - targets: ["merchant-api:8080"]
+  - job_name: payment
+    static_configs:
+      - targets: ["payment-api:8080"]
+  - job_name: ledger
+    static_configs:
+      - targets: ["ledger-api:8080"]
+  - job_name: notification
+    static_configs:
+      - targets: ["notification-api:8080"]
+  - job_name: settlement
+    static_configs:
+      - targets: ["settlement-api:8080"]
