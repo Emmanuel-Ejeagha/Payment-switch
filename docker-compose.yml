@@ -1,6 +1,7 @@
 services:
   postgres:
     image: postgres:16-alpine
+    restart: always
     environment:
       POSTGRES_USER: paymentswitch
       POSTGRES_PASSWORD: paymentswitch
@@ -11,6 +12,7 @@ services:
 
   redis:
     image: redis:7-alpine
+    restart: always
     volumes:
       - redis_data:/data
     networks:
@@ -18,6 +20,7 @@ services:
 
   rabbitmq:
     image: rabbitmq:3-management-alpine
+    restart: always
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
@@ -28,6 +31,7 @@ services:
 
   jaeger:
     image: jaegertracing/all-in-one:1.58
+    restart: always
     environment:
       - COLLECTOR_OTLP_ENABLED=true
     networks:
@@ -35,6 +39,7 @@ services:
 
   prometheus:
     image: prom/prometheus:v2.53.0
+    restart: always
     volumes:
       - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus_data:/prometheus
@@ -43,6 +48,7 @@ services:
 
   grafana:
     image: grafana/grafana:10.4.3
+    restart: always
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
@@ -55,6 +61,7 @@ services:
     build:
       context: .
       dockerfile: src/Services/Identity/Identity.API/Dockerfile
+    restart: always
     environment:
       - ConnectionStrings__IdentityDb=Host=postgres;Database=IdentityDb;Username=paymentswitch;Password=paymentswitch
       - Jwt__Secret=${JWT_SECRET:-your-super-secret-key-minimum-32-bytes!}
@@ -73,6 +80,7 @@ services:
     build:
       context: .
       dockerfile: src/Services/Merchant/Merchant.API/Dockerfile
+    restart: always
     environment:
       - ConnectionStrings__MerchantDb=Host=postgres;Database=MerchantDb;Username=paymentswitch;Password=paymentswitch
       - Jwt__Secret=${JWT_SECRET:-your-super-secret-key-minimum-32-bytes!}
@@ -91,6 +99,7 @@ services:
     build:
       context: .
       dockerfile: src/Services/Payment/Payment.API/Dockerfile
+    restart: always
     environment:
       - ConnectionStrings__PaymentDb=Host=postgres;Database=PaymentDb;Username=paymentswitch;Password=paymentswitch
       - Jwt__Secret=${JWT_SECRET:-your-super-secret-key-minimum-32-bytes!}
@@ -109,6 +118,7 @@ services:
     build:
       context: .
       dockerfile: src/Services/Ledger/Ledger.API/Dockerfile
+    restart: always
     environment:
       - ConnectionStrings__LedgerDb=Host=postgres;Database=LedgerDb;Username=paymentswitch;Password=paymentswitch
       - Jwt__Secret=${JWT_SECRET:-your-super-secret-key-minimum-32-bytes!}
@@ -127,6 +137,7 @@ services:
     build:
       context: .
       dockerfile: src/Services/Notification/Notification.API/Dockerfile
+    restart: always
     environment:
       - ConnectionStrings__NotificationDb=Host=postgres;Database=NotificationDb;Username=paymentswitch;Password=paymentswitch
       - Jwt__Secret=${JWT_SECRET:-your-super-secret-key-minimum-32-bytes!}
@@ -145,6 +156,7 @@ services:
     build:
       context: .
       dockerfile: src/Services/Settlement/Settlement.API/Dockerfile
+    restart: always
     environment:
       - ConnectionStrings__SettlementDb=Host=postgres;Database=SettlementDb;Username=paymentswitch;Password=paymentswitch
       - Jwt__Secret=${JWT_SECRET}
@@ -161,6 +173,7 @@ services:
 
   nginx:
     image: nginx:alpine
+    restart: always
     volumes:
       - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     ports:
