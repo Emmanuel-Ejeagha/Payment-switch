@@ -45,7 +45,7 @@
     <Project Path="tests/Unit/BuildingBlocks.Shared.Tests/BuildingBlocks.Shared.Tests.csproj" />
     <Project Path="tests/Unit/Identity.Application.Tests/Identity.Application.Tests.csproj" />
     <Project Path="tests/Unit/Identity.Domain.Tests/Identity.Domain.Tests.csproj" />
-    <Project Path="tests/Unit/Identity.Infrastructure.Tests/Identity.Infrastructure.Tests.csproj">
+    <Project Path="tests/Unit/Identity.Infrastructure.Tests/Identity.Infrastructure.Tests.csproj" />
     <Project Path="tests/Unit/Ledger.Application.Tests/Ledger.Application.Tests.csproj" />
     <Project Path="tests/Unit/Ledger.Domain.Tests/Ledger.Domain.Tests.csproj" />
     <Project Path="tests/Unit/Merchant.Application.Tests/Merchant.Application.Tests.csproj" />
@@ -55,7 +55,7 @@
     <Project Path="tests/Unit/Payment.Application.Tests/Payment.Application.Tests.csproj" />
     <Project Path="tests/Unit/Payment.Domain.Tests/Payment.Domain.Tests.csproj" />
     <Project Path="tests/Unit/Payment.Infrastructure.Tests/Payment.Infrastructure.Tests.csproj" />
-    <Project Path="tests/Unit/Settlement.Application.Tests/Settlement.Application.Tests.csproj">
+    <Project Path="tests/Unit/Settlement.Application.Tests/Settlement.Application.Tests.csproj" />
     <Project Path="tests/Unit/Settlement.Domain.Tests/Settlement.Domain.Tests.csproj" />
   </Folder>
 </Solution>
