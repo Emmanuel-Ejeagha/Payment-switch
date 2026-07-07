@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+option csharp_namespace = "PaymentSwitch.Protos.Ledger";
+
+package ledger;
+
+service LedgerService {
+  rpc GetBalances (GetBalancesRequest) returns (GetBalancesResponse);
+  rpc GetDailyPayoutData (GetDailyPayoutDataRequest) returns (GetDailyPayoutDataResponse);
+}
+
+message GetBalancesRequest {
+  string merchant_id = 1;
+}
+
+message GetBalancesResponse {
+  double available = 1;
+  double pending = 2;
+  double reserved = 3;
+  string currency = 4;
+}
+
+message GetDailyPayoutDataRequest {
+  string date = 1;
+}
+
+message GetDailyPayoutDataResponse {
+  repeated MerchantPayoutData payouts = 1;
+}
+
+message MerchantPayoutData {
+  string merchant_id = 1;
+  double gross_volume = 2;
+  double fees = 3;
+  string currency = 4;
+}
