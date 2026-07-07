@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Settlement.Infrastructure.Messaging;
+using PaymentSwitch.Protos.Ledger;
 
 namespace Settlement.Infrastructure;
 
@@ -25,11 +26,16 @@ public static class DependencyInjection
 
         services.AddScoped<ISettlementBatchRepository, SettlementBatchRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
-        services.AddScoped<ILedgerService, MockLedgerService>();
+        services.AddScoped<ILedgerService, GrpcLedgerService>();
 
         services.Configure<RabbitMQSettings>(configuration.GetSection("RabbitMQ"));
         services.AddScoped<IEventBus, RabbitMQEventBus>();
         services.AddHostedService<OutboxPublisherService>();
+
+        services.AddGrpcClient<LedgerService.LedgerServiceClient>(o =>
+        {
+            o.Address = new Uri("http://ledger-api:5001");
+        });
 
         return services;
     }

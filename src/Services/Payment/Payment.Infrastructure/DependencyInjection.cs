@@ -7,6 +7,8 @@ using Payment.Infrastructure.Outbox;
 using Payment.Infrastructure.Persistence;
 using Payment.Infrastructure.Persistence.Repositories;
 using Payment.Infrastructure.Services;
+using PaymentSwitch.Protos.Merchant;
+
 
 namespace Payment.Infrastructure;
 
@@ -25,11 +27,16 @@ public static class DependencyInjection
 
         services.AddScoped<IPaymentIntentRepository, PaymentIntentRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
-        services.AddScoped<IPaymentGatewayService, MockPaymentGatewayService>();
+        services.AddScoped<IMerchantService, GrpcMerchantService>();
 
         services.Configure<RabbitMQSettings>(configuration.GetSection("RabbitMQ"));
         services.AddScoped<IEventBus, RabbitMQEventBus>();
         services.AddHostedService<OutboxPublisherService>();
+
+        services.AddGrpcClient<MerchantService.MerchantServiceClient>(o =>
+        {
+            o.Address = new Uri("http://merchant-api:5001");
+        });
 
         return services;
     }
