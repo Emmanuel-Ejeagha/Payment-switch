@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+option csharp_namespace = "PaymentSwitch.Protos.Merchant";
+
+package merchant;
+
+service MerchantService {
+  rpc GetMerchantStatus (GetMerchantStatusRequest) returns (GetMerchantStatusResponse);
+  rpc GetMerchantConfig (GetMerchantConfigRequest) returns (GetMerchantConfigResponse);
+}
+
+message GetMerchantStatusRequest {
+  string merchant_id = 1;
+}
+
+message GetMerchantStatusResponse {
+  string status = 1;  
+}
+
+message GetMerchantConfigRequest {
+  string merchant_id = 1;
+}
+
+message GetMerchantConfigResponse {
+  string webhook_url = 1;
+  repeated string enabled_payment_methods = 2;
+}

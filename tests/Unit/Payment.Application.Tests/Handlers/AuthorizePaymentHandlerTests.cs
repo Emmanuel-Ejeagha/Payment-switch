@@ -18,11 +18,18 @@ public class AuthorizePaymentHandlerTests
     private readonly Mock<IUnitOfWork> _uowMock = new();
     private readonly Mock<IDomainEventDispatcher> _dispatcherMock = new();
     private readonly Mock<IValidator<AuthorizePaymentCommand>> _validatorMock = new();
+    private readonly Mock<IMerchantService> _merchantServiceMock = new();
     private readonly AuthorizePaymentHandler _handler;
 
     public AuthorizePaymentHandlerTests()
     {
-        _handler = new AuthorizePaymentHandler(_repoMock.Object, _gatewayMock.Object, _uowMock.Object, _dispatcherMock.Object, _validatorMock.Object);
+        _handler = new AuthorizePaymentHandler(
+        _repoMock.Object,
+        _gatewayMock.Object,
+        _uowMock.Object,
+        _dispatcherMock.Object,
+        _validatorMock.Object,
+        _merchantServiceMock.Object);
     }
 
     [Fact]
@@ -35,6 +42,9 @@ public class AuthorizePaymentHandlerTests
         _gatewayMock.Setup(g => g.AuthorizeAsync(intent.MerchantId, intent.Amount, intent.CardDetails, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<GatewayResponse>.Success(new GatewayResponse(true, "AUTH123", "GW-1", null)));
         _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+        _merchantServiceMock
+        .Setup(m => m.GetMerchantStatusAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+        .ReturnsAsync(Result<string>.Success("active"));
 
         var result = await _handler.Handle(command);
 
@@ -63,6 +73,9 @@ public class AuthorizePaymentHandlerTests
         var intent = CreatePendingIntent();
         var command = new AuthorizePaymentCommand(intent.Id, null, null);
         SetupValidatorSuccess(command);
+        _merchantServiceMock
+    .Setup(m => m.GetMerchantStatusAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+    .ReturnsAsync(Result<string>.Success("active"));
         _repoMock.Setup(r => r.GetByIdAsync(intent.Id, It.IsAny<CancellationToken>())).ReturnsAsync(intent);
         _gatewayMock.Setup(g => g.AuthorizeAsync(intent.MerchantId, intent.Amount, intent.CardDetails, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<GatewayResponse>.Failure(new Error("Gateway.Declined", "Card declined.")));

@@ -14,19 +14,23 @@ public class AuthorizePaymentHandler
     private readonly IUnitOfWork _unitOfWork;
     private readonly IDomainEventDispatcher _dispatcher;
     private readonly IValidator<AuthorizePaymentCommand> _validator;
+    private readonly IMerchantService _merchantService;
+
 
     public AuthorizePaymentHandler(
         IPaymentIntentRepository repository,
         IPaymentGatewayService gateway,
         IUnitOfWork unitOfWork,
         IDomainEventDispatcher dispatcher,
-        IValidator<AuthorizePaymentCommand> validator)
+        IValidator<AuthorizePaymentCommand> validator,
+        IMerchantService merchantService)                
     {
         _repository = repository;
         _gateway = gateway;
         _unitOfWork = unitOfWork;
         _dispatcher = dispatcher;
         _validator = validator;
+        _merchantService = merchantService;
     }
 
     public async Task<Result<AuthorizePaymentResponse>> Handle(AuthorizePaymentCommand command, CancellationToken cancellationToken = default)
@@ -36,8 +40,12 @@ public class AuthorizePaymentHandler
             return validation.Errors.Select(e => new Error(e.PropertyName, e.ErrorMessage)).ToList();
 
         var intent = await _repository.GetByIdAsync(command.IntentId, cancellationToken);
-        if (intent is null)
-            return PaymentErrors.PaymentIntentNotFound(command.IntentId);
+        if (intent is null) return PaymentErrors.PaymentIntentNotFound(command.IntentId);
+
+        var statusResult = await _merchantService.GetMerchantStatusAsync(intent.MerchantId, cancellationToken);
+        if (!statusResult.IsSuccess) return Result<AuthorizePaymentResponse>.Failure(statusResult.Errors);
+        if (statusResult.Value != "active") return new Error("Payment.MerchantNotActive", "Merchant is not active.");
+
 
         var gatewayResult = await _gateway.AuthorizeAsync(intent.MerchantId, intent.Amount, intent.CardDetails, cancellationToken);
         if (!gatewayResult.IsSuccess)

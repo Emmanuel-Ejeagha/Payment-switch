@@ -1,9 +1,11 @@
 using BuildingBlocks.Shared;
 using Ledger.API.Middlewares;
+using Ledger.API.Services;
 using Ledger.Application;
 using Ledger.Infrastructure;
 using Ledger.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
@@ -17,6 +19,19 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseSerilog((ctx, lc) => lc.ReadFrom.Configuration(ctx.Configuration));
 var otel = builder.AddPaymentSwitchObservability("Ledger");
 otel.WithMetrics(metrics => metrics.AddPrometheusExporter());
+
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.ListenAnyIP(8080, listenOptions =>
+    {
+        listenOptions.Protocols = HttpProtocols.Http1AndHttp2;
+    });
+    options.ListenAnyIP(5001, listenOptions =>
+    {
+        listenOptions.Protocols = HttpProtocols.Http2;
+    });
+});
+builder.Services.AddGrpc();
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -94,5 +109,6 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.MapPrometheusScrapingEndpoint();
+app.MapGrpcService<LedgerGrpcService>();
 
 app.Run();
