@@ -62,8 +62,8 @@ jobs:
           file: src/Services/${{ matrix.service }}/${{ matrix.service }}.API/Dockerfile
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.service }}-api:${{ github.sha }}
-            ${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.service }}-api:latest
+            ghcr.io/${{ github.repository_owner,lower }}/${{ github.event.repository.name,lower }}/${{ matrix.service }}-api:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner,lower }}/${{ github.event.repository.name,lower }}/${{ matrix.service }}-api:latest
 
   deploy:
     name: Deploy to Kubernetes
