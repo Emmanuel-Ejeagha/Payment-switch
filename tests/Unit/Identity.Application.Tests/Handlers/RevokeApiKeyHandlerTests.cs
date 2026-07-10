@@ -35,6 +35,8 @@ public class RevokeApiKeyHandlerTests
         SetupValidatorSuccess(command);
         _userRepositoryMock.Setup(r => r.GetByIdAsync(user.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(user);
+        _userRepositoryMock.Setup(r => r.RevokeApiKeyAsync(user.Id, keyId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
         _unitOfWorkMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);
 
@@ -43,7 +45,8 @@ public class RevokeApiKeyHandlerTests
 
         // Assert
         Assert.True(result.IsSuccess);
-        Assert.NotNull(user.ApiKeys[0].RevokedAt);
+        _userRepositoryMock.Verify(r => r.RevokeApiKeyAsync(user.Id, keyId, It.IsAny<CancellationToken>()), Times.Once);
+        _dispatcherMock.Verify(d => d.DispatchAsync(It.IsAny<IReadOnlyList<DomainEvent>>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -55,6 +58,8 @@ public class RevokeApiKeyHandlerTests
         SetupValidatorSuccess(command);
         _userRepositoryMock.Setup(r => r.GetByIdAsync(user.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(user);
+        _userRepositoryMock.Setup(r => r.RevokeApiKeyAsync(user.Id, command.KeyId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);   // simulate key not found
 
         // Act
         var result = await _handler.Handle(command);
@@ -99,8 +104,8 @@ public class RevokeApiKeyHandlerTests
     private static User CreateUserWithApiKey(out Guid keyId)
     {
         var user = new User(Guid.NewGuid(), new Email("user@example.com"), new PasswordHash("hashed"), new FullName("User"));
-        keyId = Guid.NewGuid();
-        user.GenerateApiKey("hashed_key", "test");
+        var apiKey = user.GenerateApiKey("hashed_key", "test");
+        keyId = apiKey.Id;
         user.ClearDomainEvents();
         return user;
     }
