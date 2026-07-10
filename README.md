@@ -5,12 +5,28 @@ The system simulates the core backend of payment processors like Stripe, Flutter
 
 > **Designed for education, portfolio quality, and deep understanding of distributed systems.**
 
+## Live Deployment
+
+The entire stack is deployed on **AWS EC2** (t3.small) using Docker Compose.  
+You can explore the live APIs here:
+
+| Service        | Swagger UI                                         |
+|----------------|----------------------------------------------------|
+| Identity       | http://16.171.58.173/identity/swagger              |
+| Merchant       | http://16.171.58.173/merchant/swagger              |
+| Payment        | http://16.171.58.173/payment/swagger               |
+| Ledger         | http://16.171.58.173/ledger/swagger                |
+| Notification   | http://16.171.58.173/notification/swagger          |
+| Settlement     | http://16.171.58.173/settlement/swagger            |
+
+*(The instance stops automatically when credits run out, but you can always restart it.)*
+
 ---
 
 ## Architecture
-```
 
 The system follows **Domain‑Driven Design (DDD)**, **CQRS**, **Event Sourcing**, and **Event‑Driven Architecture** with **Saga** patterns for distributed transactions.
+```
 ┌─────────────┐
 │ Clients │
 │ SPA / MAPI │
@@ -51,7 +67,7 @@ The system follows **Domain‑Driven Design (DDD)**, **CQRS**, **Event Sourcing*
 |------------------------|------------------------------------------------------------------------------|
 | **Backend**            | .NET 10, ASP.NET Core, PostgreSQL 16, Redis 7, RabbitMQ 3, Hangfire          |
 | **Testing**            | xUnit, Moq, EF Core InMemory                                                 |
-| **Communication**      | REST (OpenAPI), RabbitMQ (AMQP), gRPC (planned)                              |
+| **Communication**      | REST (OpenAPI), RabbitMQ (AMQP), gRPC (internal sync calls)                 |
 | **Authentication**     | JWT, OAuth2, API Keys                                                        |
 | **Validation**         | FluentValidation                                                             |
 | **Observability**      | Serilog (structured logging), OpenTelemetry, Jaeger (tracing), Prometheus (metrics), Grafana (dashboards) |
@@ -63,7 +79,6 @@ The system follows **Domain‑Driven Design (DDD)**, **CQRS**, **Event Sourcing*
 ---
 
 ## Microservices
-
 
 | Service        | Database           | Responsibilities                                                                                     |
 |----------------|--------------------|------------------------------------------------------------------------------------------------------|
@@ -106,15 +121,15 @@ All services follow **Clean Architecture** with distinct **Domain**, **Applicati
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/your-username/PaymentSwitch.git
+   git clone https://github.com/Emmanuel-Ejeagha/Payment-switch.git
    cd PaymentSwitch
 Start infrastructure services
 
 ```bash
 docker-compose -f infra/docker-compose.yml up -d
-```
 Run each microservice (each in its own terminal)
-```bash
+
+bash
 dotnet run --project src/Services/Identity/Identity.API
 dotnet run --project src/Services/Merchant/Merchant.API
 dotnet run --project src/Services/Payment/Payment.API
@@ -122,12 +137,11 @@ dotnet run --project src/Services/Ledger/Ledger.API
 dotnet run --project src/Services/Notification/Notification.API
 dotnet run --project src/Services/Settlement/Settlement.API
 Access APIs at http://localhost:5xxx/swagger (ports are configured in launchSettings.json).
-
+```
 Kubernetes Deployment
 Ensure Kubernetes is running (Docker Desktop / minikube / kind).
 
 Create the namespace and secrets
-```
 
 ```bash
 kubectl apply -f k8s/namespace.yaml
@@ -138,8 +152,8 @@ kubectl create secret generic payment-switch-secret \
   --from-literal=Postgres__Password="paymentswitch" \
   --from-literal=IdentityDb__ConnectionString="Host=postgres;Database=IdentityDb;Username=paymentswitch;Password=paymentswitch" \
   # ... add all connection strings (see docs/deployment.md)
-Deploy all services
 ```
+Deploy all services
 
 ```bash
 kubectl apply -f k8s/
@@ -156,16 +170,15 @@ Ledger: http://localhost/ledger/swagger
 Notification: http://localhost/notification/swagger
 
 Settlement: http://localhost/settlement/swagger
-
+```
 Observability
 Tool	Access URL / Port	Purpose
 Jaeger	http://localhost:16686	Distributed traces across all services
 Prometheus	http://localhost:9090	Metrics scraping
 Grafana	http://localhost:3000	Dashboards (admin / admin)
 A pre‑configured ASP.NET Core HTTP Overview dashboard is available in Grafana showing request rate, latency percentiles, and active connections.
-```
+
 CI/CD Pipeline
-```
 The project uses GitHub Actions:
 
 Triggers: push to main and pull requests.
@@ -181,7 +194,7 @@ Secret Name	Description
 KUBE_CONFIG	Base64‑encoded kubeconfig for the target cluster
 GITHUB_TOKEN	Automatically provided by GitHub Actions
 Project Structure
-
+```
 PaymentSwitch/
 ├── src/
 │   ├── BuildingBlocks/
@@ -203,8 +216,6 @@ PaymentSwitch/
 └── PaymentSwitch.slnx
 ```
 Future Enhancements
-gRPC for internal synchronous communication
-
 Real‑time webhooks with SignalR
 
 Full OAuth2 / OpenID Connect flows
@@ -218,4 +229,3 @@ Admin Portal
 Helm charts for Kubernetes deployment
 
 Production‑ready TLS & network policies
-

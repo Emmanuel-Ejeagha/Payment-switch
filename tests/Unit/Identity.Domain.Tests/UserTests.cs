@@ -82,12 +82,11 @@ public class UserTests
     public void RevokeApiKey_ShouldRevokeAndRaiseEvent()
     {
         var user = CreateUser();
-        var keyId = Guid.NewGuid();
-        user.GenerateApiKey("hash", "test");
+        var apiKey = user.GenerateApiKey("hash", "test");
         user.ClearDomainEvents();
 
-        user.RevokeApiKey(keyId);
-        Assert.NotNull(user.ApiKeys[0].RevokedAt);
+        user.RevokeApiKey(apiKey.Id);
+        Assert.NotNull(apiKey.RevokedAt);
         Assert.Single(user.DomainEvents, e => e is ApiKeyRevokedDomainEvent);
     }
 
