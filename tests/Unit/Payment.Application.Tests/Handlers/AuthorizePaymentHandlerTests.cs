@@ -19,6 +19,7 @@ public class AuthorizePaymentHandlerTests
     private readonly Mock<IDomainEventDispatcher> _dispatcherMock = new();
     private readonly Mock<IValidator<AuthorizePaymentCommand>> _validatorMock = new();
     private readonly Mock<IMerchantService> _merchantServiceMock = new();
+    private readonly Mock<ILogger<AuthorizePaymentHandler>> _loggerMock = new();
     private readonly AuthorizePaymentHandler _handler;
 
     public AuthorizePaymentHandlerTests()
@@ -29,7 +30,7 @@ public class AuthorizePaymentHandlerTests
         _uowMock.Object,
         _dispatcherMock.Object,
         _validatorMock.Object,
-        _merchantServiceMock.Object);
+        _merchantServiceMock.Object, _loggerMock.Object);
     }
 
     [Fact]

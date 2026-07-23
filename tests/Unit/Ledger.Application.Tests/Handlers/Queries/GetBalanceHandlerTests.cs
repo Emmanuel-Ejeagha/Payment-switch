@@ -17,7 +17,8 @@ public class GetBalanceHandlerTests
 
         var repoMock = new Mock<ILedgerAccountRepository>();
         repoMock.Setup(r => r.GetByMerchantIdAsync(account.MerchantId, It.IsAny<CancellationToken>())).ReturnsAsync(account);
-        var handler = new GetBalanceHandler(repoMock.Object);
+        var loggerMock = new Mock<ILogger<GetBalanceHandler>>();
+        var handler = new GetBalanceHandler(repoMock.Object, loggerMock.Object);
 
         var result = await handler.Handle(new GetBalanceQuery(account.MerchantId));
 
@@ -31,7 +32,8 @@ public class GetBalanceHandlerTests
     {
         var repoMock = new Mock<ILedgerAccountRepository>();
         repoMock.Setup(r => r.GetByMerchantIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync((LedgerAccount?)null);
-        var handler = new GetBalanceHandler(repoMock.Object);
+        var loggerMock = new Mock<ILogger<GetBalanceHandler>>();
+        var handler = new GetBalanceHandler(repoMock.Object, loggerMock.Object);
 
         var result = await handler.Handle(new GetBalanceQuery(Guid.NewGuid()));
 

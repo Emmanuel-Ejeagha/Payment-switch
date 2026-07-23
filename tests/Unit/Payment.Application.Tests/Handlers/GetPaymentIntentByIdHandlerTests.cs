@@ -14,7 +14,8 @@ public class GetPaymentIntentByIdHandlerTests
         var repoMock = new Mock<IPaymentIntentRepository>();
         var intent = new PaymentIntent(Guid.NewGuid(), Guid.NewGuid(), new Money(50, "USD"), new IdempotencyKey("key"), PaymentMethod.Card);
         repoMock.Setup(r => r.GetByIdAsync(intent.Id, It.IsAny<CancellationToken>())).ReturnsAsync(intent);
-        var handler = new GetPaymentIntentByIdHandler(repoMock.Object);
+        var loggerMock = new Mock<ILogger<GetPaymentIntentByIdHandler>>();
+        var handler = new GetPaymentIntentByIdHandler(repoMock.Object, loggerMock.Object);
 
         var result = await handler.Handle(new GetPaymentIntentByIdQuery(intent.Id));
 
@@ -28,7 +29,8 @@ public class GetPaymentIntentByIdHandlerTests
     {
         var repoMock = new Mock<IPaymentIntentRepository>();
         repoMock.Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync((PaymentIntent?)null);
-        var handler = new GetPaymentIntentByIdHandler(repoMock.Object);
+        var loggerMock = new Mock<ILogger<GetPaymentIntentByIdHandler>>();
+        var handler = new GetPaymentIntentByIdHandler(repoMock.Object, loggerMock.Object);
 
         var result = await handler.Handle(new GetPaymentIntentByIdQuery(Guid.NewGuid()));
 

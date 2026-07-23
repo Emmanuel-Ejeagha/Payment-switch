@@ -12,7 +12,8 @@ public class GetMerchantByIdHandlerTests
         var merchant = new MerchantEntity(Guid.NewGuid(), new BusinessName("Acme"), new MerchantEmail("acme@test.com"));
         merchant.Activate();
         repoMock.Setup(r => r.GetByIdAsync(merchant.Id, It.IsAny<CancellationToken>())).ReturnsAsync(merchant);
-        var handler = new GetMerchantByIdHandler(repoMock.Object);
+        var loggerMock = new Mock<ILogger<GetMerchantByIdHandler>>();
+        var handler = new GetMerchantByIdHandler(repoMock.Object, loggerMock.Object);
 
         var result = await handler.Handle(new GetMerchantByIdQuery(merchant.Id));
 
@@ -26,7 +27,8 @@ public class GetMerchantByIdHandlerTests
     {
         var repoMock = new Mock<IMerchantRepository>();
         repoMock.Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync((MerchantEntity?)null);
-        var handler = new GetMerchantByIdHandler(repoMock.Object);
+        var loggerMock = new Mock<ILogger<GetMerchantByIdHandler>>();
+        var handler = new GetMerchantByIdHandler(repoMock.Object, loggerMock.Object);
 
         var result = await handler.Handle(new GetMerchantByIdQuery(Guid.NewGuid()));
 
