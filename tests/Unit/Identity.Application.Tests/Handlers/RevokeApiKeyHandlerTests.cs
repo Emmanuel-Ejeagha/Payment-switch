@@ -15,6 +15,7 @@ public class RevokeApiKeyHandlerTests
     private readonly Mock<IUnitOfWork> _unitOfWorkMock = new();
     private readonly Mock<IDomainEventDispatcher> _dispatcherMock = new();
     private readonly Mock<IValidator<RevokeApiKeyCommand>> _validatorMock = new();
+    private readonly Mock<ILogger<RevokeApiKeyHandler>> _loggerMock = new();
     private readonly RevokeApiKeyHandler _handler;
 
     public RevokeApiKeyHandlerTests()
@@ -23,7 +24,7 @@ public class RevokeApiKeyHandlerTests
             _userRepositoryMock.Object,
             _unitOfWorkMock.Object,
             _dispatcherMock.Object,
-            _validatorMock.Object);
+            _validatorMock.Object, _loggerMock.Object);
     }
 
     [Fact]

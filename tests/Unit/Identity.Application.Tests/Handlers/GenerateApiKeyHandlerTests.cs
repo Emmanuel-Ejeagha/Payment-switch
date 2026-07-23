@@ -15,6 +15,7 @@ public class GenerateApiKeyHandlerTests
     private readonly Mock<IUnitOfWork> _unitOfWorkMock = new();
     private readonly Mock<IDomainEventDispatcher> _dispatcherMock = new();
     private readonly Mock<IValidator<GenerateApiKeyCommand>> _validatorMock = new();
+    private readonly Mock<ILogger<GenerateApiKeyHandler>> _loggerMock = new();
     private readonly GenerateApiKeyHandler _handler;
 
     public GenerateApiKeyHandlerTests()
@@ -23,7 +24,7 @@ public class GenerateApiKeyHandlerTests
             _userRepositoryMock.Object,
             _unitOfWorkMock.Object,
             _dispatcherMock.Object,
-            _validatorMock.Object);
+            _validatorMock.Object, _loggerMock.Object);
     }
 
     [Fact]

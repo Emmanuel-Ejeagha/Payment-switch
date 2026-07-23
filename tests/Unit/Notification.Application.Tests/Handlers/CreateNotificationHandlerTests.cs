@@ -14,11 +14,12 @@ public class CreateNotificationHandlerTests
     private readonly Mock<IUnitOfWork> _uowMock = new();
     private readonly Mock<IDomainEventDispatcher> _dispatcherMock = new();
     private readonly Mock<IValidator<CreateNotificationCommand>> _validatorMock = new();
+    private readonly Mock<ILogger<CreateNotificationHandler>> _loggerMock = new();
     private readonly CreateNotificationHandler _handler;
 
     public CreateNotificationHandlerTests()
     {
-        _handler = new CreateNotificationHandler(_repoMock.Object, _uowMock.Object, _dispatcherMock.Object, _validatorMock.Object);
+        _handler = new CreateNotificationHandler(_repoMock.Object, _uowMock.Object, _dispatcherMock.Object, _validatorMock.Object, _loggerMock.Object);
     }
 
     [Fact]

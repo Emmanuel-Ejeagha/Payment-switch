@@ -17,6 +17,7 @@ public class LoginHandlerTests
     private readonly Mock<IUnitOfWork> _unitOfWorkMock = new();
     private readonly Mock<IDomainEventDispatcher> _dispatcherMock = new();
     private readonly Mock<IValidator<LoginCommand>> _validatorMock = new();
+    private readonly Mock<ILogger<LoginHandler>> _loggerMock = new();
     private readonly LoginHandler _handler;
 
     public LoginHandlerTests()
@@ -27,7 +28,7 @@ public class LoginHandlerTests
             _tokenServiceMock.Object,
             _unitOfWorkMock.Object,
             _dispatcherMock.Object,
-            _validatorMock.Object);
+            _validatorMock.Object, _loggerMock.Object);
     }
 
     [Fact]
