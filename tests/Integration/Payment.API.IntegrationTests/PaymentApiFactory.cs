@@ -24,6 +24,7 @@ public class PaymentApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["ConnectionStrings:PaymentDb"] = _postgres.GetConnectionString(),
+                ["RabbitMQ:HostName"] = "nonexistent",
                 ["Jwt:Secret"] = "test-super-secret-key-minimum-32-bytes!!",
                 ["Jwt:Issuer"] = "PaymentService",
                 ["Jwt:Audience"] = "PaymentSwitch"

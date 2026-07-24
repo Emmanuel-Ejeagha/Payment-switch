@@ -24,6 +24,7 @@ public class LedgerApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["ConnectionStrings:LedgerDb"] = _postgres.GetConnectionString(),
+                ["RabbitMQ:HostName"] = "nonexistent",
                 ["Jwt:Secret"] = "test-super-secret-key-minimum-32-bytes!!",
                 ["Jwt:Issuer"] = "LedgerService",
                 ["Jwt:Audience"] = "PaymentSwitch"
