@@ -1,0 +1,6 @@
+CREATE DATABASE "IdentityDb";
+CREATE DATABASE "MerchantDb";
+CREATE DATABASE "PaymentDb";
+CREATE DATABASE "LedgerDb";
+CREATE DATABASE "NotificationDb";
+CREATE DATABASE "SettlementDb";

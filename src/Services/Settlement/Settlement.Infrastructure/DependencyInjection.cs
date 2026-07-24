@@ -1,4 +1,5 @@
-﻿using Settlement.Application.Interfaces;
+﻿using BuildingBlocks.Shared.Configuration;
+using Settlement.Application.Interfaces;
 using Settlement.Infrastructure.Outbox;
 using Settlement.Infrastructure.Persistence;
 using Settlement.Infrastructure.Persistence.Repositories;
@@ -20,7 +21,10 @@ public static class DependencyInjection
         services.AddDbContext<AppDbContext>((sp, options) =>
         {
             var interceptor = sp.GetRequiredService<OutboxInterceptor>();
-            options.UseNpgsql(configuration.GetConnectionString("SettlementDb"))
+            options.UseNpgsql(configuration.GetConnectionString("SettlementDb"), npgsqlOptions =>
+            {
+                npgsqlOptions.EnableRetryOnFailure(3, TimeSpan.FromSeconds(10), null);
+            })
                    .AddInterceptors(interceptor);
         });
 
@@ -28,13 +32,15 @@ public static class DependencyInjection
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<ILedgerService, GrpcLedgerService>();
 
-        services.Configure<RabbitMQSettings>(configuration.GetSection("RabbitMQ"));
+        services.AddValidatedOptions<RabbitMQSettings>(configuration, "RabbitMQ",
+            s => !string.IsNullOrEmpty(s.HostName),
+            "RabbitMQ HostName is required");
         services.AddScoped<IEventBus, RabbitMQEventBus>();
         services.AddHostedService<OutboxPublisherService>();
 
         services.AddGrpcClient<LedgerService.LedgerServiceClient>(o =>
         {
-            o.Address = new Uri("http://ledger-api:5001");
+            o.Address = new Uri("http://ledger-api:8080");
         });
 
         return services;

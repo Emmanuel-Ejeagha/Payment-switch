@@ -9,11 +9,12 @@ public class UpdateMerchantConfigurationHandlerTests
     private readonly Mock<IUnitOfWork> _uowMock = new();
     private readonly Mock<IDomainEventDispatcher> _dispatcherMock = new();
     private readonly Mock<IValidator<UpdateMerchantConfigurationCommand>> _validatorMock = new();
+    private readonly Mock<ILogger<UpdateMerchantConfigurationHandler>> _loggerMock = new();
     private readonly UpdateMerchantConfigurationHandler _handler;
 
     public UpdateMerchantConfigurationHandlerTests()
     {
-        _handler = new UpdateMerchantConfigurationHandler(_repoMock.Object, _uowMock.Object, _dispatcherMock.Object, _validatorMock.Object);
+        _handler = new UpdateMerchantConfigurationHandler(_repoMock.Object, _uowMock.Object, _dispatcherMock.Object, _validatorMock.Object, _loggerMock.Object);
     }
 
     [Fact]

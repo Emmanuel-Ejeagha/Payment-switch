@@ -30,7 +30,7 @@ public class ExceptionMiddleware
             {
                 Status = 500,
                 Title = "An unexpected error occurred.",
-                Detail = ex.Message
+                Detail = "Internal server error. Please try again later."
             };
             await context.Response.WriteAsync(JsonSerializer.Serialize(problem));
         }

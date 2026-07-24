@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: payment-switch-config
+  namespace: {{ .Values.namespace }}
+data:
+  Jwt__Issuer: {{ .Values.config.jwt.issuer | quote }}
+  Jwt__Audience: {{ .Values.config.jwt.audience | quote }}
+  RabbitMQ__HostName: {{ .Values.config.rabbitmq.hostName | quote }}
+  RabbitMQ__UserName: {{ .Values.config.rabbitmq.userName | quote }}

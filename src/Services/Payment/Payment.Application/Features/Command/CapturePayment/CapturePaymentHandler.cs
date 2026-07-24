@@ -5,6 +5,7 @@ using Payment.Application.Interfaces;
 using Payment.Domain;
 using Payment.Domain.Enums;
 using Payment.Domain.ValueObjects;
+using Microsoft.Extensions.Logging;
 
 namespace Payment.Application.Features.Command.CapturePayment;
 
@@ -15,23 +16,27 @@ public class CapturePaymentHandler
     private readonly IUnitOfWork _unitOfWork;
     private readonly IDomainEventDispatcher _dispatcher;
     private readonly IValidator<CapturePaymentCommand> _validator;
+    private readonly ILogger<CapturePaymentHandler> _logger;
 
     public CapturePaymentHandler(
         IPaymentIntentRepository repository,
         IPaymentGatewayService gateway,
         IUnitOfWork unitOfWork,
         IDomainEventDispatcher dispatcher,
-        IValidator<CapturePaymentCommand> validator)
+        IValidator<CapturePaymentCommand> validator,
+        ILogger<CapturePaymentHandler> logger)
     {
         _repository = repository;
         _gateway = gateway;
         _unitOfWork = unitOfWork;
         _dispatcher = dispatcher;
         _validator = validator;
+        _logger = logger;
     }
 
     public async Task<Result<CapturePaymentResponse>> Handle(CapturePaymentCommand command, CancellationToken cancellationToken = default)
     {
+        _logger.LogInformation("Handling {CommandName} for Intent {IntentId}", nameof(CapturePaymentCommand), command.IntentId);
         var validation = await _validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
             return validation.Errors.Select(e => new Error(e.PropertyName, e.ErrorMessage)).ToList();

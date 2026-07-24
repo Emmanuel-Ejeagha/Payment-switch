@@ -1,0 +1,46 @@
+{{- if .Values.infrastructure.rabbitmq.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rabbitmq
+  namespace: {{ .Values.namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rabbitmq
+  template:
+    metadata:
+      labels:
+        app: rabbitmq
+    spec:
+      containers:
+        - name: rabbitmq
+          image: {{ .Values.infrastructure.rabbitmq.image }}
+          ports:
+            - containerPort: {{ .Values.infrastructure.rabbitmq.port }}
+            - containerPort: {{ .Values.infrastructure.rabbitmq.managementPort }}
+          env:
+            - name: RABBITMQ_DEFAULT_USER
+              value: "guest"
+            - name: RABBITMQ_DEFAULT_PASS
+              value: "guest"
+          resources:
+            {{- toYaml .Values.infrastructure.rabbitmq.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq
+  namespace: {{ .Values.namespace }}
+spec:
+  selector:
+    app: rabbitmq
+  ports:
+    - name: amqp
+      port: {{ .Values.infrastructure.rabbitmq.port }}
+      targetPort: {{ .Values.infrastructure.rabbitmq.port }}
+    - name: management
+      port: {{ .Values.infrastructure.rabbitmq.managementPort }}
+      targetPort: {{ .Values.infrastructure.rabbitmq.managementPort }}
+{{- end }}

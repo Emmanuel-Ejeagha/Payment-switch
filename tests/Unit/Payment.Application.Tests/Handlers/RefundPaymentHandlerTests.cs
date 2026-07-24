@@ -18,11 +18,12 @@ public class RefundPaymentHandlerTests
     private readonly Mock<IUnitOfWork> _uowMock = new();
     private readonly Mock<IDomainEventDispatcher> _dispatcherMock = new();
     private readonly Mock<IValidator<RefundPaymentCommand>> _validatorMock = new();
+    private readonly Mock<ILogger<RefundPaymentHandler>> _loggerMock = new();
     private readonly RefundPaymentHandler _handler;
 
     public RefundPaymentHandlerTests()
     {
-        _handler = new RefundPaymentHandler(_repoMock.Object, _gatewayMock.Object, _uowMock.Object, _dispatcherMock.Object, _validatorMock.Object);
+        _handler = new RefundPaymentHandler(_repoMock.Object, _gatewayMock.Object, _uowMock.Object, _dispatcherMock.Object, _validatorMock.Object, _loggerMock.Object);
     }
 
     [Fact]
