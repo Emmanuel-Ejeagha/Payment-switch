@@ -125,6 +125,7 @@ export default function SettlementDetailPage() {
             <p className="text-sm text-muted-foreground">No payouts in this batch</p>
           </div>
         ) : (
+          <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b bg-muted/50 text-left text-sm text-muted-foreground">
@@ -157,7 +158,8 @@ export default function SettlementDetailPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+            </table>
+          </div>
         )}
       </div>
     </div>
