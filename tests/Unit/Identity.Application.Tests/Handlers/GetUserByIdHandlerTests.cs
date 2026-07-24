@@ -17,7 +17,8 @@ public class GetUserByIdHandlerTests
         var repoMock = new Mock<IUserRepository>();
         repoMock.Setup(r => r.GetByIdAsync(user.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(user);
-        var handler = new GetUserByIdHandler(repoMock.Object);
+        var loggerMock = new Mock<ILogger<GetUserByIdHandler>>();
+        var handler = new GetUserByIdHandler(repoMock.Object, loggerMock.Object);
 
         // Act
         var result = await handler.Handle(new GetUserByIdQuery(user.Id));
@@ -36,7 +37,8 @@ public class GetUserByIdHandlerTests
         var repoMock = new Mock<IUserRepository>();
         repoMock.Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((User?)null);
-        var handler = new GetUserByIdHandler(repoMock.Object);
+        var loggerMock = new Mock<ILogger<GetUserByIdHandler>>();
+        var handler = new GetUserByIdHandler(repoMock.Object, loggerMock.Object);
 
         // Act
         var result = await handler.Handle(new GetUserByIdQuery(Guid.NewGuid()));

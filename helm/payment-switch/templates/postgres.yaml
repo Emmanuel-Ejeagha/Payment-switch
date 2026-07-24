@@ -1,0 +1,43 @@
+{{- if .Values.infrastructure.postgres.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: {{ .Values.namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: {{ .Values.infrastructure.postgres.image }}
+          ports:
+            - containerPort: {{ .Values.infrastructure.postgres.port }}
+          env:
+            - name: POSTGRES_USER
+              value: "paymentswitch"
+            - name: POSTGRES_PASSWORD
+              value: "paymentswitch"
+            - name: POSTGRES_MULTIPLE_DATABASES
+              value: "IdentityDb,MerchantDb,PaymentDb,LedgerDb,NotificationDb,SettlementDb"
+          resources:
+            {{- toYaml .Values.infrastructure.postgres.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: {{ .Values.namespace }}
+spec:
+  selector:
+    app: postgres
+  ports:
+    - port: {{ .Values.infrastructure.postgres.port }}
+      targetPort: {{ .Values.infrastructure.postgres.port }}
+{{- end }}

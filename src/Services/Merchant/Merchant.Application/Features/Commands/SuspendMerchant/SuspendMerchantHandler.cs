@@ -1,4 +1,6 @@
-﻿namespace Merchant.Application.Features.Commands.SuspendMerchant;
+﻿using Microsoft.Extensions.Logging;
+
+namespace Merchant.Application.Features.Commands.SuspendMerchant;
 
 public class SuspendMerchantHandler
 {
@@ -6,21 +8,26 @@ public class SuspendMerchantHandler
     private readonly IUnitOfWork _unitOfWork;
     private readonly IDomainEventDispatcher _dispatcher;
     private readonly IValidator<SuspendMerchantCommand> _validator;
+    private readonly ILogger<SuspendMerchantHandler> _logger;
 
     public SuspendMerchantHandler(
         IMerchantRepository repository,
         IUnitOfWork unitOfWork,
         IDomainEventDispatcher dispatcher,
-        IValidator<SuspendMerchantCommand> validator)
+        IValidator<SuspendMerchantCommand> validator,
+        ILogger<SuspendMerchantHandler> logger)
     {
         _repository = repository;
         _unitOfWork = unitOfWork;
         _dispatcher = dispatcher;
         _validator = validator;
+        _logger = logger;
     }
 
     public async Task<Result> Handle(SuspendMerchantCommand command, CancellationToken cancellationToken = default)
     {
+        _logger.LogInformation("Handling {CommandName} for Merchant {MerchantId}", nameof(SuspendMerchantCommand), command.MerchantId);
+
         var validation = await _validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
             return validation.Errors.Select(e => new Error(e.PropertyName, e.ErrorMessage)).ToList();

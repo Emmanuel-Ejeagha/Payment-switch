@@ -1,6 +1,7 @@
 ﻿using BuildingBlocks.Shared.Events;
 using BuildingBlocks.Shared.Results;
 using FluentValidation;
+using Microsoft.Extensions.Logging;
 using Settlement.Application.Interfaces;
 using Settlement.Domain.Entities;
 using Settlement.Domain.ValueObjects;
@@ -14,23 +15,28 @@ public class TriggerSettlementHandler
     private readonly IUnitOfWork _unitOfWork;
     private readonly IDomainEventDispatcher _dispatcher;
     private readonly IValidator<TriggerSettlementCommand> _validator;
+    private readonly ILogger<TriggerSettlementHandler> _logger;
 
     public TriggerSettlementHandler(
         ISettlementBatchRepository repository,
         ILedgerService ledgerService,
         IUnitOfWork unitOfWork,
         IDomainEventDispatcher dispatcher,
-        IValidator<TriggerSettlementCommand> validator)
+        IValidator<TriggerSettlementCommand> validator,
+        ILogger<TriggerSettlementHandler> logger)
     {
         _repository = repository;
         _ledgerService = ledgerService;
         _unitOfWork = unitOfWork;
         _dispatcher = dispatcher;
         _validator = validator;
+        _logger = logger;
     }
 
     public async Task<Result<Guid>> Handle(TriggerSettlementCommand command, CancellationToken cancellationToken = default)
     {
+        _logger.LogInformation("Handling {CommandName}", nameof(TriggerSettlementCommand));
+
         var validation = await _validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
             return validation.Errors.Select(e => new Error(e.PropertyName, e.ErrorMessage)).ToList();

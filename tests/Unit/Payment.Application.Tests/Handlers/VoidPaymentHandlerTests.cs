@@ -18,11 +18,12 @@ public class VoidPaymentHandlerTests
     private readonly Mock<IUnitOfWork> _uowMock = new();
     private readonly Mock<IDomainEventDispatcher> _dispatcherMock = new();
     private readonly Mock<IValidator<VoidPaymentCommand>> _validatorMock = new();
+    private readonly Mock<ILogger<VoidPaymentHandler>> _loggerMock = new();
     private readonly VoidPaymentHandler _handler;
 
     public VoidPaymentHandlerTests()
     {
-        _handler = new VoidPaymentHandler(_repoMock.Object, _gatewayMock.Object, _uowMock.Object, _dispatcherMock.Object, _validatorMock.Object);
+        _handler = new VoidPaymentHandler(_repoMock.Object, _gatewayMock.Object, _uowMock.Object, _dispatcherMock.Object, _validatorMock.Object, _loggerMock.Object);
     }
 
     [Fact]

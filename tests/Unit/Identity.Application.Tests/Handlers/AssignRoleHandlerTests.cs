@@ -13,6 +13,7 @@ public class AssignRoleHandlerTests
     private readonly Mock<IUserRepository> _userRepositoryMock = new();
     private readonly Mock<IUnitOfWork> _unitOfWorkMock = new();
     private readonly Mock<IValidator<AssignRoleCommand>> _validatorMock = new();
+    private readonly Mock<ILogger<AssignRoleHandler>> _loggerMock = new();
     private readonly AssignRoleHandler _handler;
 
     public AssignRoleHandlerTests()
@@ -20,7 +21,7 @@ public class AssignRoleHandlerTests
         _handler = new AssignRoleHandler(
             _userRepositoryMock.Object,
             _unitOfWorkMock.Object,
-            _validatorMock.Object);
+            _validatorMock.Object, _loggerMock.Object);
     }
 
     [Fact]

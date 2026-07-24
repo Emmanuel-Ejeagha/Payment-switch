@@ -1,4 +1,5 @@
-﻿using Notification.Application.Interfaces;
+﻿using BuildingBlocks.Shared.Configuration;
+using Notification.Application.Interfaces;
 using Notification.Infrastructure.Outbox;
 using Notification.Infrastructure.Persistence;
 using Notification.Infrastructure.Persistence.Repositories;
@@ -20,7 +21,10 @@ public static class DependencyInjection
         services.AddDbContext<AppDbContext>((sp, options) =>
         {
             var interceptor = sp.GetRequiredService<OutboxInterceptor>();
-            options.UseNpgsql(configuration.GetConnectionString("NotificationDb"))
+            options.UseNpgsql(configuration.GetConnectionString("NotificationDb"), npgsqlOptions =>
+            {
+                npgsqlOptions.EnableRetryOnFailure(3, TimeSpan.FromSeconds(10), null);
+            })
                    .AddInterceptors(interceptor);
         });
 
@@ -36,7 +40,9 @@ public static class DependencyInjection
         services.AddHostedService<RabbitMQConsumerService>();
         services.AddHostedService<OutboxPublisherService>();
 
-        services.Configure<RabbitMQSettings>(configuration.GetSection("RabbitMQ"));
+        services.AddValidatedOptions<RabbitMQSettings>(configuration, "RabbitMQ",
+            s => !string.IsNullOrEmpty(s.HostName),
+            "RabbitMQ HostName is required");
         services.AddScoped<IEventBus, RabbitMQEventBus>();
         services.AddScoped<HttpClient>(_ => new HttpClient());
 

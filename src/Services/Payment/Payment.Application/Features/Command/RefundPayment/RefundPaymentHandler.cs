@@ -5,6 +5,7 @@ using Payment.Application.Interfaces;
 using Payment.Domain;
 using Payment.Domain.Enums;
 using Payment.Domain.ValueObjects;
+using Microsoft.Extensions.Logging;
 
 namespace Payment.Application.Features.Command.RefundPayment;
 
@@ -15,23 +16,27 @@ public class RefundPaymentHandler
     private readonly IUnitOfWork _unitOfWork;
     private readonly IDomainEventDispatcher _dispatcher;
     private readonly IValidator<RefundPaymentCommand> _validator;
+    private readonly ILogger<RefundPaymentHandler> _logger;
 
     public RefundPaymentHandler(
         IPaymentIntentRepository repository,
         IPaymentGatewayService gateway,
         IUnitOfWork unitOfWork,
         IDomainEventDispatcher dispatcher,
-        IValidator<RefundPaymentCommand> validator)
+        IValidator<RefundPaymentCommand> validator,
+        ILogger<RefundPaymentHandler> logger)
     {
         _repository = repository;
         _gateway = gateway;
         _unitOfWork = unitOfWork;
         _dispatcher = dispatcher;
         _validator = validator;
+        _logger = logger;
     }
 
     public async Task<Result<RefundPaymentResponse>> Handle(RefundPaymentCommand command, CancellationToken cancellationToken = default)
     {
+        _logger.LogInformation("Handling {CommandName} for Intent {IntentId}", nameof(RefundPaymentCommand), command.IntentId);
         var validation = await _validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
             return validation.Errors.Select(e => new Error(e.PropertyName, e.ErrorMessage)).ToList();

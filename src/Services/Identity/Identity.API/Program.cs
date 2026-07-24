@@ -1,10 +1,18 @@
+using Asp.Versioning.ApiExplorer;
 using BuildingBlocks.Shared;
+using BuildingBlocks.Shared.Data;
+using BuildingBlocks.Shared.HealthChecks;
+using BuildingBlocks.Shared.Middleware;
+using BuildingBlocks.Shared.RateLimiting;
+using BuildingBlocks.Shared.Versioning;
+using BuildingBlocks.Shared.Caching;
 using Identity.API.Middlewares;
 using Identity.Application;
 using Identity.Infrastructure;
 using Identity.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using OpenTelemetry.Metrics;
@@ -74,26 +82,58 @@ builder.Services.AddCors(options =>
 builder.Services.AddApplication(); 
 builder.Services.AddIdentityInfrastructure(builder.Configuration);
 
+builder.Services.AddCorrelationId();
+builder.Services.AddPaymentSwitchRateLimiting();
+builder.Services.AddPaymentSwitchVersioning();
+builder.Services.AddPaymentSwitchOutputCache();
+
+builder.Services.AddPaymentSwitchHealthChecks()
+    .AddDbContextCheck<AppDbContext>("db", tags: ["ready"])
+    .AddCheck("rabbitmq", () =>
+    {
+        try
+        {
+            using var tcp = new System.Net.Sockets.TcpClient();
+            tcp.Connect(builder.Configuration["RabbitMQ:HostName"] ?? "localhost", 5672);
+            return HealthCheckResult.Healthy();
+        }
+        catch (Exception ex)
+        {
+            return HealthCheckResult.Unhealthy("RabbitMQ unreachable", ex);
+        }
+    }, tags: ["ready"]);
+
 var app = builder.Build();
 
+app.MigrateDatabase<AppDbContext>();
+
+app.UsePaymentSwitchSecurityHeaders();
+app.UseCorrelationId();
+app.UseRequestSizeLimit();
 app.UseMiddleware<ExceptionMiddleware>();
 app.UseSerilogRequestLogging();
+app.UseSwagger(c => c.RouteTemplate = "{documentName}/swagger.json");
 
-app.UseSwagger();
-app.UseSwaggerUI();
-
-using (var scope = app.Services.CreateScope())
+app.UseSwaggerUI(options =>
 {
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.Migrate();
-}
+    options.RoutePrefix = "swagger";
+    var provider = app.Services.GetRequiredService<IApiVersionDescriptionProvider>();
+    foreach (var description in provider.ApiVersionDescriptions)
+    {
+        options.SwaggerEndpoint($"../{description.GroupName}/swagger.json",
+            description.GroupName.ToUpperInvariant());
+    }
+});
 
 app.UseCors("AllowFrontend");
+app.UseRateLimiter();
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UsePaymentSwitchOutputCache();
 
 app.MapControllers();
 app.MapPrometheusScrapingEndpoint();
+app.MapPaymentSwitchHealthEndpoints();
 
 app.Run();

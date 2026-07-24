@@ -15,11 +15,12 @@ public class CreatePaymentIntentHandlerTests
     private readonly Mock<IUnitOfWork> _uowMock = new();
     private readonly Mock<IDomainEventDispatcher> _dispatcherMock = new();
     private readonly Mock<IValidator<CreatePaymentIntentCommand>> _validatorMock = new();
+    private readonly Mock<ILogger<CreatePaymentIntentHandler>> _loggerMock = new();
     private readonly CreatePaymentIntentHandler _handler;
 
     public CreatePaymentIntentHandlerTests()
     {
-        _handler = new CreatePaymentIntentHandler(_repoMock.Object, _uowMock.Object, _dispatcherMock.Object, _validatorMock.Object);
+        _handler = new CreatePaymentIntentHandler(_repoMock.Object, _uowMock.Object, _dispatcherMock.Object, _validatorMock.Object, _loggerMock.Object);
     }
 
     [Fact]

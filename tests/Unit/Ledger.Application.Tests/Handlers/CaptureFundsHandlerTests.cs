@@ -15,11 +15,12 @@ public class CaptureFundsHandlerTests
     private readonly Mock<IUnitOfWork> _uowMock = new();
     private readonly Mock<IDomainEventDispatcher> _dispatcherMock = new();
     private readonly Mock<IValidator<CaptureFundsCommand>> _validatorMock = new();
+    private readonly Mock<ILogger<CaptureFundsHandler>> _loggerMock = new();
     private readonly CaptureFundsHandler _handler;
 
     public CaptureFundsHandlerTests()
     {
-        _handler = new CaptureFundsHandler(_repoMock.Object, _uowMock.Object, _dispatcherMock.Object, _validatorMock.Object);
+        _handler = new CaptureFundsHandler(_repoMock.Object, _uowMock.Object, _dispatcherMock.Object, _validatorMock.Object, _loggerMock.Object);
     }
 
     [Fact]

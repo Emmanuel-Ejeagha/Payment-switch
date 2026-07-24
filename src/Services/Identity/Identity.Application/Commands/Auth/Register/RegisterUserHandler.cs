@@ -5,6 +5,7 @@ using Identity.Application.Interfaces;
 using Identity.Domain.DomainErrors;
 using Identity.Domain.Entities;
 using Identity.Domain.ValueObjects;
+using Microsoft.Extensions.Logging;
 
 namespace Identity.Application.Commands.Auth.Register;
 
@@ -15,23 +16,27 @@ public class RegisterUserHandler
     private readonly IUnitOfWork _unitOfWork;
     private readonly IDomainEventDispatcher _dispatcher;
     private readonly IValidator<RegisterUserCommand> _validator;
+    private readonly ILogger<RegisterUserHandler> _logger;
 
     public RegisterUserHandler(
         IUserRepository userRepository,
         IPasswordHasher passwordHasher,
         IUnitOfWork unitOfWork,
         IDomainEventDispatcher dispatcher,
-        IValidator<RegisterUserCommand> validator)
+        IValidator<RegisterUserCommand> validator,
+        ILogger<RegisterUserHandler> logger)
     {
         _userRepository = userRepository;
         _passwordHasher = passwordHasher;
         _unitOfWork = unitOfWork;
         _dispatcher = dispatcher;
         _validator = validator;
+        _logger = logger;
     }
 
     public async Task<Result<RegisterUserResponse>> Handle(RegisterUserCommand command, CancellationToken cancellationToken = default)
     {
+        _logger.LogInformation("Handling {CommandName} for {Identifier}", nameof(RegisterUserCommand), command.Email);
         var validationResult = await _validator.ValidateAsync(command, cancellationToken);
 
         if (!validationResult.IsValid)
