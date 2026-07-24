@@ -29,7 +29,10 @@ jobs:
         run: dotnet build PaymentSwitch.slnx --configuration Release --no-restore
 
       - name: Run unit tests
-        run: dotnet test PaymentSwitch.slnx --configuration Release --no-build --verbosity normal
+        run: dotnet test tests/Unit/*/*.csproj --configuration Release --no-build --verbosity normal
+
+      - name: Run integration tests
+        run: dotnet test tests/Integration/*/*.csproj --configuration Release --no-build --verbosity normal
 
   docker:
     name: Docker Build & Push
