@@ -22,9 +22,9 @@
       }
     ],
     "paths": {
-      "@/*": [
-        "./src/*"
-      ]
+      "@/*": ["./src/*"],
+      "@paymentswitch/shared": ["../../packages/shared/src"],
+      "@paymentswitch/ui": ["../../packages/ui/src"]
     },
     "target": "ES2017"
   },
