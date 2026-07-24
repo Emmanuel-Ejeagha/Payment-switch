@@ -137,7 +137,7 @@ export default function LedgerPage() {
               </div>
             ) : (
               <>
-                <table className="w-full">
+                <div className="overflow-x-auto"><table className="w-full">
                   <thead>
                     <tr className="border-b bg-muted/50 text-left text-sm text-muted-foreground">
                       <th className="px-6 py-3 font-medium">Type</th>
@@ -169,6 +169,7 @@ export default function LedgerPage() {
                     ))}
                   </tbody>
                 </table>
+              </div>
                 <div className="flex items-center justify-between px-6 py-3 text-sm text-muted-foreground">
                   <p>Showing {skip + 1}–{skip + transactions.length}</p>
                   <div className="flex items-center gap-2">

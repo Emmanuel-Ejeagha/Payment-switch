@@ -111,7 +111,7 @@ export default function MerchantsPage() {
         </div>
       ) : (
         <>
-          <div className="overflow-hidden rounded-xl border">
+          <div className="overflow-x-auto rounded-xl border">
             <table className="w-full">
               <thead>
                 <tr className="border-b bg-muted/50 text-left text-sm text-muted-foreground">
