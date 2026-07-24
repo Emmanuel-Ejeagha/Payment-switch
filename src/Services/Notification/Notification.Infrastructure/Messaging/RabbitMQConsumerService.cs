@@ -3,6 +3,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Notification.Application.Features.Commands.CreateNotification;
+using Notification.Application.Interfaces;
 using Notification.Infrastructure.Inbox;
 using Notification.Infrastructure.Persistence;
 using RabbitMQ.Client;
@@ -20,6 +21,7 @@ public class RabbitMQConsumerService : BackgroundService
     private IConnection? _connection;
     private IChannel? _channel;
     private readonly string _queueName = "notification.events";
+
 
     public RabbitMQConsumerService(
         IOptions<RabbitMQSettings> settings,
@@ -75,6 +77,10 @@ public class RabbitMQConsumerService : BackgroundService
             using var scope = _scopeFactory.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var createHandler = scope.ServiceProvider.GetRequiredService<CreateNotificationHandler>();
+            var realTimeNotifier = scope.ServiceProvider.GetRequiredService<IRealTimeNotifier>();
+
+            // Extract merchantId from the event for real-time notification
+            Guid? merchantId = null;
 
             try
             {
@@ -89,19 +95,45 @@ public class RabbitMQConsumerService : BackgroundService
                 db.InboxMessages.Add(inboxMsg);
                 await db.SaveChangesAsync(cancellationToken);
 
-                CreateNotificationCommand? command = eventType switch
+                CreateNotificationCommand? command = null;
+
+                switch (eventType)
                 {
-                    "PaymentAuthorizedDomainEvent" => MapAuthorized(body),
-                    "PaymentCapturedDomainEvent" => MapCaptured(body),
-                    "PaymentRefundedDomainEvent" => MapRefunded(body),
-                    _ => null
-                };
+                    case "PaymentAuthorizedDomainEvent":
+                        var authEvent = JsonSerializer.Deserialize<PaymentAuthorizedEvent>(body)!;
+                        command = MapAuthorized(body);
+                        merchantId = authEvent.MerchantId;
+                        break;
+
+                    case "PaymentCapturedDomainEvent":
+                        var captEvent = JsonSerializer.Deserialize<PaymentCapturedEvent>(body)!;
+                        command = MapCaptured(body);
+                        merchantId = captEvent.MerchantId;
+                        break;
+
+                    case "PaymentRefundedDomainEvent":
+                        var refEvent = JsonSerializer.Deserialize<PaymentRefundedEvent>(body)!;
+                        command = MapRefunded(body);
+                        merchantId = refEvent.MerchantId;
+                        break;
+                }
 
                 if (command != null)
                 {
                     var result = await createHandler.Handle(command, cancellationToken);
                     if (result.IsSuccess)
+                    {
                         _logger.LogInformation("Created notification for {EventType} ({MessageId})", eventType, messageId);
+
+                        if (merchantId.HasValue)
+                        {
+                            await realTimeNotifier.NotifyPaymentEventAsync(
+                                merchantId.Value,
+                                eventType,
+                                $"Payment {eventType} processed.",
+                                cancellationToken);
+                        }
+                    }
                 }
 
                 inboxMsg.MarkAsProcessed();

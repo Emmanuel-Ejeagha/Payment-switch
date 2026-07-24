@@ -6,11 +6,12 @@ public class SuspendMerchantHandlerTests
     private readonly Mock<IUnitOfWork> _uowMock = new();
     private readonly Mock<IDomainEventDispatcher> _dispatcherMock = new();
     private readonly Mock<IValidator<SuspendMerchantCommand>> _validatorMock = new();
+    private readonly Mock<ILogger<SuspendMerchantHandler>> _loggerMock = new();
     private readonly SuspendMerchantHandler _handler;
 
     public SuspendMerchantHandlerTests()
     {
-        _handler = new SuspendMerchantHandler(_repoMock.Object, _uowMock.Object, _dispatcherMock.Object, _validatorMock.Object);
+        _handler = new SuspendMerchantHandler(_repoMock.Object, _uowMock.Object, _dispatcherMock.Object, _validatorMock.Object, _loggerMock.Object);
     }
 
     [Fact]

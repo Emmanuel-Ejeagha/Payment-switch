@@ -15,7 +15,8 @@ public class GetSettlementBatchHandlerTests
         batch.AddPayout(Guid.NewGuid(), new Money(100, "USD"), new Money(5, "USD"));
         var repoMock = new Mock<ISettlementBatchRepository>();
         repoMock.Setup(r => r.GetByIdAsync(batch.Id, It.IsAny<CancellationToken>())).ReturnsAsync(batch);
-        var handler = new GetSettlementBatchHandler(repoMock.Object);
+        var loggerMock = new Mock<ILogger<GetSettlementBatchHandler>>();
+        var handler = new GetSettlementBatchHandler(repoMock.Object, loggerMock.Object);
 
         var result = await handler.Handle(new GetSettlementBatchQuery(batch.Id));
 
@@ -29,7 +30,8 @@ public class GetSettlementBatchHandlerTests
     {
         var repoMock = new Mock<ISettlementBatchRepository>();
         repoMock.Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync((SettlementBatch?)null);
-        var handler = new GetSettlementBatchHandler(repoMock.Object);
+        var loggerMock = new Mock<ILogger<GetSettlementBatchHandler>>();
+        var handler = new GetSettlementBatchHandler(repoMock.Object, loggerMock.Object);
 
         var result = await handler.Handle(new GetSettlementBatchQuery(Guid.NewGuid()));
 

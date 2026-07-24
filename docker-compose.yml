@@ -2,11 +2,20 @@ services:
   postgres:
     image: postgres:16-alpine
     restart: always
+    ports:
+      - "5432:5432"
     environment:
       POSTGRES_USER: paymentswitch
       POSTGRES_PASSWORD: paymentswitch
     volumes:
       - postgres_data:/var/lib/postgresql/data
+            - ./infra/postgres/init-multiple-databases.sql:/docker-entrypoint-initdb.d/init-multiple-databases.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U paymentswitch"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     networks:
       - paymentswitch-network
 
@@ -21,6 +30,9 @@ services:
   rabbitmq:
     image: rabbitmq:3-management-alpine
     restart: always
+    ports:
+      - "5672:5672"
+      - "15672:15672"
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
@@ -62,7 +74,12 @@ services:
       context: .
       dockerfile: src/Services/Identity/Identity.API/Dockerfile
     restart: always
+    ports:
+      - "5146:8080"
     environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://0.0.0.0:8080
+      - RunMigrations=true
       - ConnectionStrings__IdentityDb=Host=postgres;Database=IdentityDb;Username=paymentswitch;Password=paymentswitch
       - Jwt__Secret=${JWT_SECRET:-your-super-secret-key-minimum-32-bytes!}
       - Jwt__Issuer=IdentityService
@@ -71,8 +88,10 @@ services:
       - RabbitMQ__UserName=guest
       - RabbitMQ__Password=guest
     depends_on:
-      - postgres
-      - rabbitmq
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
     networks:
       - paymentswitch-network
 
@@ -81,7 +100,12 @@ services:
       context: .
       dockerfile: src/Services/Merchant/Merchant.API/Dockerfile
     restart: always
+    ports:
+      - "5237:8080"
     environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://0.0.0.0:8080
+      - RunMigrations=true
       - ConnectionStrings__MerchantDb=Host=postgres;Database=MerchantDb;Username=paymentswitch;Password=paymentswitch
       - Jwt__Secret=${JWT_SECRET:-your-super-secret-key-minimum-32-bytes!}
       - Jwt__Issuer=IdentityService
@@ -90,8 +114,10 @@ services:
       - RabbitMQ__UserName=guest
       - RabbitMQ__Password=guest
     depends_on:
-      - postgres
-      - rabbitmq
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
     networks:
       - paymentswitch-network
 
@@ -100,7 +126,12 @@ services:
       context: .
       dockerfile: src/Services/Payment/Payment.API/Dockerfile
     restart: always
+    ports:
+      - "5118:8080"
     environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://0.0.0.0:8080
+      - RunMigrations=true
       - ConnectionStrings__PaymentDb=Host=postgres;Database=PaymentDb;Username=paymentswitch;Password=paymentswitch
       - Jwt__Secret=${JWT_SECRET:-your-super-secret-key-minimum-32-bytes!}
       - Jwt__Issuer=IdentityService
@@ -109,8 +140,10 @@ services:
       - RabbitMQ__UserName=guest
       - RabbitMQ__Password=guest
     depends_on:
-      - postgres
-      - rabbitmq
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
     networks:
       - paymentswitch-network
 
@@ -119,7 +152,12 @@ services:
       context: .
       dockerfile: src/Services/Ledger/Ledger.API/Dockerfile
     restart: always
+    ports:
+      - "5320:8080"
     environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://0.0.0.0:8080
+      - RunMigrations=true
       - ConnectionStrings__LedgerDb=Host=postgres;Database=LedgerDb;Username=paymentswitch;Password=paymentswitch
       - Jwt__Secret=${JWT_SECRET:-your-super-secret-key-minimum-32-bytes!}
       - Jwt__Issuer=IdentityService
@@ -128,8 +166,10 @@ services:
       - RabbitMQ__UserName=guest
       - RabbitMQ__Password=guest
     depends_on:
-      - postgres
-      - rabbitmq
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
     networks:
       - paymentswitch-network
 
@@ -138,7 +178,12 @@ services:
       context: .
       dockerfile: src/Services/Notification/Notification.API/Dockerfile
     restart: always
+    ports:
+      - "5281:8080"
     environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://0.0.0.0:8080
+      - RunMigrations=true
       - ConnectionStrings__NotificationDb=Host=postgres;Database=NotificationDb;Username=paymentswitch;Password=paymentswitch
       - Jwt__Secret=${JWT_SECRET:-your-super-secret-key-minimum-32-bytes!}
       - Jwt__Issuer=IdentityService
@@ -147,8 +192,10 @@ services:
       - RabbitMQ__UserName=guest
       - RabbitMQ__Password=guest
     depends_on:
-      - postgres
-      - rabbitmq
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
     networks:
       - paymentswitch-network
 
@@ -157,17 +204,24 @@ services:
       context: .
       dockerfile: src/Services/Settlement/Settlement.API/Dockerfile
     restart: always
+    ports:
+      - "5392:8080"
     environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://0.0.0.0:8080
+      - RunMigrations=true
       - ConnectionStrings__SettlementDb=Host=postgres;Database=SettlementDb;Username=paymentswitch;Password=paymentswitch
-      - Jwt__Secret=${JWT_SECRET}
+      - Jwt__Secret=${JWT_SECRET:-your-super-secret-key-minimum-32-bytes!}
       - Jwt__Issuer=IdentityService
       - Jwt__Audience=PaymentSwitch
       - RabbitMQ__HostName=rabbitmq
       - RabbitMQ__UserName=guest
       - RabbitMQ__Password=guest
     depends_on:
-      - postgres
-      - rabbitmq
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
     networks:
       - paymentswitch-network
 

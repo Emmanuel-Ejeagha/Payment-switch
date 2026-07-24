@@ -13,7 +13,8 @@ public class ListNotificationsHandlerTests
         var dtos = new List<NotificationDto> { new(Guid.NewGuid(), "a@b.com", "email", "s", "b", null, "pending", 0, null, DateTime.UtcNow, null) };
         var repoMock = new Mock<INotificationRepository>();
         repoMock.Setup(r => r.ListAsync(null, null, null, 0, 10, It.IsAny<CancellationToken>())).ReturnsAsync(dtos);
-        var handler = new ListNotificationsHandler(repoMock.Object);
+        var loggerMock = new Mock<ILogger<ListNotificationsHandler>>();
+        var handler = new ListNotificationsHandler(repoMock.Object, loggerMock.Object);
 
         var result = await handler.Handle(new ListNotificationsQuery(null, null, null, 0, 10));
 

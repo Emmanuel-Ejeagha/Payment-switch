@@ -1,0 +1,26 @@
+﻿<!DOCTYPE html>
+<html>
+<head><title>SignalR Test</title></head>
+<body>
+    <h2>Payment Notifications</h2>
+    <input id="merchantId" placeholder="Merchant ID" />
+    <button onclick="connect()">Connect</button>
+    <ul id="messages"></ul>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/6.0.1/signalr.js"></script>
+    <script>
+        async function connect() {
+            const merchantId = document.getElementById('merchantId').value;
+            const connection = new signalR.HubConnectionBuilder()
+                .withUrl(`/hubs/payment-notifications?merchantId=${merchantId}`)
+                .build();
+            connection.on("PaymentEvent", data => {
+                const li = document.createElement("li");
+                li.textContent = `${data.eventType}: ${data.message} at ${data.timestamp}`;
+                document.getElementById("messages").appendChild(li);
+            });
+            await connection.start();
+            alert("Connected!");
+        }
+    </script>
+</body>
+</html>

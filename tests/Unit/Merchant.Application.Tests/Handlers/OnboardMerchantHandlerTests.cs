@@ -8,11 +8,12 @@ public class OnboardMerchantHandlerTests
     private readonly Mock<IUnitOfWork> _uowMock = new();
     private readonly Mock<IDomainEventDispatcher> _dispatcherMock = new();
     private readonly Mock<IValidator<OnboardMerchantCommand>> _validatorMock = new();
+    private readonly Mock<ILogger<OnboardMerchantHandler>> _loggerMock = new();
     private readonly OnboardMerchantHandler _handler;
 
     public OnboardMerchantHandlerTests()
     {
-        _handler = new OnboardMerchantHandler(_repoMock.Object, _uowMock.Object, _dispatcherMock.Object, _validatorMock.Object);
+        _handler = new OnboardMerchantHandler(_repoMock.Object, _uowMock.Object, _dispatcherMock.Object, _validatorMock.Object, _loggerMock.Object);
     }
 
     [Fact]
