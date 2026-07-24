@@ -107,6 +107,12 @@ var app = builder.Build();
 
 app.MigrateDatabase<AppDbContext>();
 
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    DataSeeder.SeedAsync(db).GetAwaiter().GetResult();
+}
+
 app.UsePaymentSwitchSecurityHeaders();
 app.UseCorrelationId();
 app.UseRequestSizeLimit();
