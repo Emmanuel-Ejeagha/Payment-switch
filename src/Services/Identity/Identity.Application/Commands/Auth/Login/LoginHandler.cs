@@ -4,6 +4,7 @@ using FluentValidation;
 using FluentValidation.Results;
 using Identity.Application.Interfaces;
 using Identity.Domain.DomainErrors;
+using Microsoft.Extensions.Logging;
 
 namespace Identity.Application.Commands.Auth.Login;
 
@@ -15,8 +16,9 @@ public class LoginHandler
     private readonly IUnitOfWork _unitOfWork;
     private readonly IDomainEventDispatcher _dispatcher;
     private readonly IValidator<LoginCommand> _validator;
+    private readonly ILogger<LoginHandler> _logger;
 
-    public LoginHandler(IUserRepository userRepository, IPasswordHasher passwordHasher, ITokenService tokenService, IUnitOfWork unitOfWork, IDomainEventDispatcher dispatcher, IValidator<LoginCommand> validator)
+    public LoginHandler(IUserRepository userRepository, IPasswordHasher passwordHasher, ITokenService tokenService, IUnitOfWork unitOfWork, IDomainEventDispatcher dispatcher, IValidator<LoginCommand> validator, ILogger<LoginHandler> logger)
     {
         _userRepository = userRepository;
         _passwordHasher = passwordHasher;
@@ -24,10 +26,12 @@ public class LoginHandler
         _unitOfWork = unitOfWork;
         _dispatcher = dispatcher;
         _validator = validator;
+        _logger = logger;
     }
 
     public async Task<Result<LoginResponse>> Handle(LoginCommand command, CancellationToken cancellationToken = default)
     {
+        _logger.LogInformation("Handling {CommandName} for {Identifier}", nameof(LoginCommand), command.Email);
         var validationResult = await _validator.ValidateAsync(command, cancellationToken);
         if (!validationResult.IsValid)
             return validationResult.Errors.Select(e => new Error(e.PropertyName, e.ErrorMessage)).ToList();

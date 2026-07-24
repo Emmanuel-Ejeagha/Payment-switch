@@ -17,6 +17,7 @@ public class RegisterUserHandlerTests
     private readonly Mock<IUnitOfWork> _unitOfWorkMock = new();
     private readonly Mock<IDomainEventDispatcher> _dispatcherMock = new();
     private readonly Mock<IValidator<RegisterUserCommand>> _validatorMock = new();
+    private readonly Mock<ILogger<RegisterUserHandler>> _loggerMock = new();
     private readonly RegisterUserHandler _handler;
 
     public RegisterUserHandlerTests()
@@ -26,7 +27,7 @@ public class RegisterUserHandlerTests
             _passwordHasherMock.Object,
             _unitOfWorkMock.Object,
             _dispatcherMock.Object,
-            _validatorMock.Object);
+            _validatorMock.Object, _loggerMock.Object);
     }
 
     [Fact]

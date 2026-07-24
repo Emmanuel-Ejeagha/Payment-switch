@@ -2,6 +2,7 @@
 using FluentValidation;
 using Identity.Application.Interfaces;
 using Identity.Domain.DomainErrors;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -13,16 +14,19 @@ public class AssignRoleHandler
     private readonly IUserRepository _userRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IValidator<AssignRoleCommand> _validator;
+    private readonly ILogger<AssignRoleHandler> _logger;
 
-    public AssignRoleHandler(IUserRepository userRepository, IUnitOfWork unitOfWork, IValidator<AssignRoleCommand> validator)
+    public AssignRoleHandler(IUserRepository userRepository, IUnitOfWork unitOfWork, IValidator<AssignRoleCommand> validator, ILogger<AssignRoleHandler> logger)
     {
         _userRepository = userRepository;
         _unitOfWork = unitOfWork;
         _validator = validator;
+        _logger = logger;
     }
 
     public async Task<Result> Handle(AssignRoleCommand command, CancellationToken cancellationToken = default)
     {
+        _logger.LogInformation("Handling {CommandName}", nameof(AssignRoleCommand));
         var validationResult = await _validator.ValidateAsync(command, cancellationToken);
         if (!validationResult.IsValid)
             return validationResult.Errors.Select(e => new Error(e.PropertyName, e.ErrorMessage)).ToList();

@@ -17,13 +17,14 @@ public class TriggerSettlementHandlerTests
     private readonly Mock<IUnitOfWork> _uowMock = new();
     private readonly Mock<IDomainEventDispatcher> _dispatcherMock = new();
     private readonly Mock<IValidator<TriggerSettlementCommand>> _validatorMock = new();
+    private readonly Mock<ILogger<TriggerSettlementHandler>> _loggerMock = new();
     private readonly TriggerSettlementHandler _handler;
 
     public TriggerSettlementHandlerTests()
     {
         _handler = new TriggerSettlementHandler(
             _repoMock.Object, _ledgerMock.Object,
-            _uowMock.Object, _dispatcherMock.Object, _validatorMock.Object);
+            _uowMock.Object, _dispatcherMock.Object, _validatorMock.Object, _loggerMock.Object);
     }
 
     [Fact]

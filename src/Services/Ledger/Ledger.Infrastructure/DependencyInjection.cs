@@ -1,4 +1,5 @@
-﻿using Ledger.Application.Interfaces;
+﻿using BuildingBlocks.Shared.Configuration;
+using Ledger.Application.Interfaces;
 using Ledger.Infrastructure.Messaging;
 using Ledger.Infrastructure.Outbox;
 using Ledger.Infrastructure.Persistence;
@@ -18,14 +19,19 @@ public static class DependencyInjection
         services.AddDbContext<AppDbContext>((sp, options) =>
         {
             var interceptor = sp.GetRequiredService<OutboxInterceptor>();
-            options.UseNpgsql(configuration.GetConnectionString("LedgerDb"))
+            options.UseNpgsql(configuration.GetConnectionString("LedgerDb"), npgsqlOptions =>
+            {
+                npgsqlOptions.EnableRetryOnFailure(3, TimeSpan.FromSeconds(10), null);
+            })
                    .AddInterceptors(interceptor);
         });
 
         services.AddScoped<ILedgerAccountRepository, LedgerAccountRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
-        services.Configure<RabbitMQSettings>(configuration.GetSection("RabbitMQ"));
+        services.AddValidatedOptions<RabbitMQSettings>(configuration, "RabbitMQ",
+            s => !string.IsNullOrEmpty(s.HostName),
+            "RabbitMQ HostName is required");
         services.AddScoped<IEventBus, RabbitMQEventBus>();
         services.AddHostedService<OutboxPublisherService>();
 

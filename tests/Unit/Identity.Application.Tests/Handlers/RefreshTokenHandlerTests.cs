@@ -17,6 +17,7 @@ public class RefreshTokenHandlerTests
     private readonly Mock<IUnitOfWork> _unitOfWorkMock = new();
     private readonly Mock<IDomainEventDispatcher> _dispatcherMock = new();
     private readonly Mock<IValidator<RefreshTokenCommand>> _validatorMock = new();
+    private readonly Mock<ILogger<RefreshTokenHandler>> _loggerMock = new();
     private readonly RefreshTokenHandler _handler;
 
     public RefreshTokenHandlerTests()
@@ -26,7 +27,7 @@ public class RefreshTokenHandlerTests
             _tokenServiceMock.Object,
             _unitOfWorkMock.Object,
             _dispatcherMock.Object,
-            _validatorMock.Object);
+            _validatorMock.Object, _loggerMock.Object);
     }
 
     [Fact]

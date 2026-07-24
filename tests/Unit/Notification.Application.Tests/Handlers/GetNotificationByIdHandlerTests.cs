@@ -14,7 +14,8 @@ public class GetNotificationByIdHandlerTests
         var notification = new NotificationEntity(Guid.NewGuid(), "test@test.com", NotificationChannel.Email, "Sub", "Bod", null, "{}");
         var repoMock = new Mock<INotificationRepository>();
         repoMock.Setup(r => r.GetByIdAsync(notification.Id, It.IsAny<CancellationToken>())).ReturnsAsync(notification);
-        var handler = new GetNotificationByIdHandler(repoMock.Object);
+        var loggerMock = new Mock<ILogger<GetNotificationByIdHandler>>();
+        var handler = new GetNotificationByIdHandler(repoMock.Object, loggerMock.Object);
 
         var result = await handler.Handle(new GetNotificationByIdQuery(notification.Id));
 
@@ -27,7 +28,8 @@ public class GetNotificationByIdHandlerTests
     {
         var repoMock = new Mock<INotificationRepository>();
         repoMock.Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync((NotificationEntity?)null);
-        var handler = new GetNotificationByIdHandler(repoMock.Object);
+        var loggerMock = new Mock<ILogger<GetNotificationByIdHandler>>();
+        var handler = new GetNotificationByIdHandler(repoMock.Object, loggerMock.Object);
 
         var result = await handler.Handle(new GetNotificationByIdQuery(Guid.NewGuid()));
 

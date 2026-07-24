@@ -12,11 +12,12 @@ public class CreateLedgerAccountHandlerTests
     private readonly Mock<ILedgerAccountRepository> _repoMock = new();
     private readonly Mock<IUnitOfWork> _uowMock = new();
     private readonly Mock<IValidator<CreateLedgerAccountCommand>> _validatorMock = new();
+    private readonly Mock<ILogger<CreateLedgerAccountHandler>> _loggerMock = new();
     private readonly CreateLedgerAccountHandler _handler;
 
     public CreateLedgerAccountHandlerTests()
     {
-        _handler = new CreateLedgerAccountHandler(_repoMock.Object, _uowMock.Object, _validatorMock.Object);
+        _handler = new CreateLedgerAccountHandler(_repoMock.Object, _uowMock.Object, _validatorMock.Object, _loggerMock.Object);
     }
 
     [Fact]

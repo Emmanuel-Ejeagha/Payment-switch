@@ -4,6 +4,7 @@ using FluentValidation;
 using Ledger.Application.Interfaces;
 using Ledger.Domain.DomainErrors;
 using Ledger.Domain.ValueObjects;
+using Microsoft.Extensions.Logging;
 
 namespace Ledger.Application.Features.Commands.CaptureFunds;
 
@@ -13,21 +14,25 @@ public class CaptureFundsHandler
     private readonly IUnitOfWork _unitOfWork;
     private readonly IDomainEventDispatcher _dispatcher;
     private readonly IValidator<CaptureFundsCommand> _validator;
+    private readonly ILogger<CaptureFundsHandler> _logger;
 
     public CaptureFundsHandler(
         ILedgerAccountRepository repository,
         IUnitOfWork unitOfWork,
         IDomainEventDispatcher dispatcher,
-        IValidator<CaptureFundsCommand> validator)
+        IValidator<CaptureFundsCommand> validator,
+        ILogger<CaptureFundsHandler> logger)
     {
         _repository = repository;
         _unitOfWork = unitOfWork;
         _dispatcher = dispatcher;
         _validator = validator;
+        _logger = logger;
     }
 
     public async Task<Result> Handle(CaptureFundsCommand command, CancellationToken cancellationToken = default)
     {
+        _logger.LogInformation("Handling {CommandName} for Merchant {MerchantId}", nameof(CaptureFundsCommand), command.MerchantId);
         var validation = await _validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
             return validation.Errors.Select(e => new Error(e.PropertyName, e.ErrorMessage)).ToList();
