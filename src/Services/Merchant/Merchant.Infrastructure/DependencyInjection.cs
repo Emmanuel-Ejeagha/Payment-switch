@@ -1,4 +1,5 @@
-﻿using Merchant.Infrastructure.Messaging;
+﻿using BuildingBlocks.Shared.Configuration;
+using Merchant.Infrastructure.Messaging;
 using Merchant.Infrastructure.Outbox;
 using Merchant.Infrastructure.Persistence;
 using Merchant.Infrastructure.Persistence.Repositories;
@@ -17,13 +18,18 @@ public static class DependencyInjection
         services.AddDbContext<AppDbContext>((sp, options) =>
         {
             var interceptor = sp.GetRequiredService<OutboxInterceptor>();
-            options.UseNpgsql(configuration.GetConnectionString("MerchantDb"))
+            options.UseNpgsql(configuration.GetConnectionString("MerchantDb"), npgsqlOptions =>
+            {
+                npgsqlOptions.EnableRetryOnFailure(3, TimeSpan.FromSeconds(10), null);
+            })
                    .AddInterceptors(interceptor);
         });
 
         services.AddScoped<IMerchantRepository, MerchantRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
-        services.Configure<RabbitMQSettings>(configuration.GetSection("RabbitMQ"));
+        services.AddValidatedOptions<RabbitMQSettings>(configuration, "RabbitMQ",
+            s => !string.IsNullOrEmpty(s.HostName),
+            "RabbitMQ HostName is required");
         services.AddScoped<IEventBus, RabbitMQEventBus>();
         services.AddHostedService<OutboxPublisherService>();
 

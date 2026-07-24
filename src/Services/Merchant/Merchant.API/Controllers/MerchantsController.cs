@@ -9,6 +9,7 @@ using Merchant.Application.Features.Queries.GetMerchantById;
 using Merchant.Application.Features.Queries.ListMerchants;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OutputCaching;
 
 namespace Merchant.API.Controllers;
 
@@ -42,6 +43,7 @@ public class MerchantsController : BaseApiController
     /// <param name="handler">Handler injected via DI.</param>
     /// <returns>Merchant details, or 404 if not found.</returns>
     [HttpGet("{id:guid}")]
+    [OutputCache(PolicyName = "CacheById")]
     [ProducesResponseType(typeof(MerchantDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(
@@ -59,6 +61,7 @@ public class MerchantsController : BaseApiController
     /// <param name="handler">Handler injected via DI.</param>
     /// <returns>Merchant details, or 404 if not found.</returns>
     [HttpGet("by-email/{email}")]
+    [OutputCache(PolicyName = "CacheById")]
     [ProducesResponseType(typeof(MerchantDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetByEmail(

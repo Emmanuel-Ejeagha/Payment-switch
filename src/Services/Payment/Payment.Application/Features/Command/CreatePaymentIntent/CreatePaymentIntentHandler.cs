@@ -6,6 +6,7 @@ using Payment.Application.Interfaces;
 using Payment.Domain;
 using Payment.Domain.Entities;
 using Payment.Domain.ValueObjects;
+using Microsoft.Extensions.Logging;
 
 namespace Payment.Application.Features.Command.CreatePaymentIntent;
 
@@ -15,21 +16,25 @@ public class CreatePaymentIntentHandler
     private readonly IUnitOfWork _unitOfWork;
     private readonly IDomainEventDispatcher _dispatcher;
     private readonly IValidator<CreatePaymentIntentCommand> _validator;
+    private readonly ILogger<CreatePaymentIntentHandler> _logger;
 
     public CreatePaymentIntentHandler(
         IPaymentIntentRepository repository,
         IUnitOfWork unitOfWork,
         IDomainEventDispatcher dispatcher,
-        IValidator<CreatePaymentIntentCommand> validator)
+        IValidator<CreatePaymentIntentCommand> validator,
+        ILogger<CreatePaymentIntentHandler> logger)
     {
         _repository = repository;
         _unitOfWork = unitOfWork;
         _dispatcher = dispatcher;
         _validator = validator;
+        _logger = logger;
     }
 
     public async Task<Result<PaymentIntentResponse>> Handle(CreatePaymentIntentCommand command, CancellationToken cancellationToken = default)
     {
+        _logger.LogInformation("Handling {CommandName} for Merchant {MerchantId}", nameof(CreatePaymentIntentCommand), command.MerchantId);
         var validation = await _validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
             return validation.Errors.Select(e => new Error(e.PropertyName, e.ErrorMessage)).ToList();

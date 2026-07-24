@@ -2,6 +2,7 @@
 using BuildingBlocks.Shared.Results;
 using FluentValidation;
 using Identity.Application.Interfaces;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -15,18 +16,21 @@ public class RefreshTokenHandler
     private readonly IUnitOfWork _unitOfWork;
     private readonly IDomainEventDispatcher _dispatcher;
     private readonly IValidator<RefreshTokenCommand> _validator;
+    private readonly ILogger<RefreshTokenHandler> _logger;
 
-    public RefreshTokenHandler(IUserRepository userRepository, ITokenService tokenService, IUnitOfWork unitOfWork, IDomainEventDispatcher dispatcher, IValidator<RefreshTokenCommand> validator)
+    public RefreshTokenHandler(IUserRepository userRepository, ITokenService tokenService, IUnitOfWork unitOfWork, IDomainEventDispatcher dispatcher, IValidator<RefreshTokenCommand> validator, ILogger<RefreshTokenHandler> logger)
     {
         _userRepository = userRepository;
         _tokenService = tokenService;
         _unitOfWork = unitOfWork;
         _dispatcher = dispatcher;
         _validator = validator;
+        _logger = logger;
     }
 
     public async Task<Result<RefreshTokenResponse>> Handle(RefreshTokenCommand command, CancellationToken cancellationToken = default)
     {
+        _logger.LogInformation("Handling {CommandName} for {Identifier}", nameof(RefreshTokenCommand), command.RefreshToken);
         var validationResult = await _validator.ValidateAsync(command, cancellationToken);
         if (!validationResult.IsValid)
             return validationResult.Errors.Select(e => new Error(e.PropertyName, e.ErrorMessage)).ToList();

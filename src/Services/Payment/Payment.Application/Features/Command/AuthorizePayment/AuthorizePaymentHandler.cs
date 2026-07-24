@@ -4,6 +4,7 @@ using FluentValidation;
 using Payment.Application.Interfaces;
 using Payment.Domain;
 using Payment.Domain.ValueObjects;
+using Microsoft.Extensions.Logging;
 
 namespace Payment.Application.Features.Command.AuthorizePayment;
 
@@ -15,7 +16,7 @@ public class AuthorizePaymentHandler
     private readonly IDomainEventDispatcher _dispatcher;
     private readonly IValidator<AuthorizePaymentCommand> _validator;
     private readonly IMerchantService _merchantService;
-
+    private readonly ILogger<AuthorizePaymentHandler> _logger;
 
     public AuthorizePaymentHandler(
         IPaymentIntentRepository repository,
@@ -23,7 +24,8 @@ public class AuthorizePaymentHandler
         IUnitOfWork unitOfWork,
         IDomainEventDispatcher dispatcher,
         IValidator<AuthorizePaymentCommand> validator,
-        IMerchantService merchantService)                
+        IMerchantService merchantService,
+        ILogger<AuthorizePaymentHandler> logger)                
     {
         _repository = repository;
         _gateway = gateway;
@@ -31,10 +33,12 @@ public class AuthorizePaymentHandler
         _dispatcher = dispatcher;
         _validator = validator;
         _merchantService = merchantService;
+        _logger = logger;
     }
 
     public async Task<Result<AuthorizePaymentResponse>> Handle(AuthorizePaymentCommand command, CancellationToken cancellationToken = default)
     {
+        _logger.LogInformation("Handling {CommandName} for Intent {IntentId}", nameof(AuthorizePaymentCommand), command.IntentId);
         var validation = await _validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
             return validation.Errors.Select(e => new Error(e.PropertyName, e.ErrorMessage)).ToList();
