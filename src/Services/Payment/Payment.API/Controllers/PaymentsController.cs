@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OutputCaching;
 using Payment.API.Extensions;
 using Payment.Application.DTOs;
 using Payment.Application.Features.Command.AuthorizePayment;
@@ -100,6 +101,7 @@ public class PaymentsController : BaseApiController
     /// Get payment intent details by ID.
     /// </summary>
     [HttpGet("{id:guid}")]
+    [OutputCache(PolicyName = "CacheById")]
     [ProducesResponseType(typeof(PaymentIntentDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(

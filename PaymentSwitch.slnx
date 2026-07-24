@@ -41,6 +41,14 @@
     <Project Path="src/Services/Settlement/Settlement.Infrastructure/Settlement.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/tests/" />
+  <Folder Name="/tests/Integration/">
+    <Project Path="tests/Integration/Identity.API.IntegrationTests/Identity.API.IntegrationTests.csproj" />
+    <Project Path="tests/Integration/Payment.API.IntegrationTests/Payment.API.IntegrationTests.csproj" />
+    <Project Path="tests/Integration/Merchant.API.IntegrationTests/Merchant.API.IntegrationTests.csproj" />
+    <Project Path="tests/Integration/Ledger.API.IntegrationTests/Ledger.API.IntegrationTests.csproj" />
+    <Project Path="tests/Integration/Notification.API.IntegrationTests/Notification.API.IntegrationTests.csproj" />
+    <Project Path="tests/Integration/Settlement.API.IntegrationTests/Settlement.API.IntegrationTests.csproj" />
+  </Folder>
   <Folder Name="/tests/Unit/">
     <Project Path="tests/Unit/BuildingBlocks.Shared.Tests/BuildingBlocks.Shared.Tests.csproj" />
     <Project Path="tests/Unit/Identity.Application.Tests/Identity.Application.Tests.csproj" />

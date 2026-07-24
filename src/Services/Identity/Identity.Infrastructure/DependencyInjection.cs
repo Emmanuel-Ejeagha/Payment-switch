@@ -1,4 +1,5 @@
-﻿using Identity.Application.Interfaces;
+﻿using BuildingBlocks.Shared.Configuration;
+using Identity.Application.Interfaces;
 using Identity.Infrastructure.Messaging;
 using Identity.Infrastructure.Outbox;
 using Identity.Infrastructure.Persistence;
@@ -21,7 +22,10 @@ public static class DependencyInjection
         services.AddDbContext<AppDbContext>((sp, options) =>
         {
             var interceptor = sp.GetRequiredService<OutboxInterceptor>();
-            options.UseNpgsql(configuration.GetConnectionString("IdentityDb"))
+            options.UseNpgsql(configuration.GetConnectionString("IdentityDb"), npgsqlOptions =>
+            {
+                npgsqlOptions.EnableRetryOnFailure(3, TimeSpan.FromSeconds(10), null);
+            })
                    .AddInterceptors(interceptor);
         });
 
@@ -30,9 +34,13 @@ public static class DependencyInjection
 
         services.AddScoped<IPasswordHasher, PasswordHasher>();
         services.AddScoped<ITokenService, TokenService>();
-        services.Configure<JwtSettings>(configuration.GetSection("Jwt"));
+        services.AddValidatedOptions<JwtSettings>(configuration, "Jwt",
+            s => !string.IsNullOrEmpty(s.Secret) && !string.IsNullOrEmpty(s.Issuer),
+            "JWT Secret and Issuer are required");
 
-        services.Configure<RabbitMQSettings>(configuration.GetSection("RabbitMQ"));
+        services.AddValidatedOptions<RabbitMQSettings>(configuration, "RabbitMQ",
+            s => !string.IsNullOrEmpty(s.HostName),
+            "RabbitMQ HostName is required");
         services.AddScoped<IEventBus, RabbitMQEventBus>();
         services.AddHostedService<OutboxPublisherService>();
 

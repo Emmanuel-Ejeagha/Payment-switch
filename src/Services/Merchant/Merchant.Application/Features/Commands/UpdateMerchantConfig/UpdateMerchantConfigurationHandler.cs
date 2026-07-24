@@ -1,4 +1,6 @@
-﻿namespace Merchant.Application.Features.Commands.UpdateMerchantConfig;
+﻿using Microsoft.Extensions.Logging;
+
+namespace Merchant.Application.Features.Commands.UpdateMerchantConfig;
 
 public class UpdateMerchantConfigurationHandler
 {
@@ -6,21 +8,26 @@ public class UpdateMerchantConfigurationHandler
     private readonly IUnitOfWork _unitOfWork;
     private readonly IDomainEventDispatcher _dispatcher;
     private readonly IValidator<UpdateMerchantConfigurationCommand> _validator;
+    private readonly ILogger<UpdateMerchantConfigurationHandler> _logger;
 
     public UpdateMerchantConfigurationHandler(
         IMerchantRepository repository,
         IUnitOfWork unitOfWork,
         IDomainEventDispatcher dispatcher,
-        IValidator<UpdateMerchantConfigurationCommand> validator)
+        IValidator<UpdateMerchantConfigurationCommand> validator,
+        ILogger<UpdateMerchantConfigurationHandler> logger)
     {
         _repository = repository;
         _unitOfWork = unitOfWork;
         _dispatcher = dispatcher;
         _validator = validator;
+        _logger = logger;
     }
 
     public async Task<Result> Handle(UpdateMerchantConfigurationCommand command, CancellationToken cancellationToken = default)
     {
+        _logger.LogInformation("Handling {CommandName} for Merchant {MerchantId}", nameof(UpdateMerchantConfigurationCommand), command.MerchantId);
+
         var validation = await _validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
             return validation.Errors.Select(e => new Error(e.PropertyName, e.ErrorMessage)).ToList();
