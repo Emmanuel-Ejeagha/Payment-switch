@@ -24,6 +24,7 @@ public class IdentityApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["ConnectionStrings:IdentityDb"] = _postgres.GetConnectionString(),
+                ["RabbitMQ:HostName"] = "nonexistent",
                 ["Jwt:Secret"] = "test-super-secret-key-minimum-32-bytes!!",
                 ["Jwt:Issuer"] = "IdentityService",
                 ["Jwt:Audience"] = "PaymentSwitch"

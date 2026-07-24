@@ -24,6 +24,7 @@ public class SettlementApiFactory : WebApplicationFactory<Program>, IAsyncLifeti
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["ConnectionStrings:SettlementDb"] = _postgres.GetConnectionString(),
+                ["RabbitMQ:HostName"] = "nonexistent",
                 ["Jwt:Secret"] = "test-super-secret-key-minimum-32-bytes!!",
                 ["Jwt:Issuer"] = "SettlementService",
                 ["Jwt:Audience"] = "PaymentSwitch"
