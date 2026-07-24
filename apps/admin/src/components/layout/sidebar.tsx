@@ -11,7 +11,10 @@ import {
   Banknote,
   Shield,
   LogOut,
+  Sun,
+  Moon,
 } from "lucide-react"
+import { useTheme } from "@/components/theme-provider"
 
 const navItems = [
   { label: "Dashboard", href: "/", icon: Home },
@@ -25,6 +28,7 @@ const navItems = [
 
 export function Sidebar() {
   const router = useRouter()
+  const { theme, toggle } = useTheme()
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" })
@@ -48,7 +52,14 @@ export function Sidebar() {
           </Link>
         ))}
       </nav>
-      <div className="border-t p-4">
+      <div className="border-t p-4 space-y-1">
+        <button
+          onClick={toggle}
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+        >
+          {theme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+          {theme === "light" ? "Dark mode" : "Light mode"}
+        </button>
         <button
           onClick={handleLogout}
           className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
