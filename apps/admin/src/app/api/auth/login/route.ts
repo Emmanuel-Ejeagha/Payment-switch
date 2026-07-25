@@ -26,17 +26,18 @@ export async function POST(request: Request) {
     )
   }
 
+  const isSecure = process.env.NODE_ENV === "production"
   const response = NextResponse.json(data)
   response.cookies.set("access_token", data.accessToken as string, {
     httpOnly: true,
-    secure: true,
+    secure: isSecure,
     sameSite: "lax",
     path: "/",
     maxAge: 60 * 60,
   })
   response.cookies.set("refresh_token", data.refreshToken as string, {
     httpOnly: true,
-    secure: true,
+    secure: isSecure,
     sameSite: "lax",
     path: "/",
     maxAge: 60 * 60 * 24 * 7,
