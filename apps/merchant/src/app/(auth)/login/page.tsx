@@ -6,7 +6,7 @@ import { z } from "zod"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { useState } from "react"
-import { Store, ArrowRight } from "lucide-react"
+import { Store, ArrowRight, Eye, EyeOff } from "lucide-react"
 
 const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -18,6 +18,7 @@ type LoginForm = z.infer<typeof loginSchema>
 export default function LoginPage() {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
+  const [showPassword, setShowPassword] = useState(false)
 
   const {
     register,
@@ -91,14 +92,23 @@ export default function LoginPage() {
               <div className="flex items-center justify-between">
                 <label htmlFor="password" className="text-sm font-medium">Password</label>
               </div>
-              <input
-                id="password"
-                type="password"
-                autoComplete="current-password"
-                placeholder="Enter your password"
-                className="flex h-11 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                {...register("password")}
-              />
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  placeholder="Enter your password"
+                  className="flex h-11 w-full rounded-lg border border-input bg-background px-3 py-2 pr-10 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  {...register("password")}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
               {errors.password && <p className="text-xs text-destructive">{errors.password.message}</p>}
             </div>
 
