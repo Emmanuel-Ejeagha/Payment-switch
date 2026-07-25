@@ -12,8 +12,12 @@ async function handler(request: NextRequest, { params }: { params: Promise<{ pat
   const contentType = request.headers.get("content-type")
 
   const headers: Record<string, string> = {}
-  if (cookie) headers["cookie"] = cookie
   if (contentType) headers["content-type"] = contentType
+
+  if (cookie) {
+    const accessToken = cookie.split("; ").find(c => c.startsWith("access_token="))?.split("=")[1]
+    if (accessToken) headers["authorization"] = `Bearer ${accessToken}`
+  }
 
   const body = request.method === "GET" || request.method === "HEAD" ? undefined : await request.text()
 
