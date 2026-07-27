@@ -5,6 +5,7 @@ using Ledger.Application.Features.Commands.CaptureFunds;
 using Ledger.Application.Features.Commands.CreateLedgerAccount;
 using Ledger.Application.Features.Commands.RefundFunds;
 using Ledger.Application.Features.Commands.ReserveFunds;
+using Ledger.Application.Features.Queries.GetAllBalances;
 using Ledger.Application.Features.Queries.GetBalance;
 using Ledger.Application.Features.Queries.GetTransactionHistory;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,6 +21,7 @@ public static class DependencyInjection
         services.AddScoped<CaptureFundsHandler>();
         services.AddScoped<RefundFundsHandler>();
         services.AddScoped<GetBalanceHandler>();
+        services.AddScoped<GetAllBalancesHandler>();
         services.AddScoped<GetTransactionHistoryHandler>();
 
         services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();

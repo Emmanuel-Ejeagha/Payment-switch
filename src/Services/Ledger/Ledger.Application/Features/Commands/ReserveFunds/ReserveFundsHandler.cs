@@ -2,7 +2,7 @@
 using BuildingBlocks.Shared.Results;
 using FluentValidation;
 using Ledger.Application.Interfaces;
-using Ledger.Domain.DomainErrors;
+using Ledger.Domain.Entities;
 using Ledger.Domain.ValueObjects;
 using Microsoft.Extensions.Logging;
 
@@ -39,7 +39,11 @@ public class ReserveFundsHandler
 
         var account = await _repository.GetByMerchantIdAsync(command.MerchantId, cancellationToken);
         if (account is null)
-            return LedgerErrors.AccountNotFound(command.MerchantId);
+        {
+            _logger.LogInformation("No ledger account found for merchant {MerchantId}; auto-creating with currency {Currency}", command.MerchantId, command.Currency);
+            account = new LedgerAccount(Guid.NewGuid(), command.MerchantId, command.Currency);
+            await _repository.AddAsync(account, cancellationToken);
+        }
 
         try
         {

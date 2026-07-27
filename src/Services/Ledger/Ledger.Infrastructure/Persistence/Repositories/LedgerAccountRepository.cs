@@ -20,6 +20,14 @@ public class LedgerAccountRepository : ILedgerAccountRepository
             .FirstOrDefaultAsync(a => a.MerchantId == merchantId, cancellationToken);
     }
 
+    public async Task<List<LedgerAccount>> ListByMerchantIdAsync(Guid merchantId, CancellationToken cancellationToken = default)
+    {
+        return await _context.LedgerAccounts
+            .Include(a => a.Journal)
+            .Where(a => a.MerchantId == merchantId)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task AddAsync(LedgerAccount account, CancellationToken cancellationToken = default)
     {
         await _context.LedgerAccounts.AddAsync(account, cancellationToken);

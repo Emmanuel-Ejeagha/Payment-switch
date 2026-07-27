@@ -96,7 +96,11 @@ export default function PaymentsPage() {
         <CreatePaymentModal
           merchantId={merchant.id}
           onClose={() => setShowCreate(false)}
-          onCreated={(p) => { setPayments((prev) => [p, ...prev]); setShowCreate(false) }}
+          onCreated={async (intentId) => {
+            const res = await fetch(`/api/proxy/payment/api/v1/payments/${intentId}`)
+            if (res.ok) setPayments((prev) => [await res.json(), ...prev])
+            setShowCreate(false)
+          }}
         />
       )}
     </div>
@@ -110,7 +114,7 @@ function CreatePaymentModal({
 }: {
   merchantId: string
   onClose: () => void
-  onCreated: (payment: PaymentIntentDto) => void
+  onCreated: (intentId: string) => void
 }) {
   const [amount, setAmount] = useState("")
   const [currency, setCurrency] = useState("USD")
@@ -145,7 +149,8 @@ function CreatePaymentModal({
         return
       }
 
-      onCreated(await res.json())
+      const { intentId } = await res.json()
+      onCreated(intentId)
     } catch {
       setError("Failed to create payment")
     } finally {
