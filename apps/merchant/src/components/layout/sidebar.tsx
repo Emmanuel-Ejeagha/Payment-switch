@@ -8,6 +8,7 @@ import {
   BookOpen,
   Key,
   Settings,
+  User,
   LogOut,
   Store,
   X,
@@ -18,6 +19,7 @@ const navItems = [
   { label: "Payments", href: "/payments", icon: CreditCard },
   { label: "Ledger", href: "/ledger", icon: BookOpen },
   { label: "API Keys", href: "/api-keys", icon: Key },
+  { label: "Profile", href: "/profile", icon: User },
   { label: "Settings", href: "/settings", icon: Settings },
 ]
 
