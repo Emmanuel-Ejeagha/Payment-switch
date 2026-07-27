@@ -8,7 +8,7 @@ import type { UserDto, MerchantDto, BalanceDto, PaymentIntentDto } from "@paymen
 export default function MerchantDashboardPage() {
   const [user, setUser] = useState<UserDto | null>(null)
   const [merchant, setMerchant] = useState<MerchantDto | null>(null)
-  const [balance, setBalance] = useState<BalanceDto | null>(null)
+  const [balances, setBalances] = useState<BalanceDto[]>([])
   const [payments, setPayments] = useState<PaymentIntentDto[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -16,10 +16,10 @@ export default function MerchantDashboardPage() {
   const loadData = useCallback(async () => {
     if (!merchant) return
     const [balanceRes, paymentsRes] = await Promise.all([
-      fetch(`/api/proxy/ledger/api/v1/ledger/balance?merchantId=${merchant.id}`),
+      fetch(`/api/proxy/ledger/api/v1/ledger/balances?merchantId=${merchant.id}`),
       fetch(`/api/proxy/payment/api/v1/payments?merchantId=${merchant.id}&skip=0&take=5`),
     ])
-    if (balanceRes.ok) setBalance(await balanceRes.json())
+    if (balanceRes.ok) setBalances(await balanceRes.json())
     if (paymentsRes.ok) setPayments(await paymentsRes.json())
   }, [merchant])
 
@@ -37,11 +37,11 @@ export default function MerchantDashboardPage() {
         setMerchant(merchantData)
 
         const [balanceRes, paymentsRes] = await Promise.all([
-          fetch(`/api/proxy/ledger/api/v1/ledger/balance?merchantId=${merchantData.id}`),
+          fetch(`/api/proxy/ledger/api/v1/ledger/balances?merchantId=${merchantData.id}`),
           fetch(`/api/proxy/payment/api/v1/payments?merchantId=${merchantData.id}&skip=0&take=5`),
         ])
 
-        if (balanceRes.ok) setBalance(await balanceRes.json())
+        if (balanceRes.ok) setBalances(await balanceRes.json())
         if (paymentsRes.ok) setPayments(await paymentsRes.json())
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load dashboard")
@@ -95,26 +95,41 @@ export default function MerchantDashboardPage() {
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <StatsCard
-          title="Available"
-          value={balance ? `${(balance.available / 100).toFixed(2)} ${balance.currency}` : "—"}
-          icon={Wallet}
-          description="Ready for payout"
-        />
-        <StatsCard
-          title="Pending"
-          value={balance ? `${(balance.pending / 100).toFixed(2)} ${balance.currency}` : "—"}
-          icon={Clock}
-          description="Awaiting settlement"
-        />
-        <StatsCard
-          title="Reserved"
-          value={balance ? `${(balance.reserved / 100).toFixed(2)} ${balance.currency}` : "—"}
-          icon={Lock}
-          description="Held for disputes"
-        />
-      </div>
+      {balances.length === 0 ? (
+        <div className="rounded-xl border bg-card p-6 text-sm text-muted-foreground">
+          No balance data yet. Create a payment to get started.
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {balances.map((b) => (
+            <div key={b.currency}>
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                {b.currency}
+              </p>
+              <div className="grid gap-4 md:grid-cols-3">
+                <StatsCard
+                  title="Available"
+                  value={`${(b.available / 100).toFixed(2)} ${b.currency}`}
+                  icon={Wallet}
+                  description="Ready for payout"
+                />
+                <StatsCard
+                  title="Pending"
+                  value={`${(b.pending / 100).toFixed(2)} ${b.currency}`}
+                  icon={Clock}
+                  description="Awaiting settlement"
+                />
+                <StatsCard
+                  title="Reserved"
+                  value={`${(b.reserved / 100).toFixed(2)} ${b.currency}`}
+                  icon={Lock}
+                  description="Held for disputes"
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="rounded-xl border bg-card">
         <div className="flex items-center justify-between border-b px-6 py-4">
