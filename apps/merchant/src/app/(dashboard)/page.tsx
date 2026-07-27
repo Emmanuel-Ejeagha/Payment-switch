@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { Wallet, Clock, Lock, CreditCard } from "lucide-react"
 import { StatsCard } from "@paymentswitch/ui"
 import type { UserDto, MerchantDto, BalanceDto, PaymentIntentDto } from "@paymentswitch/shared"
@@ -12,6 +12,16 @@ export default function MerchantDashboardPage() {
   const [payments, setPayments] = useState<PaymentIntentDto[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+
+  const loadData = useCallback(async () => {
+    if (!merchant) return
+    const [balanceRes, paymentsRes] = await Promise.all([
+      fetch(`/api/proxy/ledger/api/v1/ledger/balance?merchantId=${merchant.id}`),
+      fetch(`/api/proxy/payment/api/v1/payments?merchantId=${merchant.id}&skip=0&take=5`),
+    ])
+    if (balanceRes.ok) setBalance(await balanceRes.json())
+    if (paymentsRes.ok) setPayments(await paymentsRes.json())
+  }, [merchant])
 
   useEffect(() => {
     async function load() {
@@ -42,6 +52,13 @@ export default function MerchantDashboardPage() {
 
     load()
   }, [])
+
+  useEffect(() => {
+    if (!merchant) return
+    loadData()
+    const interval = setInterval(loadData, 30000)
+    return () => clearInterval(interval)
+  }, [merchant, loadData])
 
   if (loading) {
     return (
