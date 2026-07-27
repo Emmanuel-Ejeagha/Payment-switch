@@ -34,5 +34,7 @@ public class GetPaymentIntentByIdHandler
     private static PaymentIntentDto Map(PaymentIntent intent) =>
         new(intent.Id, intent.MerchantId, intent.Amount.Amount, intent.Amount.Currency,
             intent.Status.Value,
+            intent.CardDetails?.LastFour,
+            intent.CardDetails?.Brand,
             intent.Transactions.Select(t => new TransactionDto(t.Id, t.Type.ToString(), t.Amount.Amount, t.Amount.Currency, t.Timestamp)).ToList());
 }

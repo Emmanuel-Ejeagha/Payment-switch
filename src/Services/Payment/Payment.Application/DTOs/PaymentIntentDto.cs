@@ -6,5 +6,7 @@ public record PaymentIntentDto(
     decimal Amount,
     string Currency,
     string Status,
+    string? CardLastFour,
+    string? CardBrand,
     List<TransactionDto> Transactions
 );

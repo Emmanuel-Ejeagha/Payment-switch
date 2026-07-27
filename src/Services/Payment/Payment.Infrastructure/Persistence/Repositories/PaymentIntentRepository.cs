@@ -50,6 +50,8 @@ public class PaymentIntentRepository : IPaymentIntentRepository
                 p.Amount.Amount,
                 p.Amount.Currency,
                 p.Status.Value,
+                p.CardDetails != null ? p.CardDetails.LastFour : null,
+                p.CardDetails != null ? p.CardDetails.Brand : null,
                 p.Transactions.Select(t => new TransactionDto(
                     t.Id,
                     t.Type.ToString(),
