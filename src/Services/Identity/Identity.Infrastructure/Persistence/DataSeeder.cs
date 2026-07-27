@@ -8,8 +8,20 @@ public static class DataSeeder
 {
     public static async Task SeedAsync(AppDbContext dbContext)
     {
-        if (await dbContext.Users.AnyAsync(u => u.Email.Value == "admin@paymentswitch.com"))
+        var existing = await dbContext.Users
+            .AsTracking()
+            .FirstOrDefaultAsync(u => u.Email.Value == "admin@paymentswitch.com");
+
+        if (existing is not null)
+        {
+            if (!existing.Roles.Contains("Admin"))
+            {
+                existing.AddRole("Admin");
+                dbContext.Entry(existing).Property("Roles").IsModified = true;
+                await dbContext.SaveChangesAsync();
+            }
             return;
+        }
 
         var hash = BCrypt.Net.BCrypt.HashPassword("Admin123!");
         var user = new User(Guid.NewGuid(), new Email("admin@paymentswitch.com"), new PasswordHash(hash), new FullName("Admin User"));
