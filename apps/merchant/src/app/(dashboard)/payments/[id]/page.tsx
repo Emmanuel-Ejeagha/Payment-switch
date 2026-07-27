@@ -101,7 +101,11 @@ export default function PaymentDetailPage() {
 
       <div className="flex flex-wrap gap-3">
         {canAuthorize && (
-          <ActionButton icon={CheckCircle} label="Authorize" onClick={() => doAction("authorize")} />
+          <ActionButton
+            icon={CheckCircle}
+            label="Authorize"
+            onClick={() => doAction("authorize", { cardLastFour: payment.cardLastFour, cardBrand: payment.cardBrand })}
+          />
         )}
         {canCapture && (
           <ActionButton icon={CheckCircle} label="Capture" onClick={() => doAction("capture", { amount: payment.amount })} />

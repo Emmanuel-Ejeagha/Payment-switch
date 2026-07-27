@@ -14,6 +14,8 @@ export interface PaymentIntentDto {
   amount: number
   currency: string
   status: string
+  cardLastFour?: string | null
+  cardBrand?: string | null
   transactions: TransactionDto[]
 }
 
