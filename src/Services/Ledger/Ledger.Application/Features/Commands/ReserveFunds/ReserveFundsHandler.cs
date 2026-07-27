@@ -37,10 +37,10 @@ public class ReserveFundsHandler
         if (!validation.IsValid)
             return validation.Errors.Select(e => new Error(e.PropertyName, e.ErrorMessage)).ToList();
 
-        var account = await _repository.GetByMerchantIdAsync(command.MerchantId, cancellationToken);
+        var account = await _repository.GetByMerchantIdAndCurrencyAsync(command.MerchantId, command.Currency, cancellationToken);
         if (account is null)
         {
-            _logger.LogInformation("No ledger account found for merchant {MerchantId}; auto-creating with currency {Currency}", command.MerchantId, command.Currency);
+            _logger.LogInformation("No ledger account found for merchant {MerchantId}/{Currency}; auto-creating", command.MerchantId, command.Currency);
             account = new LedgerAccount(Guid.NewGuid(), command.MerchantId, command.Currency);
             await _repository.AddAsync(account, cancellationToken);
         }
