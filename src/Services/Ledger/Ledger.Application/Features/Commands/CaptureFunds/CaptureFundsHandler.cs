@@ -37,7 +37,7 @@ public class CaptureFundsHandler
         if (!validation.IsValid)
             return validation.Errors.Select(e => new Error(e.PropertyName, e.ErrorMessage)).ToList();
 
-        var account = await _repository.GetByMerchantIdAsync(command.MerchantId, cancellationToken);
+        var account = await _repository.GetByMerchantIdAndCurrencyAsync(command.MerchantId, command.Currency, cancellationToken);
         if (account is null)
             return LedgerErrors.AccountNotFound(command.MerchantId);
 
