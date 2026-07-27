@@ -114,6 +114,9 @@ function CreatePaymentModal({
 }) {
   const [amount, setAmount] = useState("")
   const [currency, setCurrency] = useState("USD")
+  const [paymentMethod, setPaymentMethod] = useState("Card")
+  const [cardLastFour, setCardLastFour] = useState("")
+  const [cardBrand, setCardBrand] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -130,12 +133,15 @@ function CreatePaymentModal({
           merchantId,
           amount: Math.round(parseFloat(amount) * 100),
           currency,
+          paymentMethod,
+          ...(paymentMethod === "Card" ? { cardLastFour, cardBrand } : {}),
+          idempotencyKey: crypto.randomUUID(),
         }),
       })
 
       if (!res.ok) {
         const body = await res.json()
-        setError(body.message ?? body.detail ?? "Failed to create payment")
+        setError(body.title ?? body.detail ?? "Failed to create payment")
         return
       }
 
@@ -178,6 +184,48 @@ function CreatePaymentModal({
               <option value="NGN">NGN</option>
             </select>
           </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Payment Method</label>
+            <select
+              value={paymentMethod}
+              onChange={(e) => setPaymentMethod(e.target.value)}
+              className="flex h-11 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+            >
+              <option value="Card">Card</option>
+              <option value="Bank">Bank Transfer</option>
+              <option value="MobileMoney">Mobile Money</option>
+            </select>
+          </div>
+          {paymentMethod === "Card" && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Card (last 4)</label>
+                <input
+                  type="text"
+                  maxLength={4}
+                  pattern="[0-9]{4}"
+                  placeholder="1234"
+                  value={cardLastFour}
+                  onChange={(e) => setCardLastFour(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                  required
+                  className="flex h-11 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Card Brand</label>
+                <select
+                  value={cardBrand}
+                  onChange={(e) => setCardBrand(e.target.value)}
+                  className="flex h-11 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                >
+                  <option value="">Select</option>
+                  <option value="Visa">Visa</option>
+                  <option value="Mastercard">Mastercard</option>
+                  <option value="Amex">Amex</option>
+                </select>
+              </div>
+            </div>
+          )}
           {error && <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
           <div className="flex gap-3">
             <button
