@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { Menu } from "lucide-react"
 import { Sidebar } from "@/components/layout/sidebar"
+import { ErrorBoundary } from "@/components/error-boundary"
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -20,7 +21,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </button>
           <span className="font-semibold">PaymentSwitch</span>
         </div>
-        <div className="flex-1 overflow-y-auto p-4 md:p-8">{children}</div>
+        <div className="flex-1 overflow-y-auto p-4 md:p-8">
+          <ErrorBoundary>{children}</ErrorBoundary>
+        </div>
       </main>
     </div>
   )

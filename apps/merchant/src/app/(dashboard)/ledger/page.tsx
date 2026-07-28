@@ -14,7 +14,7 @@ const txTypeColors: Record<string, string> = {
 export default function MerchantLedgerPage() {
   const [user, setUser] = useState<UserDto | null>(null)
   const [merchant, setMerchant] = useState<MerchantDto | null>(null)
-  const [balance, setBalance] = useState<BalanceDto | null>(null)
+  const [balances, setBalances] = useState<BalanceDto[]>([])
   const [transactions, setTransactions] = useState<LedgerTransactionDto[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -35,10 +35,10 @@ export default function MerchantLedgerPage() {
         setMerchant(merchantData)
 
         const [balRes, txRes] = await Promise.all([
-          fetch(`/api/proxy/ledger/api/v1/ledger/balance?merchantId=${merchantData.id}`),
+          fetch(`/api/proxy/ledger/api/v1/ledger/balances?merchantId=${merchantData.id}`),
           fetch(`/api/proxy/ledger/api/v1/ledger/transactions?merchantId=${merchantData.id}&skip=0&take=${take}`),
         ])
-        if (balRes.ok) setBalance(await balRes.json())
+        if (balRes.ok) setBalances(await balRes.json())
         if (txRes.ok) setTransactions(await txRes.json())
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load ledger")
@@ -96,41 +96,42 @@ export default function MerchantLedgerPage() {
         </p>
       </div>
 
-      {balance && (
-        <div className="grid gap-4 md:grid-cols-3">
-          <div className="rounded-xl border p-6">
-            <div className="mb-3 flex items-center gap-3">
-              <div className="rounded-lg bg-emerald-500/10 p-2">
-                <Wallet className="h-5 w-5 text-emerald-600" />
+      {balances.length > 0 && (
+        <div className="space-y-6">
+          {balances.map((b) => (
+            <div key={b.currency}>
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{b.currency}</p>
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="rounded-xl border p-6">
+                  <div className="mb-3 flex items-center gap-3">
+                    <div className="rounded-lg bg-emerald-500/10 p-2">
+                      <Wallet className="h-5 w-5 text-emerald-600" />
+                    </div>
+                    <p className="text-sm text-muted-foreground">Available</p>
+                  </div>
+                  <p className="text-2xl font-semibold">{(b.available / 100).toFixed(2)} {b.currency}</p>
+                </div>
+                <div className="rounded-xl border p-6">
+                  <div className="mb-3 flex items-center gap-3">
+                    <div className="rounded-lg bg-amber-500/10 p-2">
+                      <Clock className="h-5 w-5 text-amber-600" />
+                    </div>
+                    <p className="text-sm text-muted-foreground">Pending</p>
+                  </div>
+                  <p className="text-2xl font-semibold">{(b.pending / 100).toFixed(2)} {b.currency}</p>
+                </div>
+                <div className="rounded-xl border p-6">
+                  <div className="mb-3 flex items-center gap-3">
+                    <div className="rounded-lg bg-blue-500/10 p-2">
+                      <Lock className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <p className="text-sm text-muted-foreground">Reserved</p>
+                  </div>
+                  <p className="text-2xl font-semibold">{(b.reserved / 100).toFixed(2)} {b.currency}</p>
+                </div>
               </div>
-              <p className="text-sm text-muted-foreground">Available</p>
             </div>
-            <p className="text-2xl font-semibold">
-              {(balance.available / 100).toFixed(2)} {balance.currency}
-            </p>
-          </div>
-          <div className="rounded-xl border p-6">
-            <div className="mb-3 flex items-center gap-3">
-              <div className="rounded-lg bg-amber-500/10 p-2">
-                <Clock className="h-5 w-5 text-amber-600" />
-              </div>
-              <p className="text-sm text-muted-foreground">Pending</p>
-            </div>
-            <p className="text-2xl font-semibold">
-              {(balance.pending / 100).toFixed(2)} {balance.currency}
-            </p>
-          </div>
-          <div className="rounded-xl border p-6">
-            <div className="mb-3 flex items-center gap-3">
-              <div className="rounded-lg bg-blue-500/10 p-2">
-                <Lock className="h-5 w-5 text-blue-600" />
-              </div>
-              <p className="text-sm text-muted-foreground">Reserved</p>
-            </div>
-            <p className="text-2xl font-semibold">
-              {(balance.reserved / 100).toFixed(2)} {balance.currency}
-            </p>
-          </div>
+          ))}
         </div>
       )}
 
