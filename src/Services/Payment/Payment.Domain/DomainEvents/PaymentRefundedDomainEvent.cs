@@ -5,5 +5,6 @@ namespace Payment.Domain.DomainEvents;
 
 public record PaymentRefundedDomainEvent(
     Guid IntentId,
+    Guid MerchantId,
     Guid TransactionId,
     Money Amount) : DomainEvent;

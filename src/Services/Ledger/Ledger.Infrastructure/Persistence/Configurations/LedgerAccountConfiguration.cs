@@ -16,10 +16,15 @@ public class LedgerAccountConfiguration : IEntityTypeConfiguration<LedgerAccount
         builder.Property(a => a.ReservedBalance).IsRequired();
         builder.Property(a => a.Currency).IsRequired().HasMaxLength(3);
 
+        builder.Navigation(a => a.Journal)
+            .UsePropertyAccessMode(PropertyAccessMode.PreferField);
+
         builder.OwnsMany(a => a.Journal, j =>
         {
+            j.UsePropertyAccessMode(PropertyAccessMode.PreferField);
             j.WithOwner().HasForeignKey("LedgerAccountId");
-            j.HasKey(e => e.Id);
+            j.HasKey("Id");
+            j.Property(e => e.Id).ValueGeneratedNever();
             j.Property(e => e.Type).HasConversion<string>().IsRequired();
             j.Property(e => e.Description).IsRequired().HasMaxLength(500);
             j.OwnsOne(e => e.Amount, a =>

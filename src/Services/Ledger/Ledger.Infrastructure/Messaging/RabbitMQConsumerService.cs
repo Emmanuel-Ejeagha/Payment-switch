@@ -55,42 +55,73 @@ public class RabbitMQConsumerService : BackgroundService
             var eventType = ea.RoutingKey;
             var body = Encoding.UTF8.GetString(ea.Body.ToArray());
 
-            using var scope = _scopeFactory.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var createAccountHandler = scope.ServiceProvider.GetRequiredService<CreateLedgerAccountHandler>();
-            var reserveHandler = scope.ServiceProvider.GetRequiredService<ReserveFundsHandler>();
-            var captureHandler = scope.ServiceProvider.GetRequiredService<CaptureFundsHandler>();
-            var refundHandler = scope.ServiceProvider.GetRequiredService<RefundFundsHandler>();
-
             try
             {
-                if (db.InboxMessages.Any(m => m.MessageId == messageId))
+                using (var scope = _scopeFactory.CreateScope())
                 {
-                    _logger.LogWarning("Duplicate message {MessageId} ignored", messageId);
-                    await _channel.BasicAckAsync(ea.DeliveryTag, false);
-                    return;
-                }
+                    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                    if (db.InboxMessages.Any(m => m.MessageId == messageId))
+                    {
+                        _logger.LogWarning("Duplicate message {MessageId} ignored", messageId);
+                        await _channel.BasicAckAsync(ea.DeliveryTag, false);
+                        return;
+                    }
 
-                var inboxMsg = new InboxMessage(messageId, eventType, body);
-                db.InboxMessages.Add(inboxMsg);
-                await db.SaveChangesAsync(stoppingToken);
+                    var inboxMsg = new InboxMessage(messageId, eventType, body);
+                    db.InboxMessages.Add(inboxMsg);
+                    await db.SaveChangesAsync(stoppingToken);
+                }
 
                 switch (eventType)
                 {
                     case "PaymentAuthorizedDomainEvent":
                         var authEvent = JsonSerializer.Deserialize<PaymentAuthorizedEvent>(body)!;
-                        await createAccountHandler.Handle(new CreateLedgerAccountCommand(authEvent.MerchantId, authEvent.Amount.Currency), stoppingToken);
-                        await reserveHandler.Handle(new ReserveFundsCommand(authEvent.MerchantId, authEvent.Amount.Amount, authEvent.Amount.Currency, $"PaymentAuth:{authEvent.IntentId}"), stoppingToken);
+                        using (var scope = _scopeFactory.CreateScope())
+                        {
+                            var handler = scope.ServiceProvider.GetRequiredService<CreateLedgerAccountHandler>();
+                            await handler.Handle(new CreateLedgerAccountCommand(authEvent.MerchantId, authEvent.Amount.Currency), stoppingToken);
+                        }
+                        using (var scope = _scopeFactory.CreateScope())
+                        {
+                            var handler = scope.ServiceProvider.GetRequiredService<ReserveFundsHandler>();
+                            var result = await handler.Handle(new ReserveFundsCommand(authEvent.MerchantId, authEvent.Amount.Amount, authEvent.Amount.Currency, $"PaymentAuth:{authEvent.IntentId}"), stoppingToken);
+                            if (result.IsFailure)
+                            {
+                                _logger.LogWarning("ReserveFunds failed: {Errors}", string.Join("; ", result.Errors.Select(e => e.Message)));
+                                await _channel.BasicNackAsync(ea.DeliveryTag, false, false);
+                                return;
+                            }
+                        }
                         break;
 
                     case "PaymentCapturedDomainEvent":
                         var captureEvent = JsonSerializer.Deserialize<PaymentCapturedEvent>(body)!;
-                        await captureHandler.Handle(new CaptureFundsCommand(captureEvent.MerchantId, captureEvent.Amount.Amount, captureEvent.Amount.Currency, $"PaymentCapt:{captureEvent.IntentId}"), stoppingToken);
+                        using (var scope = _scopeFactory.CreateScope())
+                        {
+                            var handler = scope.ServiceProvider.GetRequiredService<CaptureFundsHandler>();
+                            var result = await handler.Handle(new CaptureFundsCommand(captureEvent.MerchantId, captureEvent.Amount.Amount, captureEvent.Amount.Currency, $"PaymentCapt:{captureEvent.IntentId}"), stoppingToken);
+                            if (result.IsFailure)
+                            {
+                                _logger.LogWarning("CaptureFunds failed: {Errors}", string.Join("; ", result.Errors.Select(e => e.Message)));
+                                await _channel.BasicNackAsync(ea.DeliveryTag, false, false);
+                                return;
+                            }
+                        }
                         break;
 
                     case "PaymentRefundedDomainEvent":
                         var refundEvent = JsonSerializer.Deserialize<PaymentRefundedEvent>(body)!;
-                        await refundHandler.Handle(new RefundFundsCommand(refundEvent.MerchantId, refundEvent.Amount.Amount, refundEvent.Amount.Currency, $"PaymentRef:{refundEvent.IntentId}"), stoppingToken);
+                        using (var scope = _scopeFactory.CreateScope())
+                        {
+                            var handler = scope.ServiceProvider.GetRequiredService<RefundFundsHandler>();
+                            var result = await handler.Handle(new RefundFundsCommand(refundEvent.MerchantId, refundEvent.Amount.Amount, refundEvent.Amount.Currency, $"PaymentRef:{refundEvent.IntentId}"), stoppingToken);
+                            if (result.IsFailure)
+                            {
+                                _logger.LogWarning("RefundFunds failed: {Errors}", string.Join("; ", result.Errors.Select(e => e.Message)));
+                                await _channel.BasicNackAsync(ea.DeliveryTag, false, false);
+                                return;
+                            }
+                        }
                         break;
 
                     default:
@@ -98,8 +129,14 @@ public class RabbitMQConsumerService : BackgroundService
                         break;
                 }
 
-                inboxMsg.MarkAsProcessed();
-                await db.SaveChangesAsync(stoppingToken);
+                using (var scope = _scopeFactory.CreateScope())
+                {
+                    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                    var msg = db.InboxMessages.First(m => m.MessageId == messageId);
+                    msg.MarkAsProcessed();
+                    await db.SaveChangesAsync(stoppingToken);
+                }
+
                 await _channel.BasicAckAsync(ea.DeliveryTag, false);
                 _logger.LogInformation("Processed event {EventType} ({MessageId})", eventType, messageId);
             }

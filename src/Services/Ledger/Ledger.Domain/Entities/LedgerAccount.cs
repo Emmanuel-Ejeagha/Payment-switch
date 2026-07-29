@@ -14,8 +14,8 @@ public class LedgerAccount : AggregateRoot
     public decimal PendingBalance { get; internal set; }
     public decimal ReservedBalance { get; internal set; }
     public string Currency { get; private set; } = default!;
-    public IReadOnlyList<JournalEntry> Journal => _journal.AsReadOnly();
-    private readonly List<JournalEntry> _journal = new();
+    public IReadOnlyList<JournalEntry> Journal => _journal;
+    private List<JournalEntry> _journal = new();
 
     private LedgerAccount() : base() { }
 
@@ -33,10 +33,7 @@ public class LedgerAccount : AggregateRoot
     {
         if (amount.Currency != Currency)
             throw new InvalidOperationException("Currency mismatch.");
-        if (AvailableBalance < amount.Amount)
-            throw new InvalidOperationException("Insufficient available funds.");
 
-        AvailableBalance -= amount.Amount;
         PendingBalance += amount.Amount;
 
         var entry = new JournalEntry(EntryType.Debit, amount, "Funds reserved", correlationId);

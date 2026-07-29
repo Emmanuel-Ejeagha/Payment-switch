@@ -44,15 +44,18 @@ export default function RegisterPage() {
     setError(null)
 
     try {
-      const registerRes = await fetch("/api/proxy/identity/api/v1/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: data.email,
-          password: data.password,
-          fullName: data.businessName,
-        }),
-      })
+      const registerRes = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/identity/api/v1/auth/register`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: data.email,
+            password: data.password,
+            fullName: data.businessName,
+          }),
+        }
+      )
 
       if (!registerRes.ok) {
         const body = await registerRes.json()
@@ -62,15 +65,18 @@ export default function RegisterPage() {
 
       const { userId } = await registerRes.json()
 
-      const onboardRes = await fetch("/api/proxy/merchant/api/v1/merchants", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId,
-          businessName: data.businessName,
-          email: data.email,
-        }),
-      })
+      const onboardRes = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/merchant/api/v1/merchants`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId,
+            businessName: data.businessName,
+            email: data.email,
+          }),
+        }
+      )
 
       if (!onboardRes.ok) {
         setError("Account created but merchant onboarding failed. Please contact support.")

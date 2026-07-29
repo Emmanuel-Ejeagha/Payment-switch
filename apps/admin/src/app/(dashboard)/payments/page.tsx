@@ -48,13 +48,26 @@ export default function PaymentsPage() {
 
   useEffect(() => {
     async function loadMerchants() {
-      const res = await fetch("/api/proxy/merchant/api/v1/merchants?skip=0&take=100")
-      if (res.ok) {
+      try {
+        const res = await fetch("/api/proxy/merchant/api/v1/merchants?skip=0&take=100")
+        if (res.status === 403) {
+          setError("Admin access required. Log out and sign back in.")
+          setLoading(false)
+          return
+        }
+        if (!res.ok) {
+          setError(`Failed to load merchants (${res.status})`)
+          setLoading(false)
+          return
+        }
         const list: MerchantDto[] = await res.json()
         setMerchants(list)
         if (list.length > 0 && !selectedMerchantId) {
           setSelectedMerchantId(list[0].id)
         }
+      } catch {
+        setError("Failed to load merchants")
+        setLoading(false)
       }
     }
     loadMerchants()
@@ -146,7 +159,12 @@ export default function PaymentsPage() {
         </div>
       </div>
 
-      {!selectedMerchantId && merchants.length === 0 && !loading ? (
+      {error && !loading && (
+        <div className="rounded-xl border border-destructive/50 bg-destructive/10 p-6 text-destructive">
+          <p className="font-medium">{error}</p>
+        </div>
+      )}
+      {!error && !selectedMerchantId && merchants.length === 0 && !loading ? (
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-16 text-center">
           <CreditCard className="mb-3 h-8 w-8 text-muted-foreground" />
           <p className="font-medium">No merchants found</p>
