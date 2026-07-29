@@ -52,9 +52,10 @@ export default function MerchantLedgerPage() {
 
   useEffect(() => {
     if (!merchant) return
+    const mId = merchant.id
     async function loadTx() {
       const txRes = await fetch(
-        `/api/proxy/ledger/api/v1/ledger/transactions?merchantId=${merchant.id}&skip=${skip}&take=${take}`
+        `/api/proxy/ledger/api/v1/ledger/transactions?merchantId=${mId}&skip=${skip}&take=${take}`
       )
       if (txRes.ok) setTransactions(await txRes.json())
     }

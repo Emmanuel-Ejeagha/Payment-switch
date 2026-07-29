@@ -1,9 +1,15 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
-import { Wallet, Clock, Lock, CreditCard } from "lucide-react"
+import { useEffect, useState, useCallback, useMemo } from "react"
+import { Wallet, Clock, Lock, CreditCard, ChevronDown } from "lucide-react"
 import { StatsCard } from "@paymentswitch/ui"
 import type { UserDto, MerchantDto, BalanceDto, PaymentIntentDto } from "@paymentswitch/shared"
+
+const SUPPORTED_CURRENCIES = ["USD", "EUR", "GBP", "NGN"]
+
+function zeroBalance(currency: string, merchantId: string): BalanceDto {
+  return { merchantId, available: 0, pending: 0, reserved: 0, currency }
+}
 
 export default function MerchantDashboardPage() {
   const [user, setUser] = useState<UserDto | null>(null)
@@ -12,6 +18,13 @@ export default function MerchantDashboardPage() {
   const [payments, setPayments] = useState<PaymentIntentDto[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [selectedCurrency, setSelectedCurrency] = useState<string>("ALL")
+
+  const allBalances = useMemo(() => {
+    if (!merchant || balances.length === 0) return balances
+    const map = new Map(balances.map((b) => [b.currency, b]))
+    return SUPPORTED_CURRENCIES.map((c) => map.get(c) ?? zeroBalance(c, merchant.id))
+  }, [balances, merchant])
 
   const loadData = useCallback(async () => {
     if (!merchant) return
@@ -60,6 +73,8 @@ export default function MerchantDashboardPage() {
     return () => clearInterval(interval)
   }, [merchant, loadData])
 
+  const allZero = allBalances.every((b) => b.available === 0 && b.pending === 0 && b.reserved === 0)
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -95,41 +110,55 @@ export default function MerchantDashboardPage() {
         </p>
       </div>
 
-      {balances.length === 0 ? (
-        <div className="rounded-xl border bg-card p-6 text-sm text-muted-foreground">
-          No balance data yet. Create a payment to get started.
+      <div className="space-y-4">
+        <div className="relative w-48">
+          <select
+            value={selectedCurrency}
+            onChange={(e) => setSelectedCurrency(e.target.value)}
+            className="w-full appearance-none rounded-lg border bg-card px-3 py-2 pr-8 text-sm outline-none focus:ring-2 focus:ring-primary"
+          >
+            <option value="ALL">All currencies</option>
+            {SUPPORTED_CURRENCIES.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         </div>
-      ) : (
-        <div className="space-y-6">
-          {balances.map((b) => (
-            <div key={b.currency}>
-              <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                {b.currency}
-              </p>
-              <div className="grid gap-4 md:grid-cols-3">
-                <StatsCard
-                  title="Available"
-                  value={`${(b.available / 100).toFixed(2)} ${b.currency}`}
-                  icon={Wallet}
-                  description="Ready for payout"
-                />
-                <StatsCard
-                  title="Pending"
-                  value={`${(b.pending / 100).toFixed(2)} ${b.currency}`}
-                  icon={Clock}
-                  description="Awaiting settlement"
-                />
-                <StatsCard
-                  title="Reserved"
-                  value={`${(b.reserved / 100).toFixed(2)} ${b.currency}`}
-                  icon={Lock}
-                  description="Held for disputes"
-                />
-              </div>
+        {(selectedCurrency === "ALL" ? allBalances : allBalances.filter((b) => b.currency === selectedCurrency)).map((b) => (
+          <div key={b.currency}>
+            <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              {b.currency}
+            </p>
+            <div className="grid gap-4 md:grid-cols-3">
+              <StatsCard
+                title="Available"
+                value={`${(b.available / 100).toFixed(2)} ${b.currency}`}
+                icon={Wallet}
+                description="Ready for payout"
+              />
+              <StatsCard
+                title="Pending"
+                value={`${(b.pending / 100).toFixed(2)} ${b.currency}`}
+                icon={Clock}
+                description="Awaiting settlement"
+              />
+              <StatsCard
+                title="Reserved"
+                value={`${(b.reserved / 100).toFixed(2)} ${b.currency}`}
+                icon={Lock}
+                description="Held for disputes"
+              />
             </div>
-          ))}
-        </div>
-      )}
+          </div>
+        ))}
+        {allZero && (
+          <div className="rounded-xl border bg-card p-6 text-sm text-muted-foreground">
+            No balance data yet. Create a payment to get started.
+          </div>
+        )}
+      </div>
 
       <div className="rounded-xl border bg-card">
         <div className="flex items-center justify-between border-b px-6 py-4">

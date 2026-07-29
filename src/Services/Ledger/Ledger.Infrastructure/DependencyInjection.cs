@@ -34,6 +34,7 @@ public static class DependencyInjection
             "RabbitMQ HostName is required");
         services.AddScoped<IEventBus, RabbitMQEventBus>();
         services.AddHostedService<OutboxPublisherService>();
+        services.AddHostedService<RabbitMQConsumerService>();
 
         return services;
     }

@@ -56,13 +56,11 @@ public class CreatePaymentIntentHandler
 
         var intent = new PaymentIntent(Guid.NewGuid(), command.MerchantId, amount, idempotencyKey, paymentMethod, cardDetails);
 
-        await _repository.AddAsync(intent, cancellationToken);
-
-        // Auto-authorize via mock gateway
         var authResult = await _gateway.AuthorizeAsync(intent.MerchantId, intent.Amount, intent.CardDetails, cancellationToken);
         if (!authResult.IsSuccess)
         {
             intent.Fail();
+            await _repository.AddAsync(intent, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             await _dispatcher.DispatchAsync(intent.DomainEvents, cancellationToken);
             return new PaymentIntentResponse(intent.Id, intent.Status.Value, null);
@@ -73,9 +71,9 @@ public class CreatePaymentIntentHandler
         var gatewayRef = new GatewayReference(gwResponse.GatewayReference!);
         intent.Authorize(authCode, gatewayRef);
 
-        // Auto-capture full amount
         intent.Capture();
 
+        await _repository.AddAsync(intent, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         await _dispatcher.DispatchAsync(intent.DomainEvents, cancellationToken);
 

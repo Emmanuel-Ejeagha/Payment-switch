@@ -16,7 +16,7 @@ public class PaymentIntent : AggregateRoot
     public AuthorizationCode? AuthorizationCode { get; private set; }
     public GatewayReference? GatewayReference { get; private set; }
     public IReadOnlyList<Transaction> Transactions => _transactions.AsReadOnly();
-    private readonly List<Transaction> _transactions = new();
+    private List<Transaction> _transactions = new();
     public DateTime CreatedAt { get; private set; }
     public DateTime? UpdatedAt { get; private set; }
 
@@ -51,10 +51,10 @@ public class PaymentIntent : AggregateRoot
         Status = PaymentStatus.Authorized;
         UpdatedAt = DateTime.UtcNow;
 
-        var transaction = new Transaction(TransactionType.Authorization, Amount, gatewayReference);
+        var transaction = new Transaction(TransactionType.Authorization, new Money(Amount.Amount, Amount.Currency), new GatewayReference(gatewayReference.Value));
         _transactions.Add(transaction);
 
-        AddDomainEvent(new PaymentAuthorizedDomainEvent(Id, authorizationCode.Value, Amount, gatewayReference.Value));
+        AddDomainEvent(new PaymentAuthorizedDomainEvent(Id, MerchantId, authorizationCode.Value, Amount, gatewayReference.Value));
     }
 
     public void Capture(Money? amount = null)
@@ -62,7 +62,7 @@ public class PaymentIntent : AggregateRoot
         if (Status != PaymentStatus.Authorized && Status != PaymentStatus.PartiallyCaptured)
             throw new InvalidOperationException($"Cannot capture payment in '{Status}' status.");
 
-        var captureAmount = amount ?? Amount; 
+        var captureAmount = amount ?? new Money(Amount.Amount, Amount.Currency);
 
         var capturedSoFar = _transactions
             .Where(t => t.Type == TransactionType.Capture)
@@ -85,7 +85,7 @@ public class PaymentIntent : AggregateRoot
             Status = PaymentStatus.PartiallyCaptured;
 
         UpdatedAt = DateTime.UtcNow;
-        AddDomainEvent(new PaymentCapturedDomainEvent(Id, transaction.Id, captureAmount));
+        AddDomainEvent(new PaymentCapturedDomainEvent(Id, MerchantId, transaction.Id, captureAmount));
     }
 
     public void Void()
@@ -129,7 +129,7 @@ public class PaymentIntent : AggregateRoot
             Status = PaymentStatus.PartiallyRefunded;
 
         UpdatedAt = DateTime.UtcNow;
-        AddDomainEvent(new PaymentRefundedDomainEvent(Id, transaction.Id, refundAmount));
+        AddDomainEvent(new PaymentRefundedDomainEvent(Id, MerchantId, transaction.Id, refundAmount));
     }
 
     public void Fail()

@@ -3,8 +3,10 @@
 import { useEffect, useState } from "react"
 import { Plus, CreditCard } from "lucide-react"
 import type { PaymentIntentDto, MerchantDto, UserDto } from "@paymentswitch/shared"
+import { useToast } from "@/components/toast"
 
 export default function PaymentsPage() {
+  const { showToast } = useToast()
   const [merchant, setMerchant] = useState<MerchantDto | null>(null)
   const [payments, setPayments] = useState<PaymentIntentDto[]>([])
   const [loading, setLoading] = useState(true)
@@ -98,7 +100,11 @@ export default function PaymentsPage() {
           onClose={() => setShowCreate(false)}
           onCreated={async (intentId) => {
             const res = await fetch(`/api/proxy/payment/api/v1/payments/${intentId}`)
-            if (res.ok) setPayments((prev) => [await res.json(), ...prev])
+            if (res.ok) {
+              const p = await res.json()
+              setPayments((prev) => [p, ...prev])
+              showToast("success", "Payment created successfully")
+            }
             setShowCreate(false)
           }}
         />

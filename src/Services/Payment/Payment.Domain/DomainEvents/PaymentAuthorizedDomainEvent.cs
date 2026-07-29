@@ -5,6 +5,7 @@ namespace Payment.Domain.DomainEvents;
 
 public record PaymentAuthorizedDomainEvent(
     Guid IntentId,
+    Guid MerchantId,
     string AuthorizationCode,
     Money Amount,
     string GatewayReference) : DomainEvent;

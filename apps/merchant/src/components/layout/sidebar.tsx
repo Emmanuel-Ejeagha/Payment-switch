@@ -40,6 +40,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
   const pathname = usePathname()
   const { theme, toggle } = useTheme()
   const [merchantId, setMerchantId] = useState<string | null>(null)
+  const [showNotifications, setShowNotifications] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -92,12 +93,33 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         ))}
       </nav>
       <div className="border-t p-4 space-y-2">
-        {connected && events.length > 0 && (
-          <div className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
-            <Bell className="h-3.5 w-3.5 text-primary" />
-            <span className="truncate">{events[0].message}</span>
-          </div>
-        )}
+        <div className="relative">
+          <button
+            onClick={() => setShowNotifications((p) => !p)}
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+          >
+            <Bell className="h-4 w-4" />
+            Notifications
+            {events.length > 0 && (
+              <span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-semibold text-primary-foreground">
+                {events.length}
+              </span>
+            )}
+            {connected && (
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" title="Connected" />
+            )}
+          </button>
+          {showNotifications && events.length > 0 && (
+            <div className="absolute bottom-full left-0 right-0 mb-2 max-h-48 overflow-y-auto rounded-lg border bg-card shadow-lg">
+              {events.slice(0, 10).map((ev, i) => (
+                <div key={i} className="border-b px-3 py-2 text-xs last:border-0">
+                  <p className="font-medium">{ev.eventType}</p>
+                  <p className="text-muted-foreground">{ev.message}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
         <button
           onClick={toggle}
           className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
