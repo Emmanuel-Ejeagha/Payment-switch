@@ -46,6 +46,8 @@ public static class DependencyInjection
         services.AddScoped<IEventBus, RabbitMQEventBus>();
         services.AddScoped<HttpClient>(_ => new HttpClient());
 
+        services.Configure<SmtpSettings>(configuration.GetSection("Smtp"));
+
         return services;
     }
 }
