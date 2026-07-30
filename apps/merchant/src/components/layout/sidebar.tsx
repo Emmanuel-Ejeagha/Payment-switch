@@ -110,7 +110,16 @@ export function Sidebar({ open, onClose }: SidebarProps) {
             )}
           </button>
           {showNotifications && events.length > 0 && (
-            <div className="absolute bottom-full left-0 right-0 mb-2 max-h-48 overflow-y-auto rounded-lg border bg-card shadow-lg">
+            <div className="fixed bottom-20 left-16 z-50 max-h-64 w-72 overflow-y-auto rounded-lg border bg-card shadow-lg">
+              <div className="flex items-center justify-between border-b px-3 py-2">
+                <span className="text-xs font-semibold">Notifications</span>
+                <button
+                  onClick={() => setShowNotifications(false)}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
               {events.slice(0, 10).map((ev, i) => (
                 <div key={i} className="border-b px-3 py-2 text-xs last:border-0">
                   <p className="font-medium">{ev.eventType}</p>

@@ -21,5 +21,12 @@ public class SignalRRealTimeNotifier : IRealTimeNotifier
             Message = message,
             Timestamp = DateTime.UtcNow
         }, cancellationToken);
+
+        await _hubContext.Clients.Group("admin").SendAsync("PaymentEvent", new
+        {
+            EventType = eventType,
+            Message = message,
+            Timestamp = DateTime.UtcNow
+        }, cancellationToken);
     }
 }
