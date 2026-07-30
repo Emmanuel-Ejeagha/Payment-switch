@@ -12,6 +12,11 @@ public class PaymentNotificationHub : Hub
         {
             await Groups.AddToGroupAsync(Context.ConnectionId, $"merchant-{merchantId}");
         }
+        var isAdmin = httpContext?.Request.Query["isAdmin"].FirstOrDefault();
+        if (!string.IsNullOrEmpty(isAdmin) && isAdmin == "true")
+        {
+            await Groups.AddToGroupAsync(Context.ConnectionId, "admin");
+        }
         await base.OnConnectedAsync();
     }
 }

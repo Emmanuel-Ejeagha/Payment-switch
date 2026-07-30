@@ -30,7 +30,7 @@ export default function NotificationsPage() {
       const params = new URLSearchParams({ skip: String(skip), take: String(take) })
       if (statusFilter) params.set("status", statusFilter)
       if (channelFilter) params.set("channel", channelFilter)
-      const res = await fetch(`/api/proxy/notification/api/v1/notification?${params}`)
+      const res = await fetch(`/api/proxy/notification/api/v1/notifications?${params}`)
       if (res.ok) setNotifications(await res.json())
       setLoading(false)
     }
