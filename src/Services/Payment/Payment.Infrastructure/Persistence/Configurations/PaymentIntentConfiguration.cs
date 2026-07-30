@@ -54,6 +54,7 @@ public class PaymentIntentConfiguration : IEntityTypeConfiguration<PaymentIntent
         {
             t.WithOwner().HasForeignKey("PaymentIntentId");
             t.HasKey("Id");
+            t.Property(tx => tx.Id).ValueGeneratedNever();
             t.UsePropertyAccessMode(PropertyAccessMode.PreferField);
             t.Property(tx => tx.Type).HasConversion<string>().IsRequired();
             t.OwnsOne(tx => tx.Amount, txA =>
