@@ -12,6 +12,8 @@ public class Merchant : AggregateRoot
     public WebhookUrl? WebhookUrl { get; private set; } = default!;
     public IReadOnlyList<string> EnabledPaymentMethods => _paymentMethods.AsReadOnly();
     private readonly List<string> _paymentMethods = new();
+    public IReadOnlyList<MerchantApiKey> ApiKeys => _apiKeys.AsReadOnly();
+    private readonly List<MerchantApiKey> _apiKeys = new();
     public bool AutoCapture { get; private set; } = true;
     public DateTime CreatedAt { get; private set; }
     public DateTime? UpdatedAt { get; private set; }
@@ -65,5 +67,22 @@ public class Merchant : AggregateRoot
 
         UpdatedAt = DateTime.UtcNow;
         AddDomainEvent(new MerchantConfigurationUpdatedEvent(Id));
+    }
+
+    public MerchantApiKey GenerateApiKey(string keyHash, string keyPrefix, string environment)
+    {
+        var apiKey = new MerchantApiKey(Guid.NewGuid(), Id, keyHash, keyPrefix, environment);
+        _apiKeys.Add(apiKey);
+        UpdatedAt = DateTime.UtcNow;
+        return apiKey;
+    }
+
+    public void RevokeApiKey(Guid keyId)
+    {
+        var key = _apiKeys.FirstOrDefault(k => k.Id == keyId);
+        if (key is null)
+            throw new InvalidOperationException("API key not found.");
+        key.Revoke();
+        UpdatedAt = DateTime.UtcNow;
     }
 }

@@ -50,4 +50,31 @@ public class MerchantRepository : IMerchantRepository
             .Select(m => new MerchantDto(m.Id, m.BusinessName.Value, m.Email.Value, m.Status.Value, m.WebhookUrl == null ? null : m.WebhookUrl.Value, m.EnabledPaymentMethods.ToList(), m.AutoCapture))
             .ToListAsync(cancellationToken);
     }
+
+    public async Task<MerchantEntity?> GetByIdWithApiKeysAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        return await _context.Merchants
+            .Include(m => m.ApiKeys)
+            .FirstOrDefaultAsync(m => m.Id == id, cancellationToken);
+    }
+
+    public async Task<MerchantKeyResolution?> ResolveApiKeyAsync(string keyPrefix, string keyHash, CancellationToken cancellationToken = default)
+    {
+        return await (from k in _context.MerchantApiKeys
+                      join m in _context.Merchants on k.MerchantId equals m.Id
+                      where k.KeyPrefix == keyPrefix
+                            && k.KeyHash == keyHash
+                            && k.RevokedAt == null
+                      select new MerchantKeyResolution(m.Id, m.Status.Value, k.Environment))
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<List<MerchantApiKeyDto>> GetApiKeysByMerchantIdAsync(Guid merchantId, CancellationToken cancellationToken = default)
+    {
+        return await _context.MerchantApiKeys
+            .Where(k => k.MerchantId == merchantId)
+            .OrderByDescending(k => k.CreatedAt)
+            .Select(k => new MerchantApiKeyDto(k.Id, k.Environment, k.KeyPrefix, k.CreatedAt, k.RevokedAt))
+            .ToListAsync(cancellationToken);
+    }
 }

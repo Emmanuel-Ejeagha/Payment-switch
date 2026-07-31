@@ -1,7 +1,10 @@
 ﻿using Merchant.Application.Features.Commands.ActivateMerchant;
+using Merchant.Application.Features.Commands.GenerateMerchantApiKey;
 using Merchant.Application.Features.Commands.OnboardMerchant;
+using Merchant.Application.Features.Commands.RevokeMerchantApiKey;
 using Merchant.Application.Features.Commands.SuspendMerchant;
 using Merchant.Application.Features.Commands.UpdateMerchantConfig;
+using Merchant.Application.Features.Queries.GetMerchantApiKeys;
 using Merchant.Application.Features.Queries.GetMerchantByEmail;
 using Merchant.Application.Features.Queries.GetMerchantById;
 using Merchant.Application.Features.Queries.ListMerchants;
@@ -17,9 +20,12 @@ public static class DependencyInjection
         services.AddScoped<ActivateMerchantHandler>();
         services.AddScoped<SuspendMerchantHandler>();
         services.AddScoped<UpdateMerchantConfigurationHandler>();
+        services.AddScoped<GenerateMerchantApiKeyHandler>();
+        services.AddScoped<RevokeMerchantApiKeyHandler>();
         services.AddScoped<GetMerchantByIdHandler>();
         services.AddScoped<GetMerchantByEmailHandler>();
         services.AddScoped<ListMerchantsHandler>();
+        services.AddScoped<GetMerchantApiKeysHandler>();
 
         services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
 

@@ -48,7 +48,7 @@ public class AuthorizePaymentHandler
 
         var statusResult = await _merchantService.GetMerchantStatusAsync(intent.MerchantId, cancellationToken);
         if (!statusResult.IsSuccess) return Result<AuthorizePaymentResponse>.Failure(statusResult.Errors);
-        if (statusResult.Value != "active") return new Error("Payment.MerchantNotActive", "Merchant is not active.");
+        if (!string.Equals(statusResult.Value, "Active", StringComparison.OrdinalIgnoreCase)) return new Error("Payment.MerchantNotActive", "Merchant is not active.");
 
         if (intent.Status != PaymentStatus.Pending)
             return PaymentErrors.InvalidStatusTransition(intent.Status.Value, "Authorized");

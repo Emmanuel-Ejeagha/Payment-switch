@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { Key, Plus, Copy, Trash2, Check, AlertCircle } from "lucide-react"
-import type { ApiKeyDto } from "@paymentswitch/shared"
+import type { ApiKeyDto, MerchantDto, UserDto } from "@paymentswitch/shared"
 
 export default function ApiKeysPage() {
   const [apiKeys, setApiKeys] = useState<ApiKeyDto[]>([])
@@ -12,11 +12,21 @@ export default function ApiKeysPage() {
   const [generating, setGenerating] = useState(false)
   const [newKey, setNewKey] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [merchantId, setMerchantId] = useState<string | null>(null)
 
   useEffect(() => {
     async function loadKeys() {
       try {
-        const res = await fetch("/api/proxy/identity/api/v1/apikeys")
+        const userRes = await fetch("/api/proxy/identity/api/v1/users/me")
+        if (!userRes.ok) { setError("Failed to load user"); setLoading(false); return }
+        const userData: UserDto = await userRes.json()
+
+        const merchantRes = await fetch(`/api/proxy/merchant/api/v1/merchants/by-email/${encodeURIComponent(userData.email)}`)
+        if (!merchantRes.ok) { setError("Failed to load merchant"); setLoading(false); return }
+        const merchantData: MerchantDto = await merchantRes.json()
+        setMerchantId(merchantData.id)
+
+        const res = await fetch(`/api/proxy/merchant/api/v1/merchants/${merchantData.id}/apikeys`)
         if (!res.ok) { setError("Failed to load API keys"); return }
         setApiKeys(await res.json())
       } catch {
@@ -29,10 +39,11 @@ export default function ApiKeysPage() {
   }, [])
 
   const handleGenerateKey = async () => {
+    if (!merchantId) return
     setGenerating(true)
     setNewKey(null)
     try {
-      const res = await fetch("/api/proxy/identity/api/v1/apikeys", {
+      const res = await fetch(`/api/proxy/merchant/api/v1/merchants/${merchantId}/apikeys`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ environment }),
@@ -56,7 +67,8 @@ export default function ApiKeysPage() {
   }
 
   const handleRevokeKey = async (keyId: string) => {
-    const res = await fetch(`/api/proxy/identity/api/v1/apikeys/${keyId}`, {
+    if (!merchantId) return
+    const res = await fetch(`/api/proxy/merchant/api/v1/merchants/${merchantId}/apikeys/${keyId}`, {
       method: "DELETE",
     })
     if (res.ok) {
@@ -89,7 +101,7 @@ export default function ApiKeysPage() {
       <div>
         <h1 className="text-3xl font-semibold">API Keys</h1>
         <p className="text-sm text-muted-foreground">
-          Manage API keys for programmatic access
+          Secret keys authenticate your requests to the public Payments API (Authorization: Bearer sk_live_...)
         </p>
       </div>
 

@@ -29,4 +29,17 @@ public class GrpcMerchantService : IMerchantService
             string.IsNullOrEmpty(response.WebhookUrl) ? null : response.WebhookUrl,
             response.AutoCapture));
     }
+
+    public async Task<Result<MerchantKeyResolution>> ResolveApiKeyAsync(string keyPrefix, string keyHash, CancellationToken cancellationToken = default)
+    {
+        var request = new ResolveApiKeyRequest { KeyPrefix = keyPrefix, KeyHash = keyHash };
+        var response = await _client.ResolveApiKeyAsync(request, cancellationToken: cancellationToken);
+        if (string.IsNullOrEmpty(response.MerchantId))
+            return new Error("Payment.InvalidApiKey", "Invalid API key.");
+
+        return Result<MerchantKeyResolution>.Success(new MerchantKeyResolution(
+            Guid.Parse(response.MerchantId),
+            response.Status,
+            response.Environment));
+    }
 }
