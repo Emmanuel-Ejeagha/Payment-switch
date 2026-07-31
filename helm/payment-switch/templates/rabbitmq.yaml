@@ -22,9 +22,9 @@ spec:
             - containerPort: {{ .Values.infrastructure.rabbitmq.managementPort }}
           env:
             - name: RABBITMQ_DEFAULT_USER
-              value: "guest"
+              value: {{ .Values.config.rabbitmq.userName | quote }}
             - name: RABBITMQ_DEFAULT_PASS
-              value: "guest"
+              value: {{ .Values.config.rabbitmq.password | quote }}
           resources:
             {{- toYaml .Values.infrastructure.rabbitmq.resources | nindent 12 }}
 ---
