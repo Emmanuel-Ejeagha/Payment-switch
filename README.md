@@ -120,28 +120,36 @@ All services follow **Clean Architecture** with distinct **Domain**, **Applicati
 ### Local Development (Docker Compose)
 
 1. **Clone the repository**
+
    ```bash
    git clone https://github.com/Emmanuel-Ejeagha/Payment-switch.git
    cd PaymentSwitch
-Start infrastructure services
+   ```
 
-```bash
-docker-compose -f infra/docker-compose.yml up -d
-Run each microservice (each in its own terminal)
+2. **Start infrastructure services**
 
-bash
-dotnet run --project src/Services/Identity/Identity.API
-dotnet run --project src/Services/Merchant/Merchant.API
-dotnet run --project src/Services/Payment/Payment.API
-dotnet run --project src/Services/Ledger/Ledger.API
-dotnet run --project src/Services/Notification/Notification.API
-dotnet run --project src/Services/Settlement/Settlement.API
-Access APIs at http://localhost:5xxx/swagger (ports are configured in launchSettings.json).
-```
-Kubernetes Deployment
+   ```bash
+   docker-compose up -d
+   ```
+
+3. **Run each microservice** (each in its own terminal)
+
+   ```bash
+   dotnet run --project src/Services/Identity/Identity.API
+   dotnet run --project src/Services/Merchant/Merchant.API
+   dotnet run --project src/Services/Payment/Payment.API
+   dotnet run --project src/Services/Ledger/Ledger.API
+   dotnet run --project src/Services/Notification/Notification.API
+   dotnet run --project src/Services/Settlement/Settlement.API
+   ```
+
+   Access APIs at `http://localhost:5xxx/swagger` (ports are configured in launchSettings.json).
+
+### Kubernetes Deployment
+
 Ensure Kubernetes is running (Docker Desktop / minikube / kind).
 
-Create the namespace and secrets
+**Create the namespace and secrets**
 
 ```bash
 kubectl apply -f k8s/namespace.yaml
@@ -155,30 +163,31 @@ kubectl create secret generic payment-switch-secret \
   --from-literal=IdentityDb__ConnectionString="Host=postgres;Database=IdentityDb;Username=paymentswitch;Password=$DB_PASSWORD" \
   # ... add all connection strings (see docs/deployment.md)
 ```
-Deploy all services
+
+**Deploy all services**
 
 ```bash
 kubectl apply -f k8s/
-Access via Ingress
-
-Identity: http://localhost/identity/swagger
-
-Merchant: http://localhost/merchant/swagger
-
-Payment: http://localhost/payment/swagger
-
-Ledger: http://localhost/ledger/swagger
-
-Notification: http://localhost/notification/swagger
-
-Settlement: http://localhost/settlement/swagger
 ```
-Observability
-Tool	Access URL / Port	Purpose
-Jaeger	http://localhost:16686	Distributed traces across all services
-Prometheus	http://localhost:9090	Metrics scraping
-Grafana	http://localhost:3000	Dashboards (admin / admin)
-A pre‑configured ASP.NET Core HTTP Overview dashboard is available in Grafana showing request rate, latency percentiles, and active connections.
+
+**Access via Ingress**
+
+- Identity: http://localhost/identity/swagger
+- Merchant: http://localhost/merchant/swagger
+- Payment: http://localhost/payment/swagger
+- Ledger: http://localhost/ledger/swagger
+- Notification: http://localhost/notification/swagger
+- Settlement: http://localhost/settlement/swagger
+
+### Observability
+
+| Tool       | Access URL / Port          | Purpose                             |
+|------------|----------------------------|-------------------------------------|
+| Jaeger     | http://localhost:16686     | Distributed traces across services  |
+| Prometheus | http://localhost:9090      | Metrics scraping                    |
+| Grafana    | http://localhost:3000      | Dashboards (admin / admin)          |
+
+*(Grafana dashboard and datasource provisioning is a work in progress; see the Roadmap.)*
 
 CI/CD Pipeline
 The project uses GitHub Actions:
@@ -201,33 +210,39 @@ PaymentSwitch/
 ├── src/
 │   ├── BuildingBlocks/
 │   │   └── BuildingBlocks.Shared/         # Shared kernel (Result, AggregateRoot, etc.)
-│   ├── Services/
-│   │   ├── Identity/                      # Identity microservice
-│   │   ├── Merchant/                      # Merchant microservice
-│   │   ├── Payment/                       # Payment microservice
-│   │   ├── Ledger/                        # Ledger microservice
-│   │   ├── Notification/                  # Notification microservice
-│   │   └── Settlement/                    # Settlement microservice
-│   └── Frontend/                          # Future SPA
+│   ├── Protos/                            # gRPC contracts
+│   └── Services/
+│       ├── Identity/                      # Identity microservice
+│       ├── Merchant/                      # Merchant microservice
+│       ├── Payment/                       # Payment microservice
+│       ├── Ledger/                        # Ledger microservice
+│       ├── Notification/                  # Notification microservice
+│       └── Settlement/                    # Settlement microservice
+├── apps/
+│   ├── merchant/                          # Merchant portal (Next.js SPA)
+│   └── admin/                             # Admin portal (Next.js SPA)
+├── packages/
+│   ├── shared/                            # Shared TypeScript types & utils
+│   └── ui/                                # Shared React components
 ├── tests/
-│   └── Unit/                              # Unit tests per service
+│   ├── Unit/                              # Unit tests per service
+│   └── Integration/                       # Integration tests per service
 ├── k8s/                                   # Kubernetes manifests
-├── infra/                                 # Docker Compose & Nginx config
+├── helm/                                  # Helm chart
+├── infra/                                 # Nginx, Prometheus, Postgres configs
 ├── .github/workflows/                     # CI/CD pipeline
 ├── docs/                                  # Detailed documentation
 └── PaymentSwitch.slnx
 ```
 Future Enhancements
-Real‑time webhooks with SignalR
-
-Full OAuth2 / OpenID Connect flows
-
-Multi‑currency support with FX conversion
-
-Merchant Portal (React SPA)
-
-Admin Portal
-
-Helm charts for Kubernetes deployment
-
-Production‑ready TLS & network policies
+- Real‑time webhooks with SignalR *(implemented — notification hub + portal UI)*
+- Full OAuth2 / OpenID Connect flows
+- Multi‑currency support with FX conversion *(multi‑currency balances implemented; FX pending)*
+- Merchant Portal *(implemented — Next.js)*
+- Admin Portal *(implemented — Next.js)*
+- Helm charts for Kubernetes deployment *(scaffolded)*
+- Public Payments API with secret‑key auth (Stripe/Paystack‑style)
+- Card tokenization, 3DS, and a hosted Checkout page
+- Subscriptions & recurring billing
+- Disputes / chargebacks
+- Production‑ready TLS & network policies

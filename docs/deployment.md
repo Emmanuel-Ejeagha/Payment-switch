@@ -11,6 +11,8 @@
 ```bash
 kubectl apply -f k8s/namespace.yaml
 kubectl apply -f k8s/configmap.yaml
+```
+
 ## Step 2 – Create Secrets
 
 Create the secret with all connection strings and the JWT secret.
@@ -33,24 +35,34 @@ kubectl create secret generic payment-switch-secret \
   --from-literal=NotificationDb__ConnectionString="Host=postgres;Database=NotificationDb;Username=paymentswitch;Password=$DB_PASSWORD" \
   --from-literal=SettlementDb__ConnectionString="Host=postgres;Database=SettlementDb;Username=paymentswitch;Password=$DB_PASSWORD"
 ```
-Step 3 – Deploy Infrastructure & Services
+
+## Step 3 – Deploy Infrastructure & Services
+
 ```bash
 kubectl apply -f k8s/
-This deploys PostgreSQL, Redis, RabbitMQ, Jaeger, Prometheus, Grafana, all six microservices, and the Ingress.
 ```
-Step 4 – Verify
+
+This deploys PostgreSQL, Redis, RabbitMQ, Jaeger, Prometheus, Grafana, all six microservices, and the Ingress.
+
+## Step 4 – Verify
+
 ```bash
 kubectl get pods -n payment-switch
 kubectl get ingress -n payment-switch
-Access the APIs via http://localhost/<service>/swagger.
 ```
-Optional – Port‑Forward Observability Tools
+
+Access the APIs via `http://localhost/<service>/swagger`.
+
+## Optional – Port‑Forward Observability Tools
+
 ```bash
 kubectl port-forward -n payment-switch svc/jaeger 16686:16686
 kubectl port-forward -n payment-switch svc/prometheus 9090:9090
 kubectl port-forward -n payment-switch svc/grafana 3000:3000
-CI/CD Automation
-The GitHub Actions workflow (.github/workflows/ci-cd.yml) automatically builds, tests, and deploys the services when changes are pushed to the main branch. Ensure the KUBE_CONFIG secret is set in your repository.
-
 ```
----
+
+## CI/CD Automation
+
+The GitHub Actions workflow (`.github/workflows/ci-cd.yml`) automatically builds, tests, and deploys
+the services when changes are pushed to the `main` branch. Ensure the `KUBE_CONFIG` secret is set in
+your repository.
