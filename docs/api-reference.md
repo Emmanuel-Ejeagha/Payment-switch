@@ -45,6 +45,7 @@ All endpoints return JSON. Authentication uses JWT Bearer tokens obtained from t
 | Method | Endpoint                                      | Auth | Description                     |
 |--------|-----------------------------------------------|------|---------------------------------|
 | GET    | `/api/v1/ledger/balance?merchantId={id}`       | User | Get merchant balances           |
+| GET    | `/api/v1/ledger/balances?merchantId={id}`      | User | Get multi-currency balances     |
 | GET    | `/api/v1/ledger/transactions?merchantId={id}`  | User | Get transaction history (paged) |
 
 ## Notification Service
