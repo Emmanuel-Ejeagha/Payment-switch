@@ -28,6 +28,7 @@ otel.WithMetrics(metrics => metrics.AddPrometheusExporter());
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddSwaggerGen(c =>
 {
@@ -83,6 +84,7 @@ builder.Services.AddPaymentApplication();
 builder.Services.AddPaymentInfrastructure(builder.Configuration);
 
 builder.Services.AddCorrelationId();
+builder.Services.AddMemoryCache();
 builder.Services.AddPaymentSwitchRateLimiting();
 builder.Services.AddPaymentSwitchVersioning();
 builder.Services.AddPaymentSwitchOutputCache();
@@ -129,6 +131,7 @@ app.UseCors("AllowFrontend");
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseMiddleware<SecretKeyAuthMiddleware>();
 app.UsePaymentSwitchOutputCache();
 app.MapControllers();
 app.MapPrometheusScrapingEndpoint();
