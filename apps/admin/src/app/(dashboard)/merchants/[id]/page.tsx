@@ -19,6 +19,7 @@ export default function MerchantDetailPage() {
 
   const [webhookUrl, setWebhookUrl] = useState("")
   const [enabledMethods, setEnabledMethods] = useState<string[]>([])
+  const [autoCapture, setAutoCapture] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
 
@@ -34,6 +35,7 @@ export default function MerchantDetailPage() {
         setMerchant(data)
         setWebhookUrl(data.webhookUrl || "")
         setEnabledMethods(data.enabledPaymentMethods || [])
+        setAutoCapture(data.autoCapture ?? true)
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load merchant")
       } finally {
@@ -60,6 +62,7 @@ export default function MerchantDetailPage() {
           merchantId: id,
           webhookUrl: webhookUrl || null,
           paymentMethods: enabledMethods,
+          autoCapture,
         }),
       })
       if (res.ok) {
@@ -192,6 +195,30 @@ export default function MerchantDetailPage() {
               </div>
             </div>
 
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <div>
+                <p className="text-sm font-medium">Auto-capture payments</p>
+                <p className="text-xs text-muted-foreground">
+                  Capture authorized payments automatically. Turn off to authorize only.
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={autoCapture}
+                onClick={() => setAutoCapture((v) => !v)}
+                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+                  autoCapture ? "bg-primary" : "bg-input"
+                }`}
+              >
+                <span
+                  className={`inline-block h-5 w-5 transform rounded-full bg-background shadow transition-transform ${
+                    autoCapture ? "translate-x-[22px]" : "translate-x-0.5"
+                  }`}
+                />
+              </button>
+            </div>
+
             <button
               onClick={handleSaveConfig}
               disabled={saving}
@@ -240,6 +267,10 @@ export default function MerchantDetailPage() {
               <dd className="font-medium text-xs text-right">
                 {merchant.enabledPaymentMethods?.join(", ") || "—"}
               </dd>
+            </div>
+            <div className="flex justify-between">
+              <dt className="text-muted-foreground">Auto-capture</dt>
+              <dd className="font-medium">{merchant.autoCapture !== false ? "Enabled" : "Disabled"}</dd>
             </div>
           </dl>
         </div>

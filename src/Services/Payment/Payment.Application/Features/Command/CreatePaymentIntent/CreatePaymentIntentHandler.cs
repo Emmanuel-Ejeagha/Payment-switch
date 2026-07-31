@@ -15,6 +15,7 @@ public class CreatePaymentIntentHandler
 {
     private readonly IPaymentIntentRepository _repository;
     private readonly IPaymentGatewayService _gateway;
+    private readonly IMerchantService _merchantService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IDomainEventDispatcher _dispatcher;
     private readonly IValidator<CreatePaymentIntentCommand> _validator;
@@ -23,6 +24,7 @@ public class CreatePaymentIntentHandler
     public CreatePaymentIntentHandler(
         IPaymentIntentRepository repository,
         IPaymentGatewayService gateway,
+        IMerchantService merchantService,
         IUnitOfWork unitOfWork,
         IDomainEventDispatcher dispatcher,
         IValidator<CreatePaymentIntentCommand> validator,
@@ -30,6 +32,7 @@ public class CreatePaymentIntentHandler
     {
         _repository = repository;
         _gateway = gateway;
+        _merchantService = merchantService;
         _unitOfWork = unitOfWork;
         _dispatcher = dispatcher;
         _validator = validator;
@@ -56,6 +59,10 @@ public class CreatePaymentIntentHandler
 
         var intent = new PaymentIntent(Guid.NewGuid(), command.MerchantId, amount, idempotencyKey, paymentMethod, cardDetails);
 
+        var configResult = await _merchantService.GetMerchantConfigAsync(command.MerchantId, cancellationToken);
+        if (!configResult.IsSuccess)
+            return new Error("Payment.MerchantConfigRetrievalFailed", "Unable to retrieve merchant configuration.");
+
         var authResult = await _gateway.AuthorizeAsync(intent.MerchantId, intent.Amount, intent.CardDetails, cancellationToken);
         if (!authResult.IsSuccess)
         {
@@ -71,14 +78,18 @@ public class CreatePaymentIntentHandler
         var gatewayRef = new GatewayReference(gwResponse.GatewayReference!);
         intent.Authorize(authCode, gatewayRef);
 
-        intent.Capture();
+        string? clientSecret = null;
+        if (configResult.Value.AutoCapture)
+        {
+            intent.Capture();
+            clientSecret = intent.Transactions.Last(t => t.Type == TransactionType.Capture).Id.ToString();
+        }
 
         await _repository.AddAsync(intent, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         await _dispatcher.DispatchAsync(intent.DomainEvents, cancellationToken);
 
-        var captureTx = intent.Transactions.Last(t => t.Type == TransactionType.Capture);
-        return new PaymentIntentResponse(intent.Id, intent.Status.Value, captureTx.Id.ToString());
+        return new PaymentIntentResponse(intent.Id, intent.Status.Value, clientSecret);
     }
 
     private static PaymentMethod ResolvePaymentMethod(string method) => method switch

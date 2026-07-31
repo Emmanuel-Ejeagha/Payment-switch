@@ -15,6 +15,7 @@ public class CreatePaymentIntentHandlerTests
 {
     private readonly Mock<IPaymentIntentRepository> _repoMock = new();
     private readonly Mock<IPaymentGatewayService> _gatewayMock = new();
+    private readonly Mock<IMerchantService> _merchantServiceMock = new();
     private readonly Mock<IUnitOfWork> _uowMock = new();
     private readonly Mock<IDomainEventDispatcher> _dispatcherMock = new();
     private readonly Mock<IValidator<CreatePaymentIntentCommand>> _validatorMock = new();
@@ -23,7 +24,7 @@ public class CreatePaymentIntentHandlerTests
 
     public CreatePaymentIntentHandlerTests()
     {
-        _handler = new CreatePaymentIntentHandler(_repoMock.Object, _gatewayMock.Object, _uowMock.Object, _dispatcherMock.Object, _validatorMock.Object, _loggerMock.Object);
+        _handler = new CreatePaymentIntentHandler(_repoMock.Object, _gatewayMock.Object, _merchantServiceMock.Object, _uowMock.Object, _dispatcherMock.Object, _validatorMock.Object, _loggerMock.Object);
     }
 
     [Fact]
@@ -32,6 +33,7 @@ public class CreatePaymentIntentHandlerTests
         var command = new CreatePaymentIntentCommand(Guid.NewGuid(), 100, "USD", "Card", "1234", "Visa", "unique-key");
         SetupValidatorSuccess(command);
         _repoMock.Setup(r => r.GetByIdempotencyKeyAsync(command.MerchantId, command.IdempotencyKey, It.IsAny<CancellationToken>())).ReturnsAsync((PaymentIntent?)null);
+        SetupMerchantConfig(autoCapture: true);
         _gatewayMock.Setup(g => g.AuthorizeAsync(command.MerchantId, It.IsAny<Money>(), It.IsAny<CardDetails?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<GatewayResponse>.Success(new GatewayResponse(true, "AUTH123", "GW-1", null)));
         _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
@@ -48,11 +50,30 @@ public class CreatePaymentIntentHandlerTests
     }
 
     [Fact]
+    public async Task Handle_ManualCaptureMerchant_ShouldAuthorizeOnly()
+    {
+        var command = new CreatePaymentIntentCommand(Guid.NewGuid(), 100, "USD", "Card", "1234", "Visa", "manual-key");
+        SetupValidatorSuccess(command);
+        _repoMock.Setup(r => r.GetByIdempotencyKeyAsync(command.MerchantId, command.IdempotencyKey, It.IsAny<CancellationToken>())).ReturnsAsync((PaymentIntent?)null);
+        SetupMerchantConfig(autoCapture: false);
+        _gatewayMock.Setup(g => g.AuthorizeAsync(command.MerchantId, It.IsAny<Money>(), It.IsAny<CardDetails?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<GatewayResponse>.Success(new GatewayResponse(true, "AUTH123", "GW-1", null)));
+        _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Authorized", result.Value.Status);
+        Assert.Null(result.Value.ClientSecret);
+    }
+
+    [Fact]
     public async Task Handle_GatewayDeclines_ShouldFailIntent()
     {
         var command = new CreatePaymentIntentCommand(Guid.NewGuid(), 100, "USD", "Card", "1234", "Visa", "declined-key");
         SetupValidatorSuccess(command);
         _repoMock.Setup(r => r.GetByIdempotencyKeyAsync(command.MerchantId, command.IdempotencyKey, It.IsAny<CancellationToken>())).ReturnsAsync((PaymentIntent?)null);
+        SetupMerchantConfig(autoCapture: true);
         _gatewayMock.Setup(g => g.AuthorizeAsync(command.MerchantId, It.IsAny<Money>(), It.IsAny<CardDetails?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<GatewayResponse>.Failure(new Error("Gateway.Declined", "Card declined.")));
         _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
@@ -91,6 +112,10 @@ public class CreatePaymentIntentHandlerTests
 
     private void SetupValidatorSuccess(CreatePaymentIntentCommand command) =>
         _validatorMock.Setup(v => v.ValidateAsync(command, It.IsAny<CancellationToken>())).ReturnsAsync(new ValidationResult());
+
+    private void SetupMerchantConfig(bool autoCapture) =>
+        _merchantServiceMock.Setup(m => m.GetMerchantConfigAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<MerchantConfig>.Success(new MerchantConfig("https://hook.test", autoCapture)));
 
     private void SetupValidatorFailure(CreatePaymentIntentCommand command, string property, string error) =>
         _validatorMock.Setup(v => v.ValidateAsync(command, It.IsAny<CancellationToken>())).ReturnsAsync(new ValidationResult(new[] { new ValidationFailure(property, error) }));

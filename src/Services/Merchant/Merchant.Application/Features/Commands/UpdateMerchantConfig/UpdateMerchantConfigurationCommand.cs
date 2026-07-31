@@ -3,5 +3,6 @@
 public record UpdateMerchantConfigurationCommand(
     Guid MerchantId,
     string? WebhookUrl,
-    List<string>? PaymentMethods
+    List<string>? PaymentMethods,
+    bool? AutoCapture
 );

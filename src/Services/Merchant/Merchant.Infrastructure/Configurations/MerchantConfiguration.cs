@@ -40,6 +40,8 @@ public class MerchantConfiguration : IEntityTypeConfiguration<MerchantEntity>
                 v => JsonSerializer.Deserialize<List<string>>(v, (JsonSerializerOptions?)null) ?? new List<string>())
             .HasColumnType("jsonb");
 
+        builder.Property(m => m.AutoCapture).IsRequired();
+
         builder.Property(m => m.CreatedAt).IsRequired();
         builder.Property(m => m.UpdatedAt);
 

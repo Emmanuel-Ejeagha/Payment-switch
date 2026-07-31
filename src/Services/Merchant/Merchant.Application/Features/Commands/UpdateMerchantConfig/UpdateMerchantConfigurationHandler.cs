@@ -38,7 +38,7 @@ public class UpdateMerchantConfigurationHandler
 
         try
         {
-            merchant.UpdateConfiguration(command.WebhookUrl, command.PaymentMethods);
+            merchant.UpdateConfiguration(command.WebhookUrl, command.PaymentMethods, command.AutoCapture);
         }
         catch (InvalidOperationException)
         {

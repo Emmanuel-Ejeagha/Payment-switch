@@ -15,6 +15,7 @@ export default function SettingsPage() {
 
   const [webhookUrl, setWebhookUrl] = useState("")
   const [enabledMethods, setEnabledMethods] = useState<string[]>([])
+  const [autoCapture, setAutoCapture] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
   const [saveError, setSaveError] = useState(false)
@@ -33,6 +34,7 @@ export default function SettingsPage() {
         setMerchant(merchantData)
         setWebhookUrl(merchantData.webhookUrl || "")
         setEnabledMethods(merchantData.enabledPaymentMethods || [])
+        setAutoCapture(merchantData.autoCapture ?? true)
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load settings")
       } finally {
@@ -61,6 +63,7 @@ export default function SettingsPage() {
           merchantId: merchant.id,
           webhookUrl: webhookUrl || null,
           paymentMethods: enabledMethods,
+          autoCapture,
         }),
       })
       if (res.ok) {
@@ -192,6 +195,31 @@ export default function SettingsPage() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <div>
+                <p className="text-sm font-medium">Auto-capture payments</p>
+                <p className="text-xs text-muted-foreground">
+                  Capture authorized payments automatically. Turn off to authorize only and capture manually.
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={autoCapture}
+                onClick={() => setAutoCapture((v) => !v)}
+                disabled={merchant?.status !== "Active"}
+                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                  autoCapture ? "bg-primary" : "bg-input"
+                }`}
+              >
+                <span
+                  className={`inline-block h-5 w-5 transform rounded-full bg-background shadow transition-transform ${
+                    autoCapture ? "translate-x-[22px]" : "translate-x-0.5"
+                  }`}
+                />
+              </button>
             </div>
 
             <button

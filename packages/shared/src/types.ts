@@ -5,6 +5,7 @@ export interface MerchantDto {
   status: "Active" | "Pending" | "Suspended"
   webhookUrl?: string | null
   enabledPaymentMethods?: string[]
+  autoCapture?: boolean
   createdAt?: string
 }
 

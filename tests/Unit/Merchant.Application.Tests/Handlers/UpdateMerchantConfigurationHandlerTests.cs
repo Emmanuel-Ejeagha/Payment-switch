@@ -21,7 +21,7 @@ public class UpdateMerchantConfigurationHandlerTests
     public async Task Handle_ActiveMerchant_ShouldUpdate()
     {
         var merchant = CreateActiveMerchant();
-        var command = new UpdateMerchantConfigurationCommand(merchant.Id, "https://hook.com", new List<string> { "card" });
+        var command = new UpdateMerchantConfigurationCommand(merchant.Id, "https://hook.com", new List<string> { "card" }, false);
         SetupValidatorSuccess(command);
         _repoMock.Setup(r => r.GetByIdAsync(merchant.Id, It.IsAny<CancellationToken>())).ReturnsAsync(merchant);
         _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
@@ -31,6 +31,7 @@ public class UpdateMerchantConfigurationHandlerTests
         Assert.True(result.IsSuccess);
         Assert.Equal("https://hook.com", merchant.WebhookUrl!.Value);
         Assert.Contains("card", merchant.EnabledPaymentMethods);
+        Assert.False(merchant.AutoCapture);
     }
 
     [Fact]
@@ -38,7 +39,7 @@ public class UpdateMerchantConfigurationHandlerTests
     {
         var merchant = CreateActiveMerchant();
         merchant.Suspend();
-        var command = new UpdateMerchantConfigurationCommand(merchant.Id, null, null);
+        var command = new UpdateMerchantConfigurationCommand(merchant.Id, null, null, null);
         SetupValidatorSuccess(command);
         _repoMock.Setup(r => r.GetByIdAsync(merchant.Id, It.IsAny<CancellationToken>())).ReturnsAsync(merchant);
 
