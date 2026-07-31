@@ -3,6 +3,7 @@ using BuildingBlocks.Shared.Results;
 using FluentValidation;
 using Payment.Application.Interfaces;
 using Payment.Domain;
+using Payment.Domain.ValueObjects;
 using Microsoft.Extensions.Logging;
 
 namespace Payment.Application.Features.Command.VoidPayment;
@@ -43,11 +44,22 @@ public class VoidPaymentHandler
         if (intent is null)
             return PaymentErrors.PaymentIntentNotFound(command.IntentId);
 
+        if (intent.Status != PaymentStatus.Authorized)
+            return PaymentErrors.InvalidStatusTransition(intent.Status.Value, "Voided");
+
         var gatewayResult = await _gateway.VoidAsync(intent.MerchantId, intent.GatewayReference!, cancellationToken);
         if (!gatewayResult.IsSuccess)
             return new Error("Payment.VoidFailed", gatewayResult.Errors.First().Message);
 
-        intent.Void();
+        try
+        {
+            intent.Void();
+        }
+        catch (InvalidOperationException)
+        {
+            return PaymentErrors.InvalidStatusTransition(intent.Status.Value, "Voided");
+        }
+
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         await _dispatcher.DispatchAsync(intent.DomainEvents, cancellationToken);
 
