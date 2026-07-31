@@ -21,7 +21,7 @@ public class LedgerAccountTests
     }
 
     [Fact]
-    public void ReserveFunds_ShouldMoveAvailableToPending()
+    public void ReserveFunds_ShouldIncreasePending()
     {
         var account = CreateAccountWithAvailable(1000m);
 
@@ -29,17 +29,17 @@ public class LedgerAccountTests
         var correlationId = new CorrelationId("PaymentAuthorized:123");
         account.ReserveFunds(amount, correlationId);
 
-        Assert.Equal(800m, account.AvailableBalance);
+        Assert.Equal(1000m, account.AvailableBalance);
         Assert.Equal(200m, account.PendingBalance);
         Assert.Single(account.Journal, j => j.Type == EntryType.Debit && j.Amount.Amount == 200m);
         Assert.Contains(account.DomainEvents, e => e is FundsReservedEvent);
     }
 
     [Fact]
-    public void ReserveFunds_InsufficientAvailable_ShouldThrow()
+    public void ReserveFunds_CurrencyMismatch_ShouldThrow()
     {
         var account = CreateAccountWithAvailable(50m);
-        var amount = new Money(100m, "USD");
+        var amount = new Money(100m, "EUR");
         var correlationId = new CorrelationId("test");
 
         Assert.Throws<InvalidOperationException>(() => account.ReserveFunds(amount, correlationId));

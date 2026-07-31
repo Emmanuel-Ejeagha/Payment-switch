@@ -31,7 +31,7 @@ public class CaptureFundsHandlerTests
 
         var command = new CaptureFundsCommand(account.MerchantId, 100m, "USD", "corr-2");
         SetupValidatorSuccess(command);
-        _repoMock.Setup(r => r.GetByMerchantIdAsync(account.MerchantId, It.IsAny<CancellationToken>())).ReturnsAsync(account);
+        _repoMock.Setup(r => r.GetByMerchantIdAndCurrencyAsync(account.MerchantId, "USD", It.IsAny<CancellationToken>())).ReturnsAsync(account);
         _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
         var result = await _handler.Handle(command);
@@ -47,7 +47,7 @@ public class CaptureFundsHandlerTests
     {
         var command = new CaptureFundsCommand(Guid.NewGuid(), 100m, "USD", "corr");
         SetupValidatorSuccess(command);
-        _repoMock.Setup(r => r.GetByMerchantIdAsync(command.MerchantId, It.IsAny<CancellationToken>())).ReturnsAsync((LedgerAccount?)null);
+        _repoMock.Setup(r => r.GetByMerchantIdAndCurrencyAsync(command.MerchantId, "USD", It.IsAny<CancellationToken>())).ReturnsAsync((LedgerAccount?)null);
 
         var result = await _handler.Handle(command);
 
