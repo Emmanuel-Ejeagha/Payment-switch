@@ -21,9 +21,9 @@ spec:
             - containerPort: {{ .Values.infrastructure.postgres.port }}
           env:
             - name: POSTGRES_USER
-              value: "paymentswitch"
+              value: {{ .Values.config.postgres.userName | quote }}
             - name: POSTGRES_PASSWORD
-              value: "paymentswitch"
+              value: {{ .Values.config.postgres.password | quote }}
             - name: POSTGRES_MULTIPLE_DATABASES
               value: "IdentityDb,MerchantDb,PaymentDb,LedgerDb,NotificationDb,SettlementDb"
           resources:

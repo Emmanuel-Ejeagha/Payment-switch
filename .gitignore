@@ -28,3 +28,7 @@ Thumbs.db
 *.env
 appsettings.Development.json
 /.env.example
+
+# Kubernetes secrets - never commit real credentials
+k8s/secret.yaml
+helm/**/secrets.yaml

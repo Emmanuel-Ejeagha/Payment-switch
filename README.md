@@ -146,11 +146,13 @@ Create the namespace and secrets
 ```bash
 kubectl apply -f k8s/namespace.yaml
 kubectl apply -f k8s/configmap.yaml
+DB_PASSWORD=$(openssl rand -base64 24)
+JWT_SECRET=$(openssl rand -base64 32)
 kubectl create secret generic payment-switch-secret \
   --namespace payment-switch \
-  --from-literal=Jwt__Secret="your-super-secret-key-minimum-32-bytes!" \
-  --from-literal=Postgres__Password="paymentswitch" \
-  --from-literal=IdentityDb__ConnectionString="Host=postgres;Database=IdentityDb;Username=paymentswitch;Password=paymentswitch" \
+  --from-literal=Jwt__Secret="$JWT_SECRET" \
+  --from-literal=Postgres__Password="$DB_PASSWORD" \
+  --from-literal=IdentityDb__ConnectionString="Host=postgres;Database=IdentityDb;Username=paymentswitch;Password=$DB_PASSWORD" \
   # ... add all connection strings (see docs/deployment.md)
 ```
 Deploy all services

@@ -11,23 +11,28 @@
 ```bash
 kubectl apply -f k8s/namespace.yaml
 kubectl apply -f k8s/configmap.yaml
-Step 2 – Create Secrets
-Create the secret with all connection strings and the JWT secret.
-Do not commit these values to source control.
+## Step 2 – Create Secrets
 
-```
+Create the secret with all connection strings and the JWT secret.
+**Do not commit these values to source control.** The repository ships a template at
+`k8s/secret.example.yaml`; copy it to `k8s/secret.yaml` (gitignored) and replace the
+`REPLACE_ME` values, or generate a fresh secret with:
+
 ```bash
+DB_PASSWORD=$(openssl rand -base64 24)
+JWT_SECRET=$(openssl rand -base64 32)
+
 kubectl create secret generic payment-switch-secret \
   --namespace payment-switch \
-  --from-literal=Jwt__Secret="your-super-secret-key-minimum-32-bytes!" \
-  --from-literal=Postgres__Password="paymentswitch" \
-  --from-literal=IdentityDb__ConnectionString="Host=postgres;Database=IdentityDb;Username=paymentswitch;Password=paymentswitch" \
-  --from-literal=MerchantDb__ConnectionString="Host=postgres;Database=MerchantDb;Username=paymentswitch;Password=paymentswitch" \
-  --from-literal=PaymentDb__ConnectionString="Host=postgres;Database=PaymentDb;Username=paymentswitch;Password=paymentswitch" \
-  --from-literal=LedgerDb__ConnectionString="Host=postgres;Database=LedgerDb;Username=paymentswitch;Password=paymentswitch" \
-  --from-literal=NotificationDb__ConnectionString="Host=postgres;Database=NotificationDb;Username=paymentswitch;Password=paymentswitch" \
-  --from-literal=SettlementDb__ConnectionString="Host=postgres;Database=SettlementDb;Username=paymentswitch;Password=paymentswitch"
-  ```
+  --from-literal=Postgres__Password="$DB_PASSWORD" \
+  --from-literal=Jwt__Secret="$JWT_SECRET" \
+  --from-literal=IdentityDb__ConnectionString="Host=postgres;Database=IdentityDb;Username=paymentswitch;Password=$DB_PASSWORD" \
+  --from-literal=MerchantDb__ConnectionString="Host=postgres;Database=MerchantDb;Username=paymentswitch;Password=$DB_PASSWORD" \
+  --from-literal=PaymentDb__ConnectionString="Host=postgres;Database=PaymentDb;Username=paymentswitch;Password=$DB_PASSWORD" \
+  --from-literal=LedgerDb__ConnectionString="Host=postgres;Database=LedgerDb;Username=paymentswitch;Password=$DB_PASSWORD" \
+  --from-literal=NotificationDb__ConnectionString="Host=postgres;Database=NotificationDb;Username=paymentswitch;Password=$DB_PASSWORD" \
+  --from-literal=SettlementDb__ConnectionString="Host=postgres;Database=SettlementDb;Username=paymentswitch;Password=$DB_PASSWORD"
+```
 Step 3 – Deploy Infrastructure & Services
 ```bash
 kubectl apply -f k8s/

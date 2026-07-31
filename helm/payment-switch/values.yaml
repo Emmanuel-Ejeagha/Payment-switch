@@ -153,9 +153,18 @@ config:
   jwt:
     issuer: "IdentityService"
     audience: "PaymentSwitch"
+    # REQUIRED: provide a strong secret via --set config.jwt.secret="..." or a secrets values file
+    secret: ""
   rabbitmq:
     hostName: "rabbitmq"
     userName: "guest"
+    # REQUIRED: provide a strong password via --set config.rabbitmq.password="..."
+    password: ""
+  postgres:
+    hostName: "postgres"
+    userName: "paymentswitch"
+    # REQUIRED: provide a strong password via --set config.postgres.password="..."
+    password: ""
 
 infrastructure:
   postgres:
