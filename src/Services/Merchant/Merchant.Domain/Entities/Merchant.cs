@@ -12,6 +12,7 @@ public class Merchant : AggregateRoot
     public WebhookUrl? WebhookUrl { get; private set; } = default!;
     public IReadOnlyList<string> EnabledPaymentMethods => _paymentMethods.AsReadOnly();
     private readonly List<string> _paymentMethods = new();
+    public bool AutoCapture { get; private set; } = true;
     public DateTime CreatedAt { get; private set; }
     public DateTime? UpdatedAt { get; private set; }
 
@@ -22,6 +23,7 @@ public class Merchant : AggregateRoot
         BusinessName = businessName ?? throw new ArgumentNullException(nameof(businessName));
         Email = email ?? throw new ArgumentNullException(nameof(email));
         Status = MerchantStatus.Pending;
+        AutoCapture = true;
         CreatedAt = DateTime.UtcNow;
         AddDomainEvent(new MerchantOnboardedEvent(Id, businessName.Value, email.Value));
     }
@@ -44,7 +46,7 @@ public class Merchant : AggregateRoot
         AddDomainEvent(new MerchantSuspendedEvent(Id));
     }
 
-    public void UpdateConfiguration(string? webhookUrl, List<string>? paymentMethods)
+    public void UpdateConfiguration(string? webhookUrl, List<string>? paymentMethods, bool? autoCapture = null)
     {
         if (Status != MerchantStatus.Active)
             throw new InvalidOperationException("Cannot update configuration: merchant is not active.");
@@ -57,6 +59,9 @@ public class Merchant : AggregateRoot
             _paymentMethods.Clear();
             _paymentMethods.AddRange(paymentMethods);
         }
+
+        if (autoCapture.HasValue)
+            AutoCapture = autoCapture.Value;
 
         UpdatedAt = DateTime.UtcNow;
         AddDomainEvent(new MerchantConfigurationUpdatedEvent(Id));

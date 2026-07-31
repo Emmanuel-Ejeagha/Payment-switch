@@ -27,7 +27,8 @@ public class GetMerchantByEmailHandler
             merchant.Email.Value,
             merchant.Status.Value,
             merchant.WebhookUrl?.Value,
-            merchant.EnabledPaymentMethods.ToList()
+            merchant.EnabledPaymentMethods.ToList(),
+            merchant.AutoCapture
         );
     }
 }

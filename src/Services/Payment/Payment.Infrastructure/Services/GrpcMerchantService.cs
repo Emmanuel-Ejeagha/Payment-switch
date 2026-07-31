@@ -1,4 +1,5 @@
 ﻿using BuildingBlocks.Shared.Results;
+using Payment.Application.DTOs;
 using Payment.Application.Interfaces;
 using PaymentSwitch.Protos.Merchant;
 
@@ -18,5 +19,14 @@ public class GrpcMerchantService : IMerchantService
         var request = new GetMerchantStatusRequest { MerchantId = merchantId.ToString() };
         var response = await _client.GetMerchantStatusAsync(request, cancellationToken: cancellationToken);
         return Result<string>.Success(response.Status);
+    }
+
+    public async Task<Result<MerchantConfig>> GetMerchantConfigAsync(Guid merchantId, CancellationToken cancellationToken = default)
+    {
+        var request = new GetMerchantConfigRequest { MerchantId = merchantId.ToString() };
+        var response = await _client.GetMerchantConfigAsync(request, cancellationToken: cancellationToken);
+        return Result<MerchantConfig>.Success(new MerchantConfig(
+            string.IsNullOrEmpty(response.WebhookUrl) ? null : response.WebhookUrl,
+            response.AutoCapture));
     }
 }

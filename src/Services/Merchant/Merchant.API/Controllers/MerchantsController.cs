@@ -126,7 +126,7 @@ public class MerchantsController : BaseApiController
         [FromBody] UpdateMerchantConfigurationCommand command,
         [FromServices] UpdateMerchantConfigurationHandler handler)
     {
-        command = new UpdateMerchantConfigurationCommand(id, command.WebhookUrl, command.PaymentMethods);
+        command = new UpdateMerchantConfigurationCommand(id, command.WebhookUrl, command.PaymentMethods, command.AutoCapture);
         var result = await handler.Handle(command);
         return result.ToActionResult();
     }
