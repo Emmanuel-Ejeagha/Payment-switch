@@ -59,6 +59,29 @@ public class VoidPaymentHandlerTests
         Assert.Equal("Payment.VoidFailed", result.Errors[0].Code);
     }
 
+    [Fact]
+    public async Task Handle_NonAuthorizedIntent_ShouldFailWithInvalidTransition()
+    {
+        var intent = CreateCapturedIntent();
+        var command = new VoidPaymentCommand(intent.Id);
+        SetupValidatorSuccess(command);
+        _repoMock.Setup(r => r.GetByIdAsync(intent.Id, It.IsAny<CancellationToken>())).ReturnsAsync(intent);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Payment.InvalidStatusTransition", result.Errors[0].Code);
+        _gatewayMock.Verify(g => g.VoidAsync(It.IsAny<Guid>(), It.IsAny<GatewayReference>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    private PaymentIntent CreateCapturedIntent()
+    {
+        var intent = CreateAuthorizedIntent();
+        intent.Capture(new Money(100, "USD"));
+        intent.ClearDomainEvents();
+        return intent;
+    }
+
     private PaymentIntent CreateAuthorizedIntent()
     {
         var intent = new PaymentIntent(Guid.NewGuid(), Guid.NewGuid(), new Money(100, "USD"), new IdempotencyKey("k"), PaymentMethod.Card);

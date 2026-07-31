@@ -45,6 +45,9 @@ public class RefundPaymentHandler
         if (intent is null)
             return PaymentErrors.PaymentIntentNotFound(command.IntentId);
 
+        if (intent.Status != PaymentStatus.Captured && intent.Status != PaymentStatus.PartiallyCaptured && intent.Status != PaymentStatus.PartiallyRefunded)
+            return PaymentErrors.InvalidStatusTransition(intent.Status.Value, "Refunded");
+
         Money? amount = command.Amount.HasValue ? new Money(command.Amount.Value, intent.Amount.Currency) : null;
         var refundAmount = amount ?? new Money(intent.Amount.Amount, intent.Amount.Currency);
 
@@ -52,7 +55,20 @@ public class RefundPaymentHandler
         if (!gatewayResult.IsSuccess)
             return new Error("Payment.RefundFailed", gatewayResult.Errors.First().Message);
 
-        intent.Refund(amount);
+        try
+        {
+            intent.Refund(amount);
+        }
+        catch (InvalidOperationException ex)
+        {
+            if (ex.Message.Contains("exceeds available refund amount", StringComparison.OrdinalIgnoreCase))
+            {
+                var captured = intent.Transactions.Where(t => t.Type == TransactionType.Capture).Sum(t => t.Amount.Amount);
+                return PaymentErrors.RefundExceedsCaptured(refundAmount.Amount, captured);
+            }
+            return PaymentErrors.InvalidStatusTransition(intent.Status.Value, "Refunded");
+        }
+
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         await _dispatcher.DispatchAsync(intent.DomainEvents, cancellationToken);
 

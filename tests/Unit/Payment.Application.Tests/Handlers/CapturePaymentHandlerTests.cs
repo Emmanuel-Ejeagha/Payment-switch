@@ -59,6 +59,37 @@ public class CapturePaymentHandlerTests
         Assert.Equal("Payment.CaptureFailed", result.Errors[0].Code);
     }
 
+    [Fact]
+    public async Task Handle_NonAuthorizedIntent_ShouldFailWithInvalidTransition()
+    {
+        var intent = new PaymentIntent(Guid.NewGuid(), Guid.NewGuid(), new Money(100, "USD"), new IdempotencyKey("k"), PaymentMethod.Card);
+        var command = new CapturePaymentCommand(intent.Id, 50);
+        SetupValidatorSuccess(command);
+        _repoMock.Setup(r => r.GetByIdAsync(intent.Id, It.IsAny<CancellationToken>())).ReturnsAsync(intent);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Payment.InvalidStatusTransition", result.Errors[0].Code);
+        _gatewayMock.Verify(g => g.CaptureAsync(It.IsAny<Guid>(), It.IsAny<GatewayReference>(), It.IsAny<Money>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_CaptureExceedsAuthorized_ShouldFail()
+    {
+        var intent = CreateAuthorizedIntent();
+        var command = new CapturePaymentCommand(intent.Id, 150);
+        SetupValidatorSuccess(command);
+        _repoMock.Setup(r => r.GetByIdAsync(intent.Id, It.IsAny<CancellationToken>())).ReturnsAsync(intent);
+        _gatewayMock.Setup(g => g.CaptureAsync(intent.MerchantId, intent.GatewayReference!, It.IsAny<Money>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<GatewayResponse>.Success(new GatewayResponse(true, null, "GW-CAP", null)));
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Payment.CaptureExceedsAuthorized", result.Errors[0].Code);
+    }
+
     private PaymentIntent CreateAuthorizedIntent()
     {
         var intent = new PaymentIntent(Guid.NewGuid(), Guid.NewGuid(), new Money(100, "USD"), new IdempotencyKey("k"), PaymentMethod.Card);

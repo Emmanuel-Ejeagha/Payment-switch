@@ -59,6 +59,45 @@ public class RefundPaymentHandlerTests
         Assert.Equal("Payment.RefundFailed", result.Errors[0].Code);
     }
 
+    [Fact]
+    public async Task Handle_NonCapturedIntent_ShouldFailWithInvalidTransition()
+    {
+        var intent = CreateAuthorizedIntent();
+        var command = new RefundPaymentCommand(intent.Id, 50);
+        SetupValidatorSuccess(command);
+        _repoMock.Setup(r => r.GetByIdAsync(intent.Id, It.IsAny<CancellationToken>())).ReturnsAsync(intent);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Payment.InvalidStatusTransition", result.Errors[0].Code);
+        _gatewayMock.Verify(g => g.RefundAsync(It.IsAny<Guid>(), It.IsAny<GatewayReference>(), It.IsAny<Money>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_RefundExceedsCaptured_ShouldFail()
+    {
+        var intent = CreateCapturedIntent();
+        var command = new RefundPaymentCommand(intent.Id, 150);
+        SetupValidatorSuccess(command);
+        _repoMock.Setup(r => r.GetByIdAsync(intent.Id, It.IsAny<CancellationToken>())).ReturnsAsync(intent);
+        _gatewayMock.Setup(g => g.RefundAsync(intent.MerchantId, intent.GatewayReference!, It.IsAny<Money>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<GatewayResponse>.Success(new GatewayResponse(true, null, "GW-REF", null)));
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Payment.RefundExceedsCaptured", result.Errors[0].Code);
+    }
+
+    private PaymentIntent CreateAuthorizedIntent()
+    {
+        var intent = new PaymentIntent(Guid.NewGuid(), Guid.NewGuid(), new Money(100, "USD"), new IdempotencyKey("k"), PaymentMethod.Card);
+        intent.Authorize(new AuthorizationCode("AUTH"), new GatewayReference("GW"));
+        intent.ClearDomainEvents();
+        return intent;
+    }
+
     private PaymentIntent CreateCapturedIntent()
     {
         var intent = new PaymentIntent(Guid.NewGuid(), Guid.NewGuid(), new Money(100, "USD"), new IdempotencyKey("k"), PaymentMethod.Card);

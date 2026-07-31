@@ -45,13 +45,26 @@ public class CapturePaymentHandler
         if (intent is null)
             return PaymentErrors.PaymentIntentNotFound(command.IntentId);
 
+        if (intent.Status != PaymentStatus.Authorized && intent.Status != PaymentStatus.PartiallyCaptured)
+            return PaymentErrors.InvalidStatusTransition(intent.Status.Value, "Captured");
+
         Money? amount = command.Amount.HasValue ? new Money(command.Amount.Value, intent.Amount.Currency) : null;
 
         var gatewayResult = await _gateway.CaptureAsync(intent.MerchantId, intent.GatewayReference!, amount ?? intent.Amount, cancellationToken);
         if (!gatewayResult.IsSuccess)
             return new Error("Payment.CaptureFailed", gatewayResult.Errors.First().Message);
 
-        intent.Capture(amount);
+        try
+        {
+            intent.Capture(amount);
+        }
+        catch (InvalidOperationException ex)
+        {
+            if (ex.Message.Contains("exceeds remaining authorized amount", StringComparison.OrdinalIgnoreCase))
+                return PaymentErrors.CaptureExceedsAuthorized(amount?.Amount ?? intent.Amount.Amount, intent.Amount.Amount);
+            return PaymentErrors.InvalidStatusTransition(intent.Status.Value, "Captured");
+        }
+
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         await _dispatcher.DispatchAsync(intent.DomainEvents, cancellationToken);
 

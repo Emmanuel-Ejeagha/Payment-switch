@@ -50,6 +50,8 @@ public class AuthorizePaymentHandler
         if (!statusResult.IsSuccess) return Result<AuthorizePaymentResponse>.Failure(statusResult.Errors);
         if (statusResult.Value != "active") return new Error("Payment.MerchantNotActive", "Merchant is not active.");
 
+        if (intent.Status != PaymentStatus.Pending)
+            return PaymentErrors.InvalidStatusTransition(intent.Status.Value, "Authorized");
 
         var gatewayResult = await _gateway.AuthorizeAsync(intent.MerchantId, intent.Amount, intent.CardDetails, cancellationToken);
         if (!gatewayResult.IsSuccess)
@@ -59,7 +61,15 @@ public class AuthorizePaymentHandler
         var authCode = new AuthorizationCode(gwResponse.AuthorizationCode!);
         var gatewayRef = new GatewayReference(gwResponse.GatewayReference!);
 
-        intent.Authorize(authCode, gatewayRef);
+        try
+        {
+            intent.Authorize(authCode, gatewayRef);
+        }
+        catch (InvalidOperationException)
+        {
+            return PaymentErrors.InvalidStatusTransition(intent.Status.Value, "Authorized");
+        }
+
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         await _dispatcher.DispatchAsync(intent.DomainEvents, cancellationToken);
 
