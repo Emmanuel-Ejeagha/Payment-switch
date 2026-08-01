@@ -1,11 +1,14 @@
-﻿using Grpc.Core;
+﻿using BuildingBlocks.Shared.Auth;
+using Grpc.Core;
 using Ledger.Domain.Entities;
 using Ledger.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using PaymentSwitch.Protos.Ledger;
 
 namespace Ledger.API.Services;
 
+[Authorize(Policy = AuthPolicies.ServiceOnly)]
 public class LedgerGrpcService : LedgerService.LedgerServiceBase
 {
     private readonly AppDbContext _db;
