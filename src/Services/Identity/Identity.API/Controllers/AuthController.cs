@@ -3,10 +3,12 @@ using Identity.Application.Commands.Auth.Login;
 using Identity.Application.Commands.Auth.Register;
 using Identity.Application.Commands.Auth.Tokens;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Identity.API.Controllers;
 
 [Produces("application/json")]
+[EnableRateLimiting("Strict")]
 public class AuthController : BaseApiController
 {
     /// <summary>

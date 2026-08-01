@@ -4,12 +4,14 @@ using Identity.Application.DTOs;
 using Identity.Application.Queries.User;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
 
 namespace Identity.API.Controllers;
 
 [Authorize]
 [Produces("application/json")]
+[EnableRateLimiting("Strict")]
 public class ApiKeysController : BaseApiController
 {
     /// <summary>

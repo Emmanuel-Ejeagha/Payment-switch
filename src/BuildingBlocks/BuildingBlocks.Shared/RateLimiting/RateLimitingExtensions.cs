@@ -29,6 +29,17 @@ public static class RateLimitingExtensions
                 config.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
                 config.QueueLimit = 0;
             });
+
+            options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(
+                _ => RateLimitPartition.GetFixedWindowLimiter(
+                    "Default",
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 100,
+                        Window = TimeSpan.FromSeconds(10),
+                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                        QueueLimit = 5
+                    }));
         });
 
         return services;
