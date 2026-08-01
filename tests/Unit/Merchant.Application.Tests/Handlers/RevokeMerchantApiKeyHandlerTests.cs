@@ -1,3 +1,4 @@
+using Merchant.Application.Auth;
 using Merchant.Application.Features.Commands.RevokeMerchantApiKey;
 
 namespace Merchant.Application.Tests.Handlers;
@@ -19,7 +20,7 @@ public class RevokeMerchantApiKeyHandlerTests
     public async Task Handle_ExistingKey_ShouldRevoke()
     {
         var merchant = CreateActiveMerchantWithKey(out var keyId);
-        var command = new RevokeMerchantApiKeyCommand(merchant.Id, keyId);
+        var command = new RevokeMerchantApiKeyCommand(merchant.Id, keyId, OwnerCaller(merchant));
         SetupValidatorSuccess(command);
         _repoMock.Setup(r => r.GetByIdWithApiKeysAsync(merchant.Id, It.IsAny<CancellationToken>())).ReturnsAsync(merchant);
         _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
@@ -34,7 +35,7 @@ public class RevokeMerchantApiKeyHandlerTests
     public async Task Handle_MissingKey_ShouldFail()
     {
         var merchant = CreateActiveMerchantWithKey(out _);
-        var command = new RevokeMerchantApiKeyCommand(merchant.Id, Guid.NewGuid());
+        var command = new RevokeMerchantApiKeyCommand(merchant.Id, Guid.NewGuid(), OwnerCaller(merchant));
         SetupValidatorSuccess(command);
         _repoMock.Setup(r => r.GetByIdWithApiKeysAsync(merchant.Id, It.IsAny<CancellationToken>())).ReturnsAsync(merchant);
 
@@ -47,7 +48,7 @@ public class RevokeMerchantApiKeyHandlerTests
     [Fact]
     public async Task Handle_MerchantNotFound_ShouldFail()
     {
-        var command = new RevokeMerchantApiKeyCommand(Guid.NewGuid(), Guid.NewGuid());
+        var command = new RevokeMerchantApiKeyCommand(Guid.NewGuid(), Guid.NewGuid(), new CallerContext(Guid.NewGuid(), null, false));
         SetupValidatorSuccess(command);
         _repoMock.Setup(r => r.GetByIdWithApiKeysAsync(command.MerchantId, It.IsAny<CancellationToken>())).ReturnsAsync((MerchantEntity?)null);
 
@@ -57,9 +58,26 @@ public class RevokeMerchantApiKeyHandlerTests
         Assert.Equal("Merchant.MerchantNotFound", result.Errors[0].Code);
     }
 
+    [Fact]
+    public async Task Handle_NonOwner_ShouldFail()
+    {
+        var merchant = CreateActiveMerchantWithKey(out var keyId);
+        var command = new RevokeMerchantApiKeyCommand(merchant.Id, keyId, new CallerContext(Guid.NewGuid(), null, false));
+        SetupValidatorSuccess(command);
+        _repoMock.Setup(r => r.GetByIdWithApiKeysAsync(merchant.Id, It.IsAny<CancellationToken>())).ReturnsAsync(merchant);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Merchant.Unauthorized", result.Errors[0].Code);
+    }
+
+    private CallerContext OwnerCaller(MerchantEntity merchant) => new(merchant.OwnerId, null, false);
+
     private MerchantEntity CreateActiveMerchantWithKey(out Guid keyId)
     {
-        var m = new MerchantEntity(Guid.NewGuid(), new BusinessName("Test"), new MerchantEmail("t@t.com"));
+        var ownerId = Guid.NewGuid();
+        var m = new MerchantEntity(Guid.NewGuid(), ownerId, new BusinessName("Test"), new MerchantEmail("t@t.com"));
         m.Activate();
         var key = m.GenerateApiKey("hash", "sk_test_", "test");
         keyId = key.Id;

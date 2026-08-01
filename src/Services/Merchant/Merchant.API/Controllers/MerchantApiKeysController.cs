@@ -6,7 +6,6 @@ using Merchant.Application.Features.Commands.RevokeMerchantApiKey;
 using Merchant.Application.Features.Queries.GetMerchantApiKeys;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-
 namespace Merchant.API.Controllers;
 
 [Authorize]
@@ -32,7 +31,7 @@ public class MerchantApiKeysController : ControllerBase
         [FromBody] GenerateMerchantApiKeyCommand command,
         [FromServices] GenerateMerchantApiKeyHandler handler)
     {
-        var result = await handler.Handle(new GenerateMerchantApiKeyCommand(merchantId, command.Environment));
+        var result = await handler.Handle(new GenerateMerchantApiKeyCommand(merchantId, command.Environment, User.ToCallerContext()));
         return result.ToActionResult();
     }
 
@@ -49,7 +48,7 @@ public class MerchantApiKeysController : ControllerBase
         Guid merchantId,
         [FromServices] GetMerchantApiKeysHandler handler)
     {
-        var result = await handler.Handle(new GetMerchantApiKeysQuery(merchantId));
+        var result = await handler.Handle(new GetMerchantApiKeysQuery(merchantId, User.ToCallerContext()));
         return result.ToActionResult();
     }
 
@@ -68,7 +67,7 @@ public class MerchantApiKeysController : ControllerBase
         Guid keyId,
         [FromServices] RevokeMerchantApiKeyHandler handler)
     {
-        var result = await handler.Handle(new RevokeMerchantApiKeyCommand(merchantId, keyId));
+        var result = await handler.Handle(new RevokeMerchantApiKeyCommand(merchantId, keyId, User.ToCallerContext()));
         return result.ToActionResult();
     }
 }

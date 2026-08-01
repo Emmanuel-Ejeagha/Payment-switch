@@ -18,4 +18,7 @@ public static class MerchantErrors
 
     public static Error EmailAlreadyInUse(string email) =>
         new("Merchant.EmailAlreadyInUse", $"Email '{email}' is already used by another merchant.");
+
+    public static Error Unauthorized() =>
+        new("Merchant.Unauthorized", "You do not have permission to access this merchant.");
 }

@@ -50,7 +50,7 @@ public class MerchantsController : BaseApiController
         Guid id,
         [FromServices] GetMerchantByIdHandler handler)
     {
-        var result = await handler.Handle(new GetMerchantByIdQuery(id));
+        var result = await handler.Handle(new GetMerchantByIdQuery(id, User.ToCallerContext()));
         return result.ToActionResult();
     }
 
@@ -68,7 +68,7 @@ public class MerchantsController : BaseApiController
         string email,
         [FromServices] GetMerchantByEmailHandler handler)
     {
-        var result = await handler.Handle(new GetMerchantByEmailQuery(email));
+        var result = await handler.Handle(new GetMerchantByEmailQuery(email, User.ToCallerContext()));
         return result.ToActionResult();
     }
 
@@ -126,7 +126,7 @@ public class MerchantsController : BaseApiController
         [FromBody] UpdateMerchantConfigurationCommand command,
         [FromServices] UpdateMerchantConfigurationHandler handler)
     {
-        command = new UpdateMerchantConfigurationCommand(id, command.WebhookUrl, command.PaymentMethods, command.AutoCapture);
+        command = new UpdateMerchantConfigurationCommand(id, command.WebhookUrl, command.PaymentMethods, command.AutoCapture, User.ToCallerContext());
         var result = await handler.Handle(command);
         return result.ToActionResult();
     }

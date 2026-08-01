@@ -11,6 +11,8 @@ public class MerchantConfiguration : IEntityTypeConfiguration<MerchantEntity>
     {
         builder.HasKey(m => m.Id);
 
+        builder.Property(m => m.OwnerId);
+
         builder.OwnsOne(m => m.BusinessName, bn =>
         {
             bn.Property(b => b.Value).HasColumnName("BusinessName").IsRequired().HasMaxLength(200);

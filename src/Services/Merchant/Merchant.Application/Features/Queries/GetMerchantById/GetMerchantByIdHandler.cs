@@ -21,6 +21,9 @@ public class GetMerchantByIdHandler
         if (merchant == null)
             return MerchantErrors.MerchantNotFound(query.MerchantId);
 
+        if (!query.Caller.CanAccess(merchant.OwnerId))
+            return MerchantErrors.Unauthorized();
+
         return new MerchantDto(
             merchant.Id,
             merchant.BusinessName.Value,

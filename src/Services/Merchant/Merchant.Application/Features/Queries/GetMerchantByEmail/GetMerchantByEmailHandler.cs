@@ -21,6 +21,9 @@ public class GetMerchantByEmailHandler
         if (merchant == null)
             return MerchantErrors.MerchantNotFound(Guid.Empty);
 
+        if (!query.Caller.CanAccessMerchant(merchant.OwnerId, merchant.Email.Value))
+            return MerchantErrors.Unauthorized();
+
         return new MerchantDto(
             merchant.Id,
             merchant.BusinessName.Value,

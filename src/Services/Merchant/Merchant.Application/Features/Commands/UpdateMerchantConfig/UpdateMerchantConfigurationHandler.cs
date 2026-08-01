@@ -36,6 +36,9 @@ public class UpdateMerchantConfigurationHandler
         if (merchant == null)
             return MerchantErrors.MerchantNotFound(command.MerchantId);
 
+        if (!command.Caller.CanAccess(merchant.OwnerId))
+            return MerchantErrors.Unauthorized();
+
         try
         {
             merchant.UpdateConfiguration(command.WebhookUrl, command.PaymentMethods, command.AutoCapture);

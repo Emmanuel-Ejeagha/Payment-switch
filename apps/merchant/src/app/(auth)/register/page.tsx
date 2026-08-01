@@ -71,7 +71,7 @@ export default function RegisterPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            userId,
+            ownerId: userId,
             businessName: data.businessName,
             email: data.email,
           }),

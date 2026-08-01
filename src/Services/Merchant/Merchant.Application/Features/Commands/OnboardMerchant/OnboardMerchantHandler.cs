@@ -37,7 +37,7 @@ public class OnboardMerchantHandler
 
         var businessName = new BusinessName(command.BusinessName);
         var email = new MerchantEmail(command.Email);
-        var merchant = new MerchantEntity(Guid.NewGuid(), businessName, email);
+        var merchant = new MerchantEntity(Guid.NewGuid(), command.OwnerId, businessName, email);
 
         await _repository.AddAsync(merchant, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);

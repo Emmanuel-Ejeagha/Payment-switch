@@ -34,6 +34,9 @@ public class GenerateMerchantApiKeyHandler
         if (merchant is null)
             return MerchantErrors.MerchantNotFound(command.MerchantId);
 
+        if (!command.Caller.CanAccess(merchant.OwnerId))
+            return MerchantErrors.Unauthorized();
+
         var (plainTextKey, prefix, keyHash) = GenerateKey(command.Environment);
         var apiKey = merchant.GenerateApiKey(keyHash, prefix, command.Environment);
 

@@ -33,6 +33,9 @@ public class RevokeMerchantApiKeyHandler
         if (merchant is null)
             return MerchantErrors.MerchantNotFound(command.MerchantId);
 
+        if (!command.Caller.CanAccess(merchant.OwnerId))
+            return MerchantErrors.Unauthorized();
+
         try
         {
             merchant.RevokeApiKey(command.KeyId);

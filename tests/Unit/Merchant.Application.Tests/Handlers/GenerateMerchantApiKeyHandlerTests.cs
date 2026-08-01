@@ -1,3 +1,4 @@
+using Merchant.Application.Auth;
 using Merchant.Application.Features.Commands.GenerateMerchantApiKey;
 
 namespace Merchant.Application.Tests.Handlers;
@@ -19,7 +20,7 @@ public class GenerateMerchantApiKeyHandlerTests
     public async Task Handle_ActiveMerchant_ShouldGenerateKey()
     {
         var merchant = CreateActiveMerchant();
-        var command = new GenerateMerchantApiKeyCommand(merchant.Id, "test");
+        var command = new GenerateMerchantApiKeyCommand(merchant.Id, "test", OwnerCaller(merchant));
         SetupValidatorSuccess(command);
         _repoMock.Setup(r => r.GetByIdWithApiKeysAsync(merchant.Id, It.IsAny<CancellationToken>())).ReturnsAsync(merchant);
         _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
@@ -37,7 +38,7 @@ public class GenerateMerchantApiKeyHandlerTests
     public async Task Handle_LiveEnvironment_ShouldUseLivePrefix()
     {
         var merchant = CreateActiveMerchant();
-        var command = new GenerateMerchantApiKeyCommand(merchant.Id, "live");
+        var command = new GenerateMerchantApiKeyCommand(merchant.Id, "live", OwnerCaller(merchant));
         SetupValidatorSuccess(command);
         _repoMock.Setup(r => r.GetByIdWithApiKeysAsync(merchant.Id, It.IsAny<CancellationToken>())).ReturnsAsync(merchant);
         _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
@@ -51,7 +52,7 @@ public class GenerateMerchantApiKeyHandlerTests
     [Fact]
     public async Task Handle_MerchantNotFound_ShouldFail()
     {
-        var command = new GenerateMerchantApiKeyCommand(Guid.NewGuid(), "test");
+        var command = new GenerateMerchantApiKeyCommand(Guid.NewGuid(), "test", new CallerContext(Guid.NewGuid(), null, false));
         SetupValidatorSuccess(command);
         _repoMock.Setup(r => r.GetByIdWithApiKeysAsync(command.MerchantId, It.IsAny<CancellationToken>())).ReturnsAsync((MerchantEntity?)null);
 
@@ -62,9 +63,23 @@ public class GenerateMerchantApiKeyHandlerTests
     }
 
     [Fact]
+    public async Task Handle_NonOwner_ShouldFail()
+    {
+        var merchant = CreateActiveMerchant();
+        var command = new GenerateMerchantApiKeyCommand(merchant.Id, "test", new CallerContext(Guid.NewGuid(), null, false));
+        SetupValidatorSuccess(command);
+        _repoMock.Setup(r => r.GetByIdWithApiKeysAsync(merchant.Id, It.IsAny<CancellationToken>())).ReturnsAsync(merchant);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Merchant.Unauthorized", result.Errors[0].Code);
+    }
+
+    [Fact]
     public async Task Handle_InvalidEnvironment_ShouldReturnValidationErrors()
     {
-        var command = new GenerateMerchantApiKeyCommand(Guid.NewGuid(), "prod");
+        var command = new GenerateMerchantApiKeyCommand(Guid.NewGuid(), "prod", new CallerContext(Guid.NewGuid(), null, false));
         SetupValidatorFailure(command);
 
         var result = await _handler.Handle(command);
@@ -73,9 +88,12 @@ public class GenerateMerchantApiKeyHandlerTests
         Assert.Equal("Environment", result.Errors[0].Code);
     }
 
+    private CallerContext OwnerCaller(MerchantEntity merchant) => new(merchant.OwnerId, null, false);
+
     private MerchantEntity CreateActiveMerchant()
     {
-        var m = new MerchantEntity(Guid.NewGuid(), new BusinessName("Test"), new MerchantEmail("t@t.com"));
+        var ownerId = Guid.NewGuid();
+        var m = new MerchantEntity(Guid.NewGuid(), ownerId, new BusinessName("Test"), new MerchantEmail("t@t.com"));
         m.Activate();
         m.ClearDomainEvents();
         return m;
