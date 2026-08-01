@@ -1,4 +1,5 @@
-﻿using BuildingBlocks.Shared.Configuration;
+﻿using BuildingBlocks.Shared.Auth;
+using BuildingBlocks.Shared.Configuration;
 using BuildingBlocks.Shared.Resilience;
 using Settlement.Application.Interfaces;
 using Settlement.Infrastructure.Outbox;
@@ -33,6 +34,8 @@ public static class DependencyInjection
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<ILedgerService, GrpcLedgerService>();
 
+        services.AddServiceTokenProvider(configuration, "Settlement");
+
         services.AddValidatedOptions<RabbitMQSettings>(configuration, "RabbitMQ",
             s => !string.IsNullOrEmpty(s.HostName),
             "RabbitMQ HostName is required");
@@ -41,8 +44,12 @@ public static class DependencyInjection
 
         services.AddGrpcClient<LedgerService.LedgerServiceClient>(o =>
         {
-            o.Address = new Uri("http://ledger-api:8080");
-        }).AddGrpcResilienceInterceptor();
+            o.Address = new Uri(configuration["Grpc:Ledger:Address"] ?? "http://ledger-api:8080");
+            o.ChannelOptionsActions.Add(channel =>
+                channel.UnsafeUseInsecureChannelCallCredentials = true);
+        })
+        .AddGrpcResilienceInterceptor()
+        .AddServiceTokenAuthentication();
 
         return services;
     }

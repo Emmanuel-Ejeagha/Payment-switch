@@ -1,4 +1,5 @@
-﻿using BuildingBlocks.Shared.Configuration;
+﻿using BuildingBlocks.Shared.Auth;
+using BuildingBlocks.Shared.Configuration;
 using BuildingBlocks.Shared.Resilience;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -35,6 +36,8 @@ public static class DependencyInjection
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IMerchantService, GrpcMerchantService>();
 
+        services.AddServiceTokenProvider(configuration, "Payment");
+
         services.AddValidatedOptions<RabbitMQSettings>(configuration, "RabbitMQ",
             s => !string.IsNullOrEmpty(s.HostName),
             "RabbitMQ HostName is required");
@@ -43,8 +46,12 @@ public static class DependencyInjection
 
         services.AddGrpcClient<MerchantService.MerchantServiceClient>(o =>
         {
-            o.Address = new Uri("http://merchant-api:8080");
-        }).AddGrpcResilienceInterceptor();
+            o.Address = new Uri(configuration["Grpc:Merchant:Address"] ?? "http://merchant-api:8080");
+            o.ChannelOptionsActions.Add(channel =>
+                channel.UnsafeUseInsecureChannelCallCredentials = true);
+        })
+        .AddGrpcResilienceInterceptor()
+        .AddServiceTokenAuthentication();
 
         return services;
     }

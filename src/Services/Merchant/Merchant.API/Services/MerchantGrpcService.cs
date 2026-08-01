@@ -1,10 +1,13 @@
-﻿using Grpc.Core;
-using Microsoft.EntityFrameworkCore;
+﻿using BuildingBlocks.Shared.Auth;
+using Grpc.Core;
 using Merchant.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.EntityFrameworkCore;
 using PaymentSwitch.Protos.Merchant;
 
 namespace Merchant.API.Services;
 
+[Authorize(Policy = AuthPolicies.ServiceOnly)]
 public class MerchantGrpcService : MerchantService.MerchantServiceBase
 {
     private readonly AppDbContext _db;
