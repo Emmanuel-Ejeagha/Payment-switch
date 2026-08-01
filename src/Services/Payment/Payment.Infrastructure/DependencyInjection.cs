@@ -1,4 +1,5 @@
 ﻿using BuildingBlocks.Shared.Configuration;
+using BuildingBlocks.Shared.Resilience;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -43,7 +44,7 @@ public static class DependencyInjection
         services.AddGrpcClient<MerchantService.MerchantServiceClient>(o =>
         {
             o.Address = new Uri("http://merchant-api:8080");
-        });
+        }).AddGrpcResilienceInterceptor();
 
         return services;
     }
