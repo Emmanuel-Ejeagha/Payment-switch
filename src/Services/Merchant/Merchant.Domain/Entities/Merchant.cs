@@ -6,6 +6,7 @@ namespace Merchant.Domain.Entities;
 
 public class Merchant : AggregateRoot
 {
+    public Guid? OwnerId { get; private set; }
     public BusinessName BusinessName { get; private set; } = default!;
     public MerchantEmail Email { get; private set; } = default!;
     public MerchantStatus Status { get; private set; } = default!;
@@ -20,8 +21,9 @@ public class Merchant : AggregateRoot
 
     private Merchant() : base() { } 
 
-    public Merchant(Guid id, BusinessName businessName, MerchantEmail email) : base(id)
+    public Merchant(Guid id, Guid? ownerId, BusinessName businessName, MerchantEmail email) : base(id)
     {
+        OwnerId = ownerId;
         BusinessName = businessName ?? throw new ArgumentNullException(nameof(businessName));
         Email = email ?? throw new ArgumentNullException(nameof(email));
         Status = MerchantStatus.Pending;
@@ -29,6 +31,9 @@ public class Merchant : AggregateRoot
         CreatedAt = DateTime.UtcNow;
         AddDomainEvent(new MerchantOnboardedEvent(Id, businessName.Value, email.Value));
     }
+
+    public Merchant(Guid id, BusinessName businessName, MerchantEmail email)
+        : this(id, null, businessName, email) { }
 
     public void Activate()
     {

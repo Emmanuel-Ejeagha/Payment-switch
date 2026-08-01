@@ -1,8 +1,11 @@
-﻿namespace Merchant.Application.Features.Commands.UpdateMerchantConfig;
+﻿using Merchant.Application.Auth;
+
+namespace Merchant.Application.Features.Commands.UpdateMerchantConfig;
 
 public record UpdateMerchantConfigurationCommand(
     Guid MerchantId,
     string? WebhookUrl,
     List<string>? PaymentMethods,
-    bool? AutoCapture
+    bool? AutoCapture,
+    CallerContext Caller
 );

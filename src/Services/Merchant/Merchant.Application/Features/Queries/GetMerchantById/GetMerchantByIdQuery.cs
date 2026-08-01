@@ -1,4 +1,5 @@
-﻿namespace Merchant.Application.Features.Queries.GetMerchantById;
+﻿using Merchant.Application.Auth;
 
-public record GetMerchantByIdQuery(Guid MerchantId);
+namespace Merchant.Application.Features.Queries.GetMerchantById;
 
+public record GetMerchantByIdQuery(Guid MerchantId, CallerContext Caller);

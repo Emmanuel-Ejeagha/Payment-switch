@@ -4,6 +4,9 @@ public class OnboardMerchantCommandValidator : AbstractValidator<OnboardMerchant
 {
     public OnboardMerchantCommandValidator()
     {
+        RuleFor(x => x.OwnerId)
+            .NotEmpty().WithMessage("Owner id is required.");
+
         RuleFor(x => x.BusinessName)
             .NotEmpty().WithMessage("Business name is required.")
             .MinimumLength(2).WithMessage("Business name must be at least 2 characters.")

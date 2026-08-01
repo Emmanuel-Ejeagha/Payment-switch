@@ -19,7 +19,7 @@ public class OnboardMerchantHandlerTests
     [Fact]
     public async Task Handle_ValidCommand_ShouldCreateMerchant()
     {
-        var command = new OnboardMerchantCommand("Acme Corp", "acme@test.com");
+        var command = new OnboardMerchantCommand(Guid.NewGuid(), "Acme Corp", "acme@test.com");
         SetupValidatorSuccess(command);
         _repoMock.Setup(r => r.ExistsByEmailAsync(command.Email, It.IsAny<CancellationToken>())).ReturnsAsync(false);
         _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
@@ -28,7 +28,7 @@ public class OnboardMerchantHandlerTests
 
         Assert.True(result.IsSuccess);
         Assert.NotEqual(Guid.Empty, result.Value!.MerchantId);
-        _repoMock.Verify(r => r.AddAsync(It.Is<MerchantEntity>(m => m.BusinessName.Value == command.BusinessName), It.IsAny<CancellationToken>()), Times.Once);
+        _repoMock.Verify(r => r.AddAsync(It.Is<MerchantEntity>(m => m.BusinessName.Value == command.BusinessName && m.OwnerId == command.OwnerId), It.IsAny<CancellationToken>()), Times.Once);
         _uowMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
         _dispatcherMock.Verify(d => d.DispatchAsync(It.IsAny<IReadOnlyList<DomainEvent>>(), It.IsAny<CancellationToken>()), Times.Once);
     }
@@ -36,7 +36,7 @@ public class OnboardMerchantHandlerTests
     [Fact]
     public async Task Handle_DuplicateEmail_ShouldFail()
     {
-        var command = new OnboardMerchantCommand("Acme", "dup@test.com");
+        var command = new OnboardMerchantCommand(Guid.NewGuid(), "Acme", "dup@test.com");
         SetupValidatorSuccess(command);
         _repoMock.Setup(r => r.ExistsByEmailAsync(command.Email, It.IsAny<CancellationToken>())).ReturnsAsync(true);
 
@@ -49,7 +49,7 @@ public class OnboardMerchantHandlerTests
     [Fact]
     public async Task Handle_InvalidCommand_ShouldReturnValidationErrors()
     {
-        var command = new OnboardMerchantCommand("", "");
+        var command = new OnboardMerchantCommand(Guid.Empty, "", "");
         SetupValidatorFailure(command, "BusinessName", "Business name is required.");
 
         var result = await _handler.Handle(command);

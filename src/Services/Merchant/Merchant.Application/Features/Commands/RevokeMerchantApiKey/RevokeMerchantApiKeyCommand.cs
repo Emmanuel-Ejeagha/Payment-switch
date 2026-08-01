@@ -1,3 +1,5 @@
+using Merchant.Application.Auth;
+
 namespace Merchant.Application.Features.Commands.RevokeMerchantApiKey;
 
-public record RevokeMerchantApiKeyCommand(Guid MerchantId, Guid KeyId);
+public record RevokeMerchantApiKeyCommand(Guid MerchantId, Guid KeyId, CallerContext Caller);

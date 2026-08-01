@@ -21,6 +21,9 @@ public class GetMerchantApiKeysHandler
         if (merchant is null)
             return MerchantErrors.MerchantNotFound(query.MerchantId);
 
+        if (!query.Caller.CanAccess(merchant.OwnerId))
+            return MerchantErrors.Unauthorized();
+
         var keys = await _repository.GetApiKeysByMerchantIdAsync(query.MerchantId, cancellationToken);
         return Result<List<MerchantApiKeyDto>>.Success(keys);
     }
