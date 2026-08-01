@@ -1,4 +1,5 @@
 ﻿using BuildingBlocks.Shared.Configuration;
+using BuildingBlocks.Shared.Resilience;
 using Settlement.Application.Interfaces;
 using Settlement.Infrastructure.Outbox;
 using Settlement.Infrastructure.Persistence;
@@ -41,7 +42,7 @@ public static class DependencyInjection
         services.AddGrpcClient<LedgerService.LedgerServiceClient>(o =>
         {
             o.Address = new Uri("http://ledger-api:8080");
-        });
+        }).AddGrpcResilienceInterceptor();
 
         return services;
     }
