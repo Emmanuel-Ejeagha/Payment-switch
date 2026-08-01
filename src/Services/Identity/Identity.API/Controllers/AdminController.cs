@@ -2,12 +2,14 @@
 using Identity.Application.Commands.Role;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
 
 namespace Identity.API.Controllers;
 
 [Authorize(Roles = "Admin")]
 [Produces("application/json")]
+[EnableRateLimiting("Strict")]
 public class AdminController : BaseApiController
 {
     /// <summary>

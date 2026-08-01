@@ -10,11 +10,13 @@ using Merchant.Application.Features.Queries.ListMerchants;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Merchant.API.Controllers;
 
 [Authorize]
 [Produces("application/json")]
+[EnableRateLimiting("Strict")]
 public class MerchantsController : BaseApiController
 {
     /// <summary>

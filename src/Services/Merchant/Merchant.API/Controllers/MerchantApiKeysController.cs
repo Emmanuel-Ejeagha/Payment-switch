@@ -6,6 +6,7 @@ using Merchant.Application.Features.Commands.RevokeMerchantApiKey;
 using Merchant.Application.Features.Queries.GetMerchantApiKeys;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 namespace Merchant.API.Controllers;
 
 [Authorize]
@@ -13,6 +14,7 @@ namespace Merchant.API.Controllers;
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/merchants/{merchantId:guid}/apikeys")]
 [Produces("application/json")]
+[EnableRateLimiting("Strict")]
 public class MerchantApiKeysController : ControllerBase
 {
     /// <summary>
