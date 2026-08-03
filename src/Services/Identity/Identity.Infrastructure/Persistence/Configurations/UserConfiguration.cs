@@ -36,7 +36,8 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         {
             rt.WithOwner().HasForeignKey("UserId");
             rt.HasKey("Id");
-            rt.Property(t => t.Value).IsRequired();
+            rt.Property(t => t.Value).IsRequired().HasMaxLength(128);
+            rt.HasIndex(t => t.Value).IsUnique();
             rt.Property(t => t.ExpiresAt).IsRequired();
             rt.Property(t => t.IsRevoked);
             rt.ToTable("RefreshTokens");

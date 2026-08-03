@@ -115,6 +115,19 @@ public class UserTests
         user.RevokeRefreshToken("nonexistent"); 
     }
 
+    [Fact]
+    public void RevokeAllRefreshTokens_ShouldRevokeEveryToken()
+    {
+        var user = CreateUser();
+        user.AddRefreshToken("token1", DateTime.UtcNow.AddDays(1));
+        user.AddRefreshToken("token2", DateTime.UtcNow.AddDays(1));
+        user.AddRefreshToken("token3", DateTime.UtcNow.AddDays(1));
+
+        user.RevokeAllRefreshTokens();
+
+        Assert.All(user.RefreshTokens, t => Assert.True(t.IsRevoked));
+    }
+
     private static User CreateUser()
     {
         return new User(Guid.NewGuid(), new Email("user@domain.com"), new PasswordHash("hash"), new FullName("John Doe"));

@@ -43,8 +43,9 @@ public class UserRepository : IUserRepository
 
     public async Task<User?> FindByRefreshTokenAsync(string refreshToken, CancellationToken cancellationToken = default)
     {
-        var users = await _context.Users.ToListAsync(cancellationToken);
-        return users.FirstOrDefault(u => u.RefreshTokens.Any(t => t.Value == refreshToken));
+        return await _context.Users
+            .Where(u => u.RefreshTokens.Any(t => t.Value == refreshToken))
+            .FirstOrDefaultAsync(cancellationToken);
     }
 
     public async Task<List<ApiKeyDto>> GetApiKeysByUserIdAsync(Guid userId, CancellationToken cancellationToken = default)

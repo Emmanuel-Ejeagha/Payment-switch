@@ -65,17 +65,23 @@ public class User : AggregateRoot
         AddDomainEvent(new ApiKeyRevokedDomainEvent(Id, keyId));
     }
 
-    public TokenValue AddRefreshToken(string tokenValue, DateTime expiresAt)
+    public TokenValue AddRefreshToken(string tokenHash, DateTime expiresAt)
     {
-        var token = new TokenValue(tokenValue, expiresAt);
+        var token = new TokenValue(tokenHash, expiresAt);
         _refreshTokens.Add(token);
         return token;
     }
 
-    public void RevokeRefreshToken(string tokenValue)
+    public void RevokeRefreshToken(string tokenHash)
     {
-        var token = _refreshTokens.FirstOrDefault(t => t.Value == tokenValue);
+        var token = _refreshTokens.FirstOrDefault(t => t.Value == tokenHash);
         if (token != null)
+            token.Revoke();
+    }
+
+    public void RevokeAllRefreshTokens()
+    {
+        foreach (var token in _refreshTokens)
             token.Revoke();
     }
 }

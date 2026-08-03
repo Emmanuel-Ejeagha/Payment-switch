@@ -30,23 +30,32 @@ public class RefreshTokenHandler
 
     public async Task<Result<RefreshTokenResponse>> Handle(RefreshTokenCommand command, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Handling {CommandName} for {Identifier}", nameof(RefreshTokenCommand), command.RefreshToken);
+        _logger.LogInformation("Handling {CommandName}", nameof(RefreshTokenCommand));
         var validationResult = await _validator.ValidateAsync(command, cancellationToken);
         if (!validationResult.IsValid)
             return validationResult.Errors.Select(e => new Error(e.PropertyName, e.ErrorMessage)).ToList();
 
-        var user = await _userRepository.FindByRefreshTokenAsync(command.RefreshToken, cancellationToken);
+        var tokenHash = _tokenService.HashRefreshToken(command.RefreshToken);
+        var user = await _userRepository.FindByRefreshTokenAsync(tokenHash, cancellationToken);
         if (user == null)
             return new Error("Identity.InvalidRefreshToken", "Refresh token not found.");
 
-        var token = user.RefreshTokens.FirstOrDefault(t => t.Value == command.RefreshToken);
-        if (token == null || token.IsRevoked || token.ExpiresAt < DateTime.UtcNow)
+        var token = user.RefreshTokens.FirstOrDefault(t => t.Value == tokenHash);
+        if (token == null || token.ExpiresAt < DateTime.UtcNow)
             return new Error("Identity.RefreshTokenInvalidOrExpired", "Refresh token is invalid or expired.");
 
-        user.RevokeRefreshToken(command.RefreshToken);
+        if (token.IsRevoked)
+        {
+            _logger.LogWarning("Refresh token reuse detected for user {UserId}. Revoking all refresh tokens.", user.Id);
+            user.RevokeAllRefreshTokens();
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            return new Error("Identity.RefreshTokenReuseDetected", "Refresh token reuse detected. All refresh tokens revoked.");
+        }
+
+        user.RevokeRefreshToken(tokenHash);
         var newAccessToken = _tokenService.GenerateAccessToken(user);
         var newRefreshToken = _tokenService.GenerateRefreshToken();
-        user.AddRefreshToken(newRefreshToken, DateTime.UtcNow.AddDays(7));
+        user.AddRefreshToken(_tokenService.HashRefreshToken(newRefreshToken), DateTime.UtcNow.AddDays(7));
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         await _dispatcher.DispatchAsync(user.DomainEvents, cancellationToken);
 

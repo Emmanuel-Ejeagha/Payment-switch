@@ -47,6 +47,8 @@ public class LoginHandlerTests
             .Returns("access_token");
         _tokenServiceMock.Setup(t => t.GenerateRefreshToken())
             .Returns("refresh_token");
+        _tokenServiceMock.Setup(t => t.HashRefreshToken(It.IsAny<string>()))
+            .Returns<string>(token => $"hash-{token}");
         _unitOfWorkMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);
 

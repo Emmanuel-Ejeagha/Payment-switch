@@ -2,8 +2,10 @@
 using Identity.Application.Commands.Auth.Login;
 using Identity.Application.Commands.Auth.Register;
 using Identity.Application.Commands.Auth.Tokens;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using System.Security.Claims;
 
 namespace Identity.API.Controllers;
 
@@ -64,19 +66,24 @@ public class AuthController : BaseApiController
     }
 
     /// <summary>
-    /// Revoke a specific refresh token.
+    /// Revoke a specific refresh token belonging to the authenticated user.
     /// </summary>
     /// <param name="command">The refresh token to revoke.</param>
     /// <param name="handler">Handler injected via DI.</param>
     /// <returns>200 OK if revoked, or an error if the token was not found.</returns>
     [HttpPost("revoke")]
+    [Authorize]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> Revoke(
         [FromBody] RevokeRefreshTokenCommand command,
         [FromServices] RevokeRefreshTokenHandler handler)
     {
-        var result = await handler.Handle(command);
+        var userId = User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
+        if (userId is null) return Unauthorized();
+
+        var result = await handler.Handle(command, Guid.Parse(userId));
         return result.ToActionResult();
     }
 }
