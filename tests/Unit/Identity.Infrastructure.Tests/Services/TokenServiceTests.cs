@@ -42,4 +42,13 @@ public class TokenServiceTests
         var token = _tokenService.GenerateRefreshToken();
         Assert.False(string.IsNullOrEmpty(token));
     }
+
+    [Fact]
+    public void HashRefreshToken_ShouldProduceDeterministicBase64Hash()
+    {
+        var hash = _tokenService.HashRefreshToken("plain-token");
+        Assert.False(string.IsNullOrEmpty(hash));
+        Assert.Equal(hash, _tokenService.HashRefreshToken("plain-token"));
+        Assert.NotEqual("plain-token", hash);
+    }
 }

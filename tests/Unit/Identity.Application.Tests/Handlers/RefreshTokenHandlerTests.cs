@@ -28,6 +28,9 @@ public class RefreshTokenHandlerTests
             _unitOfWorkMock.Object,
             _dispatcherMock.Object,
             _validatorMock.Object, _loggerMock.Object);
+
+        _tokenServiceMock.Setup(t => t.HashRefreshToken(It.IsAny<string>()))
+            .Returns<string>(token => $"hash-{token}");
     }
 
     [Fact]
@@ -37,7 +40,7 @@ public class RefreshTokenHandlerTests
         var command = new RefreshTokenCommand("valid_refresh_token");
         var user = CreateUserWithRefreshToken("valid_refresh_token");
         SetupValidatorSuccess(command);
-        _userRepositoryMock.Setup(r => r.FindByRefreshTokenAsync("valid_refresh_token", It.IsAny<CancellationToken>()))
+        _userRepositoryMock.Setup(r => r.FindByRefreshTokenAsync("hash-valid_refresh_token", It.IsAny<CancellationToken>()))
             .ReturnsAsync(user);
         _tokenServiceMock.Setup(t => t.GenerateAccessToken(user))
             .Returns("new_access_token");
@@ -53,8 +56,8 @@ public class RefreshTokenHandlerTests
         Assert.True(result.IsSuccess);
         Assert.Equal("new_access_token", result.Value.AccessToken);
         Assert.Equal("new_refresh_token", result.Value.RefreshToken);
-        Assert.True(user.RefreshTokens.First(t => t.Value == "valid_refresh_token").IsRevoked);
-        Assert.Contains(user.RefreshTokens, t => t.Value == "new_refresh_token");
+        Assert.True(user.RefreshTokens.First(t => t.Value == "hash-valid_refresh_token").IsRevoked);
+        Assert.Contains(user.RefreshTokens, t => t.Value == "hash-new_refresh_token");
     }
 
     [Fact]
@@ -64,7 +67,7 @@ public class RefreshTokenHandlerTests
         var command = new RefreshTokenCommand("expired_token");
         var user = CreateUserWithExpiredRefreshToken("expired_token");
         SetupValidatorSuccess(command);
-        _userRepositoryMock.Setup(r => r.FindByRefreshTokenAsync("expired_token", It.IsAny<CancellationToken>()))
+        _userRepositoryMock.Setup(r => r.FindByRefreshTokenAsync("hash-expired_token", It.IsAny<CancellationToken>()))
             .ReturnsAsync(user);
 
         // Act
@@ -76,14 +79,16 @@ public class RefreshTokenHandlerTests
     }
 
     [Fact]
-    public async Task Handle_RevokedToken_ShouldReturnFailure()
+    public async Task Handle_RevokedToken_ShouldDetectReuseAndRevokeAll()
     {
         // Arrange
         var command = new RefreshTokenCommand("revoked_token");
         var user = CreateUserWithRefreshToken("revoked_token");
-        user.RevokeRefreshToken("revoked_token"); // mark revoked
+        user.AddRefreshToken("hash-another_token", DateTime.UtcNow.AddDays(1));
+        user.RevokeRefreshToken("hash-revoked_token");
+        user.RevokeRefreshToken("hash-another_token");
         SetupValidatorSuccess(command);
-        _userRepositoryMock.Setup(r => r.FindByRefreshTokenAsync("revoked_token", It.IsAny<CancellationToken>()))
+        _userRepositoryMock.Setup(r => r.FindByRefreshTokenAsync("hash-revoked_token", It.IsAny<CancellationToken>()))
             .ReturnsAsync(user);
 
         // Act
@@ -91,7 +96,8 @@ public class RefreshTokenHandlerTests
 
         // Assert
         Assert.True(result.IsFailure);
-        Assert.Equal("Identity.RefreshTokenInvalidOrExpired", result.Errors[0].Code);
+        Assert.Equal("Identity.RefreshTokenReuseDetected", result.Errors[0].Code);
+        Assert.All(user.RefreshTokens, t => Assert.True(t.IsRevoked));
     }
 
     [Fact]
@@ -100,7 +106,7 @@ public class RefreshTokenHandlerTests
         // Arrange
         var command = new RefreshTokenCommand("nonexistent");
         SetupValidatorSuccess(command);
-        _userRepositoryMock.Setup(r => r.FindByRefreshTokenAsync("nonexistent", It.IsAny<CancellationToken>()))
+        _userRepositoryMock.Setup(r => r.FindByRefreshTokenAsync("hash-nonexistent", It.IsAny<CancellationToken>()))
             .ReturnsAsync((User?)null);
 
         // Act
@@ -129,7 +135,7 @@ public class RefreshTokenHandlerTests
     private static User CreateUserWithRefreshToken(string tokenValue)
     {
         var user = new User(Guid.NewGuid(), new Email("user@example.com"), new PasswordHash("hashed"), new FullName("User"));
-        user.AddRefreshToken(tokenValue, DateTime.UtcNow.AddDays(1));
+        user.AddRefreshToken($"hash-{tokenValue}", DateTime.UtcNow.AddDays(1));
         user.ClearDomainEvents();
         return user;
     }
@@ -137,7 +143,7 @@ public class RefreshTokenHandlerTests
     private static User CreateUserWithExpiredRefreshToken(string tokenValue)
     {
         var user = new User(Guid.NewGuid(), new Email("user@example.com"), new PasswordHash("hashed"), new FullName("User"));
-        user.AddRefreshToken(tokenValue, DateTime.UtcNow.AddDays(-1)); // expired
+        user.AddRefreshToken($"hash-{tokenValue}", DateTime.UtcNow.AddDays(-1)); // expired
         user.ClearDomainEvents();
         return user;
     }
