@@ -9,18 +9,26 @@ export interface PaymentEvent {
   timestamp: string
 }
 
-export function useNotifications(merchantId: string | null) {
+async function getAccessToken(): Promise<string> {
+  const res = await fetch("/api/auth/token")
+  if (!res.ok) throw new Error("Not authenticated")
+  const data = (await res.json()) as { accessToken?: string }
+  return data.accessToken ?? ""
+}
+
+export function useNotifications() {
   const [connected, setConnected] = useState(false)
   const [events, setEvents] = useState<PaymentEvent[]>([])
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!merchantId) return
-
     const conn = new signalR.HubConnectionBuilder()
       .withUrl(
-        `${process.env.NEXT_PUBLIC_API_URL}/notification/hubs/payment-notifications?merchantId=${merchantId}`,
-        { withCredentials: false }
+        `${process.env.NEXT_PUBLIC_API_URL}/notification/hubs/payment-notifications`,
+        {
+          withCredentials: false,
+          accessTokenFactory: getAccessToken,
+        }
       )
       .withAutomaticReconnect()
       .configureLogging(signalR.LogLevel.Warning)
@@ -50,7 +58,7 @@ export function useNotifications(merchantId: string | null) {
     return () => {
       conn.stop()
     }
-  }, [merchantId])
+  }, [])
 
   const clearEvents = useCallback(() => setEvents([]), [])
 

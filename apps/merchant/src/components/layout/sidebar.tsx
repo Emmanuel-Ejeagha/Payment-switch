@@ -18,8 +18,7 @@ import {
 } from "lucide-react"
 import { useTheme } from "@/components/theme-provider"
 import { useNotifications } from "@/components/use-notifications"
-import { useEffect, useState } from "react"
-import type { MerchantDto, UserDto } from "@paymentswitch/shared"
+import { useState } from "react"
 
 const navItems = [
   { label: "Dashboard", href: "/", icon: Home },
@@ -39,25 +38,9 @@ export function Sidebar({ open, onClose }: SidebarProps) {
   const router = useRouter()
   const pathname = usePathname()
   const { theme, toggle } = useTheme()
-  const [merchantId, setMerchantId] = useState<string | null>(null)
   const [showNotifications, setShowNotifications] = useState(false)
 
-  useEffect(() => {
-    async function load() {
-      try {
-        const userRes = await fetch("/api/proxy/identity/api/v1/users/me")
-        if (!userRes.ok) return
-        const userData: UserDto = await userRes.json()
-        const merchantRes = await fetch(`/api/proxy/merchant/api/v1/merchants/by-email/${encodeURIComponent(userData.email)}`)
-        if (!merchantRes.ok) return
-        const merchantData: MerchantDto = await merchantRes.json()
-        setMerchantId(merchantData.id)
-      } catch {}
-    }
-    load()
-  }, [])
-
-  const { connected, events } = useNotifications(merchantId)
+  const { connected, events } = useNotifications()
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" })

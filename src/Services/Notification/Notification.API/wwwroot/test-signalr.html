@@ -3,15 +3,15 @@
 <head><title>SignalR Test</title></head>
 <body>
     <h2>Payment Notifications</h2>
-    <input id="merchantId" placeholder="Merchant ID" />
+    <input id="token" placeholder="Access token" style="width: 400px" />
     <button onclick="connect()">Connect</button>
     <ul id="messages"></ul>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/6.0.1/signalr.js"></script>
     <script>
         async function connect() {
-            const merchantId = document.getElementById('merchantId').value;
+            const token = document.getElementById('token').value;
             const connection = new signalR.HubConnectionBuilder()
-                .withUrl(`/hubs/payment-notifications?merchantId=${merchantId}`)
+                .withUrl(`/hubs/payment-notifications?access_token=${encodeURIComponent(token)}`)
                 .build();
             connection.on("PaymentEvent", data => {
                 const li = document.createElement("li");
