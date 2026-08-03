@@ -1,7 +1,9 @@
 ﻿using BuildingBlocks.Shared.Events;
 using BuildingBlocks.Shared.Results;
 using FluentValidation;
+using Ledger.Application.Common;
 using Ledger.Application.Interfaces;
+using Ledger.Application.Options;
 using Ledger.Domain.DomainErrors;
 using Ledger.Domain.ValueObjects;
 using Microsoft.Extensions.Logging;
@@ -14,6 +16,7 @@ public class CaptureFundsHandler
     private readonly IUnitOfWork _unitOfWork;
     private readonly IDomainEventDispatcher _dispatcher;
     private readonly IValidator<CaptureFundsCommand> _validator;
+    private readonly LedgerOptions _options;
     private readonly ILogger<CaptureFundsHandler> _logger;
 
     public CaptureFundsHandler(
@@ -21,12 +24,14 @@ public class CaptureFundsHandler
         IUnitOfWork unitOfWork,
         IDomainEventDispatcher dispatcher,
         IValidator<CaptureFundsCommand> validator,
+        LedgerOptions options,
         ILogger<CaptureFundsHandler> logger)
     {
         _repository = repository;
         _unitOfWork = unitOfWork;
         _dispatcher = dispatcher;
         _validator = validator;
+        _options = options;
         _logger = logger;
     }
 
@@ -46,6 +51,13 @@ public class CaptureFundsHandler
             var amount = new Money(command.Amount, command.Currency);
             var correlationId = new CorrelationId(command.CorrelationId);
             account.CaptureFunds(amount, correlationId);
+
+            var fee = FeeCalculator.Calculate(command.Amount, _options.FeeBasisPoints);
+            if (fee > 0)
+            {
+                _logger.LogInformation("Charging {Fee} processing fee for Merchant {MerchantId}", fee, command.MerchantId);
+                account.ChargeFees(new Money(fee, command.Currency), correlationId);
+            }
         }
         catch (InvalidOperationException ex)
         {
