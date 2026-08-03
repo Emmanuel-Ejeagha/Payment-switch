@@ -26,6 +26,8 @@ public class LedgerAccountConfiguration : IEntityTypeConfiguration<LedgerAccount
             j.HasKey("Id");
             j.Property(e => e.Id).ValueGeneratedNever();
             j.Property(e => e.Type).HasConversion<string>().IsRequired();
+            j.Property(e => e.DebitAccount).HasConversion<string>().IsRequired();
+            j.Property(e => e.CreditAccount).HasConversion<string>().IsRequired();
             j.Property(e => e.Description).IsRequired().HasMaxLength(500);
             j.OwnsOne(e => e.Amount, a =>
             {

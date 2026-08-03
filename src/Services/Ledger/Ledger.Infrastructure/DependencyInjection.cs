@@ -1,5 +1,6 @@
 ﻿using BuildingBlocks.Shared.Configuration;
 using Ledger.Application.Interfaces;
+using Ledger.Application.Options;
 using Ledger.Infrastructure.Messaging;
 using Ledger.Infrastructure.Outbox;
 using Ledger.Infrastructure.Persistence;
@@ -32,6 +33,9 @@ public static class DependencyInjection
         services.AddValidatedOptions<RabbitMQSettings>(configuration, "RabbitMQ",
             s => !string.IsNullOrEmpty(s.HostName),
             "RabbitMQ HostName is required");
+        services.AddValidatedOptions<LedgerOptions>(configuration, "Ledger",
+            o => o.FeeBasisPoints >= 0,
+            "Ledger FeeBasisPoints must be >= 0");
         services.AddScoped<IEventBus, RabbitMQEventBus>();
         services.AddHostedService<OutboxPublisherService>();
         services.AddHostedService<RabbitMQConsumerService>();

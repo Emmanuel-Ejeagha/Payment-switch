@@ -39,7 +39,8 @@ public class ReserveFundsHandlerTests
         Assert.True(result.IsSuccess);
         Assert.Equal(200L, account.AvailableBalance);
         Assert.Equal(100L, account.PendingBalance);
-        Assert.Single(account.Journal, j => j.Type == EntryType.Debit);
+        Assert.Equal(100L, account.ReservedBalance);
+        Assert.Single(account.Journal, j => j.Type == EntryType.Credit && j.CreditAccount == GlAccountCode.Reserve);
         _dispatcherMock.Verify(d => d.DispatchAsync(It.IsAny<IReadOnlyList<DomainEvent>>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
