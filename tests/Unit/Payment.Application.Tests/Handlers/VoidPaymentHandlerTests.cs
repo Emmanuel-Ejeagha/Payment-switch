@@ -74,6 +74,24 @@ public class VoidPaymentHandlerTests
         _gatewayMock.Verify(g => g.VoidAsync(It.IsAny<Guid>(), It.IsAny<GatewayReference>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
+    [Fact]
+    public async Task Handle_ReplayedIdempotencyKey_ShouldReturnExistingVoid()
+    {
+        var intent = CreateAuthorizedIntent();
+        intent.Void("void-key");
+        intent.ClearDomainEvents();
+        var command = new VoidPaymentCommand(intent.Id, "void-key");
+        SetupValidatorSuccess(command);
+        _repoMock.Setup(r => r.GetByIdAsync(intent.Id, It.IsAny<CancellationToken>())).ReturnsAsync(intent);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Voided", result.Value.Status);
+        _gatewayMock.Verify(g => g.VoidAsync(It.IsAny<Guid>(), It.IsAny<GatewayReference>(), It.IsAny<CancellationToken>()), Times.Never);
+        _uowMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     private PaymentIntent CreateCapturedIntent()
     {
         var intent = CreateAuthorizedIntent();

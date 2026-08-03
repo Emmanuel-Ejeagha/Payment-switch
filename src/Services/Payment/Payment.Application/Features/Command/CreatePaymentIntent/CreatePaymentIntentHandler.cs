@@ -49,7 +49,10 @@ public class CreatePaymentIntentHandler
 
         var existing = await _repository.GetByIdempotencyKeyAsync(command.MerchantId, command.IdempotencyKey, cancellationToken);
         if (existing is not null)
-            return PaymentErrors.IdempotencyKeyViolation(command.IdempotencyKey);
+        {
+            _logger.LogInformation("Replaying create for Merchant {MerchantId} with key {Key}", command.MerchantId, command.IdempotencyKey);
+            return ToResponse(existing);
+        }
 
         var amount = new Money(command.Amount, command.Currency);
         var paymentMethod = ResolvePaymentMethod(command.PaymentMethod);
@@ -89,12 +92,8 @@ public class CreatePaymentIntentHandler
         var gatewayRef = new GatewayReference(gwResponse.GatewayReference!);
         intent.Authorize(authCode, gatewayRef);
 
-        string? clientSecret = null;
         if (configResult.Value.AutoCapture)
-        {
             intent.Capture();
-            clientSecret = intent.Transactions.Last(t => t.Type == TransactionType.Capture).Id.ToString();
-        }
 
         await _unitOfWork.BeginTransactionAsync(cancellationToken);
         await _repository.AddAsync(intent, cancellationToken);
@@ -110,6 +109,12 @@ public class CreatePaymentIntentHandler
         }
         await _dispatcher.DispatchAsync(intent.DomainEvents, cancellationToken);
 
+        return ToResponse(intent);
+    }
+
+    private static PaymentIntentResponse ToResponse(PaymentIntent intent)
+    {
+        string? clientSecret = intent.Transactions.LastOrDefault(t => t.Type == TransactionType.Capture)?.Id.ToString();
         return new PaymentIntentResponse(intent.Id, intent.Status.Value, clientSecret);
     }
 

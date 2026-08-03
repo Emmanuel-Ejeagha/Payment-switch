@@ -46,6 +46,16 @@ public class CapturePaymentHandler
         if (intent is null)
             return PaymentErrors.PaymentIntentNotFound(command.IntentId);
 
+        if (!string.IsNullOrWhiteSpace(command.IdempotencyKey))
+        {
+            var replay = intent.Transactions.FirstOrDefault(t => t.Type == TransactionType.Capture && t.IdempotencyKey == command.IdempotencyKey);
+            if (replay is not null)
+            {
+                _logger.LogInformation("Replaying capture for Intent {IntentId} with key {Key}", intent.Id, command.IdempotencyKey);
+                return new CapturePaymentResponse(replay.Id, intent.Status.Value);
+            }
+        }
+
         if (intent.Status != PaymentStatus.Authorized && intent.Status != PaymentStatus.PartiallyCaptured)
             return PaymentErrors.InvalidStatusTransition(intent.Status.Value, "Captured");
 
@@ -58,7 +68,7 @@ public class CapturePaymentHandler
         await _unitOfWork.BeginTransactionAsync(cancellationToken);
         try
         {
-            intent.Capture(amount);
+            intent.Capture(amount, command.IdempotencyKey);
         }
         catch (InvalidOperationException ex)
         {

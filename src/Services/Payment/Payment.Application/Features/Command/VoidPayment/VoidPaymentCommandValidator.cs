@@ -7,5 +7,6 @@ public class VoidPaymentCommandValidator : AbstractValidator<VoidPaymentCommand>
     public VoidPaymentCommandValidator()
     {
         RuleFor(x => x.IntentId).NotEmpty();
+        RuleFor(x => x.IdempotencyKey).MaximumLength(200);
     }
 }

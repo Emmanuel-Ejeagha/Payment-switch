@@ -4,6 +4,7 @@ using BuildingBlocks.Shared.Results;
 using FluentValidation;
 using Payment.Application.Interfaces;
 using Payment.Domain;
+using Payment.Domain.Enums;
 using Payment.Domain.ValueObjects;
 using Microsoft.Extensions.Logging;
 
@@ -45,6 +46,16 @@ public class VoidPaymentHandler
         if (intent is null)
             return PaymentErrors.PaymentIntentNotFound(command.IntentId);
 
+        if (!string.IsNullOrWhiteSpace(command.IdempotencyKey))
+        {
+            var replay = intent.Transactions.FirstOrDefault(t => t.Type == TransactionType.Void && t.IdempotencyKey == command.IdempotencyKey);
+            if (replay is not null)
+            {
+                _logger.LogInformation("Replaying void for Intent {IntentId} with key {Key}", intent.Id, command.IdempotencyKey);
+                return new VoidPaymentResponse(intent.Status.Value);
+            }
+        }
+
         if (intent.Status != PaymentStatus.Authorized)
             return PaymentErrors.InvalidStatusTransition(intent.Status.Value, "Voided");
 
@@ -55,7 +66,7 @@ public class VoidPaymentHandler
         await _unitOfWork.BeginTransactionAsync(cancellationToken);
         try
         {
-            intent.Void();
+            intent.Void(command.IdempotencyKey);
         }
         catch (InvalidOperationException)
         {

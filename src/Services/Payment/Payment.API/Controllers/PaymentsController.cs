@@ -43,7 +43,7 @@ public class PaymentsController : BaseApiController
         [FromBody] AuthorizePaymentCommand command,
         [FromServices] AuthorizePaymentHandler handler)
     {
-        command = new AuthorizePaymentCommand(id, command.CardLastFour, command.CardBrand);
+        command = new AuthorizePaymentCommand(id, command.CardLastFour, command.CardBrand, command.IdempotencyKey);
         var result = await handler.Handle(command);
         return result.ToActionResult();
     }
@@ -60,7 +60,7 @@ public class PaymentsController : BaseApiController
         [FromBody] CapturePaymentCommand command,
         [FromServices] CapturePaymentHandler handler)
     {
-        command = new CapturePaymentCommand(id, command.Amount);
+        command = new CapturePaymentCommand(id, command.Amount, command.IdempotencyKey);
         var result = await handler.Handle(command);
         return result.ToActionResult();
     }
@@ -74,9 +74,10 @@ public class PaymentsController : BaseApiController
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Void(
         Guid id,
+        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
         [FromServices] VoidPaymentHandler handler)
     {
-        var result = await handler.Handle(new VoidPaymentCommand(id));
+        var result = await handler.Handle(new VoidPaymentCommand(id, idempotencyKey));
         return result.ToActionResult();
     }
 
@@ -92,7 +93,7 @@ public class PaymentsController : BaseApiController
         [FromBody] RefundPaymentCommand command,
         [FromServices] RefundPaymentHandler handler)
     {
-        command = new RefundPaymentCommand(id, command.Amount);
+        command = new RefundPaymentCommand(id, command.Amount, command.IdempotencyKey);
         var result = await handler.Handle(command);
         return result.ToActionResult();
     }

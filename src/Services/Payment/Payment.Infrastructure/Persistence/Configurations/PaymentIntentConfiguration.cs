@@ -19,11 +19,11 @@ public class PaymentIntentConfiguration : IEntityTypeConfiguration<PaymentIntent
             a.Property(m => m.Currency).HasColumnName("Currency").IsRequired().HasMaxLength(3);
         });
 
-        builder.OwnsOne(p => p.IdempotencyKey, ik =>
-        {
-            ik.Property(i => i.Value).HasColumnName("IdempotencyKey").IsRequired();
-            ik.HasIndex(i => i.Value).IsUnique();
-        });
+        builder.Property(p => p.IdempotencyKey)
+            .HasConversion(k => k.Value, v => new IdempotencyKey(v))
+            .HasColumnName("IdempotencyKey")
+            .HasMaxLength(200);
+        builder.HasIndex(p => new { p.MerchantId, p.IdempotencyKey }).IsUnique();
 
         builder.OwnsOne(p => p.AuthorizationCode, ac =>
         {
@@ -57,6 +57,8 @@ public class PaymentIntentConfiguration : IEntityTypeConfiguration<PaymentIntent
             t.Property(tx => tx.Id).ValueGeneratedNever();
             t.UsePropertyAccessMode(PropertyAccessMode.PreferField);
             t.Property(tx => tx.Type).HasConversion<string>().IsRequired();
+            t.Property(tx => tx.IdempotencyKey).HasMaxLength(200);
+            t.HasIndex("PaymentIntentId", "IdempotencyKey").IsUnique();
             t.OwnsOne(tx => tx.Amount, txA =>
             {
                 txA.Property(m => m.Amount).HasColumnName("Amount").IsRequired();
