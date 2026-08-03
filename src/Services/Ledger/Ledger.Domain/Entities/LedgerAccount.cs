@@ -10,9 +10,9 @@ namespace Ledger.Domain.Entities;
 public class LedgerAccount : AggregateRoot
 {
     public Guid MerchantId { get; private set; }
-    public decimal AvailableBalance { get; internal set; }
-    public decimal PendingBalance { get; internal set; }
-    public decimal ReservedBalance { get; internal set; }
+    public long AvailableBalance { get; internal set; }
+    public long PendingBalance { get; internal set; }
+    public long ReservedBalance { get; internal set; }
     public string Currency { get; private set; } = default!;
     public IReadOnlyList<JournalEntry> Journal => _journal;
     private List<JournalEntry> _journal = new();

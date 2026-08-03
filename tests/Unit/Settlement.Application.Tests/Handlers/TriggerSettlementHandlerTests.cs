@@ -36,8 +36,8 @@ public class TriggerSettlementHandlerTests
         _ledgerMock.Setup(l => l.GetDailyPayoutDataAsync(command.BatchDate, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<List<MerchantPayoutData>>.Success(new List<MerchantPayoutData>
             {
-                new(Guid.NewGuid(), 1000m, 20m, "USD"),
-                new(Guid.NewGuid(), 2000m, 40m, "USD")
+                new(Guid.NewGuid(), 1000L, 20L, "USD"),
+                new(Guid.NewGuid(), 2000L, 40L, "USD")
             }));
         _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 

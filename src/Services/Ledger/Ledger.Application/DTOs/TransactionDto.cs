@@ -3,7 +3,7 @@
 public record TransactionDto(
     Guid Id,
     string Type,
-    decimal Amount,
+    long Amount,
     string Currency,
     string Description,
     DateTime Timestamp

@@ -8,7 +8,7 @@ import type { SettlementBatchDto, MerchantDto } from "@paymentswitch/shared"
 import { StatusBadge } from "@paymentswitch/ui"
 
 function format(amount: number, currency = "USD") {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(amount)
+  return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(amount / 100)
 }
 
 export default function SettlementDetailPage() {

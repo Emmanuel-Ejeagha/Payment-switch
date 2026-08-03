@@ -2,4 +2,4 @@
 
 namespace Settlement.Domain.DomainEvents;
 
-public record SettlementBatchCompletedEvent(Guid BatchId, DateTime BatchDate, decimal TotalAmount, string Currency) : DomainEvent;
+public record SettlementBatchCompletedEvent(Guid BatchId, DateTime BatchDate, long TotalAmount, string Currency) : DomainEvent;

@@ -141,9 +141,9 @@ public class PaymentIntent : AggregateRoot
         UpdatedAt = DateTime.UtcNow;
     }
 
-    private decimal GetTotalCaptured() =>
+    private long GetTotalCaptured() =>
         _transactions.Where(t => t.Type == TransactionType.Capture).Sum(t => t.Amount.Amount);
 
-    private decimal GetTotalRefunded() =>
+    private long GetTotalRefunded() =>
         _transactions.Where(t => t.Type == TransactionType.Refund).Sum(t => t.Amount.Amount);
 }

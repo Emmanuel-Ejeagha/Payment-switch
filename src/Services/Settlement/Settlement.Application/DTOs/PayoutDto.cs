@@ -2,8 +2,8 @@
 
 public record PayoutDto(
     Guid MerchantId,
-    decimal GrossVolume,
-    decimal Fees,
-    decimal NetAmount,
+    long GrossVolume,
+    long Fees,
+    long NetAmount,
     string Currency
 );

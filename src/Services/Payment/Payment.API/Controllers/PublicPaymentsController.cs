@@ -77,7 +77,7 @@ public class PublicPaymentsController : ControllerBase
 }
 
 public record PublicCreatePaymentIntentRequest(
-    decimal Amount,
+    long Amount,
     string Currency,
     string PaymentMethod,
     string? CardLastFour = null,

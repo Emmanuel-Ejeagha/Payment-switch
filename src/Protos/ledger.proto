@@ -14,9 +14,9 @@ message GetBalancesRequest {
 }
 
 message GetBalancesResponse {
-  double available = 1;
-  double pending = 2;
-  double reserved = 3;
+  int64 available = 1;
+  int64 pending = 2;
+  int64 reserved = 3;
   string currency = 4;
 }
 
@@ -30,7 +30,7 @@ message GetDailyPayoutDataResponse {
 
 message MerchantPayoutData {
   string merchant_id = 1;
-  double gross_volume = 2;
-  double fees = 3;
+  int64 gross_volume = 2;
+  int64 fees = 3;
   string currency = 4;
 }

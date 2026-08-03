@@ -27,9 +27,9 @@ public class CaptureFundsHandlerTests
     public async Task Handle_ValidCommand_ShouldCaptureFunds()
     {
         var account = new LedgerAccount(Guid.NewGuid(), Guid.NewGuid(), "USD");
-        account.PendingBalance = 200m; // simulate authorized funds
+        account.PendingBalance = 200L; // simulate authorized funds
 
-        var command = new CaptureFundsCommand(account.MerchantId, 100m, "USD", "corr-2");
+        var command = new CaptureFundsCommand(account.MerchantId, 100L, "USD", "corr-2");
         SetupValidatorSuccess(command);
         _repoMock.Setup(r => r.GetByMerchantIdAndCurrencyAsync(account.MerchantId, "USD", It.IsAny<CancellationToken>())).ReturnsAsync(account);
         _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
@@ -37,15 +37,15 @@ public class CaptureFundsHandlerTests
         var result = await _handler.Handle(command);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(100m, account.AvailableBalance);
-        Assert.Equal(100m, account.PendingBalance);
+        Assert.Equal(100L, account.AvailableBalance);
+        Assert.Equal(100L, account.PendingBalance);
         Assert.Single(account.Journal, j => j.Type == EntryType.Credit);
     }
 
     [Fact]
     public async Task Handle_AccountNotFound_ShouldFail()
     {
-        var command = new CaptureFundsCommand(Guid.NewGuid(), 100m, "USD", "corr");
+        var command = new CaptureFundsCommand(Guid.NewGuid(), 100L, "USD", "corr");
         SetupValidatorSuccess(command);
         _repoMock.Setup(r => r.GetByMerchantIdAndCurrencyAsync(command.MerchantId, "USD", It.IsAny<CancellationToken>())).ReturnsAsync((LedgerAccount?)null);
 

@@ -2,8 +2,8 @@
 
 public record BalanceDto(
     Guid MerchantId,
-    decimal Available,
-    decimal Pending,
-    decimal Reserved,
+    long Available,
+    long Pending,
+    long Reserved,
     string Currency
 );
