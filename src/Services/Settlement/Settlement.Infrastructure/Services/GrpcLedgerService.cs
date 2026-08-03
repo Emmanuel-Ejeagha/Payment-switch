@@ -21,8 +21,8 @@ public class GrpcLedgerService : ILedgerService
 
         var data = response.Payouts.Select(p => new Application.DTOs.MerchantPayoutData(
             Guid.Parse(p.MerchantId),
-            (decimal)p.GrossVolume,
-            (decimal)p.Fees,
+            p.GrossVolume,
+            p.Fees,
             p.Currency
         )).ToList();
 

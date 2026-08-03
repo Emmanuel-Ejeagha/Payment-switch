@@ -27,9 +27,9 @@ public class LedgerGrpcService : LedgerService.LedgerServiceBase
 
         return new GetBalancesResponse
         {
-            Available = (double)(account?.AvailableBalance ?? 0),
-            Pending = (double)(account?.PendingBalance ?? 0),
-            Reserved = (double)(account?.ReservedBalance ?? 0),
+            Available = account?.AvailableBalance ?? 0,
+            Pending = account?.PendingBalance ?? 0,
+            Reserved = account?.ReservedBalance ?? 0,
             Currency = account?.Currency ?? "USD"
         };
     }
@@ -44,12 +44,12 @@ public class LedgerGrpcService : LedgerService.LedgerServiceBase
         foreach (var account in accounts)
         {
             var gross = account.AvailableBalance; 
-            var fees = 0m; 
+            var fees = 0L; 
             resp.Payouts.Add(new MerchantPayoutData
             {
                 MerchantId = account.MerchantId.ToString(),
-                GrossVolume = (double)gross,
-                Fees = (double)fees,
+                GrossVolume = gross,
+                Fees = fees,
                 Currency = account.Currency
             });
         }

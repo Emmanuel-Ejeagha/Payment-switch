@@ -11,7 +11,7 @@ public class SettlementBatch : AggregateRoot
 {
     public DateTime BatchDate { get; private set; }
     public SettlementStatus Status { get; internal set; }
-    public decimal TotalAmount { get; internal set; }
+    public long TotalAmount { get; internal set; }
     public IReadOnlyList<Payout> Payouts => _payouts.AsReadOnly();
     private readonly List<Payout> _payouts = new();
     public DateTime CreatedAt { get; private set; }

@@ -16,10 +16,10 @@ public static class PaymentErrors
     public static Error InvalidStatusTransition(string current, string target) =>
         new("Payment.InvalidStatusTransition", $"Cannot transition from '{current}' to '{target}'.");
 
-    public static Error CaptureExceedsAuthorized(decimal attempted, decimal authorized) =>
+    public static Error CaptureExceedsAuthorized(long attempted, long authorized) =>
         new("Payment.CaptureExceedsAuthorized", $"Capture amount {attempted} exceeds authorized amount {authorized}.");
 
-    public static Error RefundExceedsCaptured(decimal attempted, decimal captured) =>
+    public static Error RefundExceedsCaptured(long attempted, long captured) =>
         new("Payment.RefundExceedsCaptured", $"Refund amount {attempted} exceeds captured amount {captured}.");
 
     public static Error PaymentIntentNotFound(Guid intentId) =>

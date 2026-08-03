@@ -2,5 +2,5 @@
 
 public record RefundPaymentCommand(
     Guid IntentId,
-    decimal? Amount
+    long? Amount
 );

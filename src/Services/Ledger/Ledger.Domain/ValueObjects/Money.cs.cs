@@ -4,10 +4,10 @@ namespace Ledger.Domain.ValueObjects;
 
 public class Money : ValueObject
 {
-    public decimal Amount { get; }
+    public long Amount { get; }
     public string Currency { get; }
 
-    public Money(decimal amount, string currency)
+    public Money(long amount, string currency)
     {
         if (amount < 0)
             throw new ArgumentException("Amount cannot be negative.", nameof(amount));

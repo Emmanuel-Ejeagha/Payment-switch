@@ -27,9 +27,9 @@ public class ReserveFundsHandlerTests
     public async Task Handle_ValidCommand_ShouldReserveFunds()
     {
         var account = new LedgerAccount(Guid.NewGuid(), Guid.NewGuid(), "USD");
-        account.AvailableBalance = 200m; // internal setter via InternalsVisibleTo
+        account.AvailableBalance = 200L; // internal setter via InternalsVisibleTo
 
-        var command = new ReserveFundsCommand(account.MerchantId, 100m, "USD", "correlation-1");
+        var command = new ReserveFundsCommand(account.MerchantId, 100L, "USD", "correlation-1");
         SetupValidatorSuccess(command);
         _repoMock.Setup(r => r.GetByMerchantIdAndCurrencyAsync(account.MerchantId, "USD", It.IsAny<CancellationToken>())).ReturnsAsync(account);
         _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
@@ -37,8 +37,8 @@ public class ReserveFundsHandlerTests
         var result = await _handler.Handle(command);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(200m, account.AvailableBalance);
-        Assert.Equal(100m, account.PendingBalance);
+        Assert.Equal(200L, account.AvailableBalance);
+        Assert.Equal(100L, account.PendingBalance);
         Assert.Single(account.Journal, j => j.Type == EntryType.Debit);
         _dispatcherMock.Verify(d => d.DispatchAsync(It.IsAny<IReadOnlyList<DomainEvent>>(), It.IsAny<CancellationToken>()), Times.Once);
     }
@@ -46,7 +46,7 @@ public class ReserveFundsHandlerTests
     [Fact]
     public async Task Handle_AccountNotFound_AutoCreatesAccount()
     {
-        var command = new ReserveFundsCommand(Guid.NewGuid(), 100m, "USD", "corr");
+        var command = new ReserveFundsCommand(Guid.NewGuid(), 100L, "USD", "corr");
         SetupValidatorSuccess(command);
         _repoMock.Setup(r => r.GetByMerchantIdAndCurrencyAsync(command.MerchantId, "USD", It.IsAny<CancellationToken>())).ReturnsAsync((LedgerAccount?)null);
         _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
@@ -61,8 +61,8 @@ public class ReserveFundsHandlerTests
     public async Task Handle_CurrencyMismatch_ShouldFail()
     {
         var account = new LedgerAccount(Guid.NewGuid(), Guid.NewGuid(), "USD");
-        account.AvailableBalance = 50m;
-        var command = new ReserveFundsCommand(account.MerchantId, 100m, "EUR", "corr");
+        account.AvailableBalance = 50L;
+        var command = new ReserveFundsCommand(account.MerchantId, 100L, "EUR", "corr");
         SetupValidatorSuccess(command);
         _repoMock.Setup(r => r.GetByMerchantIdAndCurrencyAsync(account.MerchantId, "EUR", It.IsAny<CancellationToken>())).ReturnsAsync(account);
 

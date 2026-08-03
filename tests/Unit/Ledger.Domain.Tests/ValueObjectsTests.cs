@@ -7,21 +7,21 @@ public class ValueObjectsTests
     [Fact]
     public void Money_Valid_ShouldCreate()
     {
-        var m = new Money(10m, "usd");
-        Assert.Equal(10m, m.Amount);
+        var m = new Money(10L, "usd");
+        Assert.Equal(10L, m.Amount);
         Assert.Equal("USD", m.Currency);
     }
 
     [Fact]
     public void Money_Negative_Throws()
     {
-        Assert.Throws<ArgumentException>(() => new Money(-1m, "USD"));
+        Assert.Throws<ArgumentException>(() => new Money(-1L, "USD"));
     }
 
     [Fact]
     public void Money_InvalidCurrency_Throws()
     {
-        Assert.Throws<ArgumentException>(() => new Money(10m, "US"));
+        Assert.Throws<ArgumentException>(() => new Money(10L, "US"));
     }
 
     [Fact]

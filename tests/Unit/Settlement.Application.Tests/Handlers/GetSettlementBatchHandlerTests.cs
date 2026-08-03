@@ -12,7 +12,7 @@ public class GetSettlementBatchHandlerTests
     public async Task Handle_Found_ReturnsDto()
     {
         var batch = new SettlementBatch(Guid.NewGuid(), new DateTime(2026, 7, 3));
-        batch.AddPayout(Guid.NewGuid(), new Money(100, "USD"), new Money(5, "USD"));
+        batch.AddPayout(Guid.NewGuid(), new Money(100L, "USD"), new Money(5L, "USD"));
         var repoMock = new Mock<ISettlementBatchRepository>();
         repoMock.Setup(r => r.GetByIdAsync(batch.Id, It.IsAny<CancellationToken>())).ReturnsAsync(batch);
         var loggerMock = new Mock<ILogger<GetSettlementBatchHandler>>();
@@ -22,7 +22,7 @@ public class GetSettlementBatchHandlerTests
 
         Assert.True(result.IsSuccess);
         Assert.Single(result.Value.Payouts);
-        Assert.Equal(95m, result.Value.TotalAmount);
+        Assert.Equal(95L, result.Value.TotalAmount);
     }
 
     [Fact]

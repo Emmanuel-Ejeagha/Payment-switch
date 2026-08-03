@@ -2,7 +2,7 @@
 
 public record CreatePaymentIntentCommand(
     Guid MerchantId,
-    decimal Amount,
+    long Amount,
     string Currency,
     string PaymentMethod,
     string? CardLastFour,

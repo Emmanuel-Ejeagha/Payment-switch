@@ -8,7 +8,7 @@ namespace Payment.Domain.Tests;
 public class PaymentIntentTests
 {
     private readonly Guid _merchantId = Guid.NewGuid();
-    private readonly Money _amount = new(100m, "USD");
+    private readonly Money _amount = new(100L, "USD");
     private readonly IdempotencyKey _idempotencyKey = new("unique-key-123");
 
     [Fact]
@@ -56,7 +56,7 @@ public class PaymentIntentTests
     public void Capture_Full_FromAuthorized_ShouldCaptureAndSetStatus()
     {
         var intent = CreateAuthorizedIntent();
-        var captureAmount = new Money(100m, "USD");
+        var captureAmount = new Money(100L, "USD");
 
         intent.Capture(captureAmount);
 
@@ -69,7 +69,7 @@ public class PaymentIntentTests
     public void Capture_Partial_ShouldSetPartiallyCaptured()
     {
         var intent = CreateAuthorizedIntent();
-        var captureAmount = new Money(40m, "USD");
+        var captureAmount = new Money(40L, "USD");
 
         intent.Capture(captureAmount);
 
@@ -80,7 +80,7 @@ public class PaymentIntentTests
     public void Capture_ExceedsAuthorized_Throws()
     {
         var intent = CreateAuthorizedIntent();
-        var captureAmount = new Money(200m, "USD");
+        var captureAmount = new Money(200L, "USD");
 
         Assert.Throws<InvalidOperationException>(() => intent.Capture(captureAmount));
     }
@@ -89,7 +89,7 @@ public class PaymentIntentTests
     public void Capture_FromPending_Throws()
     {
         var intent = CreatePendingIntent();
-        Assert.Throws<InvalidOperationException>(() => intent.Capture(new Money(10m, "USD")));
+        Assert.Throws<InvalidOperationException>(() => intent.Capture(new Money(10L, "USD")));
     }
 
     [Fact]
@@ -115,7 +115,7 @@ public class PaymentIntentTests
     public void Refund_Full_FromCaptured_ShouldRefundAndSetStatus()
     {
         var intent = CreateCapturedIntent();
-        var refundAmount = new Money(100m, "USD");
+        var refundAmount = new Money(100L, "USD");
 
         intent.Refund(refundAmount);
 
@@ -128,7 +128,7 @@ public class PaymentIntentTests
     public void Refund_Partial_ShouldSetPartiallyRefunded()
     {
         var intent = CreateCapturedIntent();
-        var refundAmount = new Money(30m, "USD");
+        var refundAmount = new Money(30L, "USD");
 
         intent.Refund(refundAmount);
 
@@ -139,7 +139,7 @@ public class PaymentIntentTests
     public void Refund_ExceedsCaptured_Throws()
     {
         var intent = CreateCapturedIntent();
-        var refundAmount = new Money(200m, "USD");
+        var refundAmount = new Money(200L, "USD");
 
         Assert.Throws<InvalidOperationException>(() => intent.Refund(refundAmount));
     }
@@ -148,7 +148,7 @@ public class PaymentIntentTests
     public void Refund_FromUnauthorizedStatus_Throws()
     {
         var intent = CreatePendingIntent();
-        Assert.Throws<InvalidOperationException>(() => intent.Refund(new Money(10m, "USD")));
+        Assert.Throws<InvalidOperationException>(() => intent.Refund(new Money(10L, "USD")));
     }
 
     [Fact]
@@ -169,15 +169,21 @@ public class PaymentIntentTests
     [Fact]
     public void Money_InvalidAmount_Throws()
     {
-        Assert.Throws<ArgumentException>(() => new Money(0m, "USD"));
-        Assert.Throws<ArgumentException>(() => new Money(-5m, "USD"));
+        Assert.Throws<ArgumentException>(() => new Money(-5L, "USD"));
+    }
+
+    [Fact]
+    public void Money_ZeroAmount_IsAllowed()
+    {
+        var money = new Money(0L, "USD");
+        Assert.Equal(0L, money.Amount);
     }
 
     [Fact]
     public void Money_InvalidCurrency_Throws()
     {
-        Assert.Throws<ArgumentException>(() => new Money(10m, "US"));
-        Assert.Throws<ArgumentException>(() => new Money(10m, ""));
+        Assert.Throws<ArgumentException>(() => new Money(10L, "US"));
+        Assert.Throws<ArgumentException>(() => new Money(10L, ""));
     }
 
     [Fact]
@@ -201,7 +207,7 @@ public class PaymentIntentTests
     private PaymentIntent CreateCapturedIntent()
     {
         var intent = CreateAuthorizedIntent();
-        intent.Capture(new Money(100m, "USD"));
+        intent.Capture(new Money(100L, "USD"));
         intent.ClearDomainEvents();
         return intent;
     }

@@ -2,5 +2,5 @@
 
 public record CapturePaymentCommand(
     Guid IntentId,
-    decimal? Amount
+    long? Amount
 );
