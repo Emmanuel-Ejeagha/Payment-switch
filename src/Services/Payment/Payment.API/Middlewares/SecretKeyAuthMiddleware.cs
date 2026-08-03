@@ -40,11 +40,10 @@ public class SecretKeyAuthMiddleware
             return;
         }
 
-        var keyHash = HashKey(apiKey);
-        var cacheKey = $"apikey:{keyPrefix}:{keyHash}";
+        var cacheKey = $"apikey:{keyPrefix}:{HashKey(apiKey)}";
         if (!_cache.TryGetValue(cacheKey, out MerchantKeyResolution? resolution))
         {
-            var result = await merchantService.ResolveApiKeyAsync(keyPrefix, keyHash, context.RequestAborted);
+            var result = await merchantService.ResolveApiKeyAsync(keyPrefix, apiKey, context.RequestAborted);
             if (!result.IsSuccess)
             {
                 await WriteUnauthorized(context, "Invalid API key.");

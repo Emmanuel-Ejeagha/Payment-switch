@@ -46,8 +46,30 @@ public class GenerateApiKeyHandlerTests
         // Assert
         Assert.True(result.IsSuccess);
         Assert.Equal("live", result.Value.Environment);
+        Assert.StartsWith("sk_live_", result.Value.PlainTextKey);
         Assert.NotEmpty(result.Value.PlainTextKey);
         Assert.Single(user.ApiKeys);
+    }
+
+    [Fact]
+    public async Task Handle_TestEnvironment_ShouldUseTestPrefix()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var command = new GenerateApiKeyCommand(userId, "test");
+        var user = CreateUser(userId);
+        SetupValidatorSuccess(command);
+        _userRepositoryMock.Setup(r => r.GetByIdAsync(userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+        _unitOfWorkMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        // Act
+        var result = await _handler.Handle(command);
+
+        // Assert
+        Assert.True(result.IsSuccess);
+        Assert.StartsWith("sk_test_", result.Value.PlainTextKey);
     }
 
     [Fact]

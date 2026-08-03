@@ -21,4 +21,7 @@ public static class MerchantErrors
 
     public static Error Unauthorized() =>
         new("Merchant.Unauthorized", "You do not have permission to access this merchant.");
+
+    public static Error MerchantNotActive() =>
+        new("Merchant.NotActive", "Only active merchants can generate API keys.");
 }

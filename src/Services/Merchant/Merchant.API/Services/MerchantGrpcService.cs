@@ -1,4 +1,5 @@
 ﻿using BuildingBlocks.Shared.Auth;
+using BuildingBlocks.Shared.Security;
 using Grpc.Core;
 using Merchant.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
@@ -48,20 +49,21 @@ public class MerchantGrpcService : MerchantService.MerchantServiceBase
     public override async Task<ResolveApiKeyResponse> ResolveApiKey(
         ResolveApiKeyRequest request, ServerCallContext context)
     {
-        var resolution = await (from k in _db.MerchantApiKeys
+        var candidates = await (from k in _db.MerchantApiKeys
                                 join m in _db.Merchants on k.MerchantId equals m.Id
                                 where k.KeyPrefix == request.KeyPrefix
-                                      && k.KeyHash == request.KeyHash
                                       && k.RevokedAt == null
-                                select new { m.Id, m.Status, k.Environment })
-            .FirstOrDefaultAsync(context.CancellationToken);
+                                select new { m.Id, m.Status, k.Environment, k.KeyHash })
+            .ToListAsync(context.CancellationToken);
+
+        var match = candidates.FirstOrDefault(c => ApiKeyHasher.Verify(request.KeyValue, c.KeyHash));
 
         var response = new ResolveApiKeyResponse();
-        if (resolution != null)
+        if (match != null)
         {
-            response.MerchantId = resolution.Id.ToString();
-            response.Status = resolution.Status.Value;
-            response.Environment = resolution.Environment;
+            response.MerchantId = match.Id.ToString();
+            response.Status = match.Status.Value;
+            response.Environment = match.Environment;
         }
         return response;
     }

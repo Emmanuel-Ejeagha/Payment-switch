@@ -1,4 +1,5 @@
-﻿using Merchant.Application.DTOs;
+﻿using BuildingBlocks.Shared.Security;
+using Merchant.Application.DTOs;
 using Merchant.Application.Interfaces;
 using Merchant.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -58,15 +59,16 @@ public class MerchantRepository : IMerchantRepository
             .FirstOrDefaultAsync(m => m.Id == id, cancellationToken);
     }
 
-    public async Task<MerchantKeyResolution?> ResolveApiKeyAsync(string keyPrefix, string keyHash, CancellationToken cancellationToken = default)
+    public async Task<MerchantKeyResolution?> ResolveApiKeyAsync(string keyPrefix, string keyValue, CancellationToken cancellationToken = default)
     {
-        return await (from k in _context.MerchantApiKeys
-                      join m in _context.Merchants on k.MerchantId equals m.Id
-                      where k.KeyPrefix == keyPrefix
-                            && k.KeyHash == keyHash
-                            && k.RevokedAt == null
-                      select new MerchantKeyResolution(m.Id, m.Status.Value, k.Environment))
-            .FirstOrDefaultAsync(cancellationToken);
+        var candidates = await (from k in _context.MerchantApiKeys
+                                join m in _context.Merchants on k.MerchantId equals m.Id
+                                where k.KeyPrefix == keyPrefix
+                                      && k.RevokedAt == null
+                                select new MerchantKeyResolution(m.Id, m.Status.Value, k.Environment, k.KeyHash))
+            .ToListAsync(cancellationToken);
+
+        return candidates.FirstOrDefault(c => ApiKeyHasher.Verify(keyValue, c.KeyHash));
     }
 
     public async Task<List<MerchantApiKeyDto>> GetApiKeysByMerchantIdAsync(Guid merchantId, CancellationToken cancellationToken = default)
