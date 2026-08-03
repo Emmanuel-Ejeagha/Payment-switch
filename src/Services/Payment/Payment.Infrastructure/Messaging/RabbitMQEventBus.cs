@@ -31,13 +31,15 @@ public class RabbitMQEventBus : IEventBus, IDisposable
             durable: true).GetAwaiter().GetResult();
     }
 
-    public async Task PublishAsync(string eventType, string payload, CancellationToken cancellationToken = default)
+    public async Task PublishAsync(string eventType, string payload, string? messageId = null, string? correlationId = null, CancellationToken cancellationToken = default)
     {
         var body = Encoding.UTF8.GetBytes(payload);
         var properties = new BasicProperties
         {
             Persistent = true,
-            ContentType = "application/json"
+            ContentType = "application/json",
+            MessageId = messageId,
+            CorrelationId = correlationId
         };
 
         await _channel.BasicPublishAsync(

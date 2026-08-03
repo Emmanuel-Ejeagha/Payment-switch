@@ -13,5 +13,6 @@ public class OutboxMessageConfiguration : IEntityTypeConfiguration<OutboxMessage
         builder.Property(m => m.Payload).IsRequired().HasColumnType("jsonb");
         builder.Property(m => m.OccurredOn).IsRequired();
         builder.Property(m => m.Processed).IsRequired();
+        builder.Property(m => m.CorrelationId).HasMaxLength(200);
     }
 }
