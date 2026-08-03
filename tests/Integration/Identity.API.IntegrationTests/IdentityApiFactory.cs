@@ -26,7 +26,11 @@ public class IdentityApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 ["ConnectionStrings:IdentityDb"] = _postgres.GetConnectionString(),
                 ["Jwt:Secret"] = "test-super-secret-key-minimum-32-bytes!!",
                 ["Jwt:Issuer"] = "IdentityService",
-                ["Jwt:Audience"] = "PaymentSwitch"
+                ["Jwt:Audience"] = "PaymentSwitch",
+                ["RabbitMQ:HostName"] = "localhost",
+                ["RabbitMQ:UserName"] = "test",
+                ["RabbitMQ:Password"] = "test-rabbit-password",
+                ["Seed:AdminPassword"] = "test-admin-password"
             });
         });
     }

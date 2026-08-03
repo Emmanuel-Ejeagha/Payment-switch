@@ -165,6 +165,10 @@ config:
     userName: "paymentswitch"
     # REQUIRED: provide a strong password via --set config.postgres.password="..."
     password: ""
+  seed:
+    adminEmail: "admin@paymentswitch.com"
+    # REQUIRED: provide a strong admin password via --set config.seed.adminPassword="..."
+    adminPassword: ""
 
 infrastructure:
   postgres:

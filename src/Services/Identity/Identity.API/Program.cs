@@ -1,5 +1,6 @@
 using Asp.Versioning.ApiExplorer;
 using BuildingBlocks.Shared;
+using BuildingBlocks.Shared.Configuration;
 using BuildingBlocks.Shared.Data;
 using BuildingBlocks.Shared.HealthChecks;
 using BuildingBlocks.Shared.Middleware;
@@ -21,6 +22,8 @@ using System.Reflection;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Configuration.ValidateSecuritySecrets("IdentityDb");
 
 builder.Host.UseSerilog((ctx, lc) => lc.ReadFrom.Configuration(ctx.Configuration));
 var otel = builder.AddPaymentSwitchObservability("Identity");
@@ -110,7 +113,7 @@ app.MigrateDatabase<AppDbContext>();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    DataSeeder.SeedAsync(db).GetAwaiter().GetResult();
+    DataSeeder.SeedAsync(db, app.Configuration).GetAwaiter().GetResult();
 }
 
 app.UsePaymentSwitchSecurityHeaders();

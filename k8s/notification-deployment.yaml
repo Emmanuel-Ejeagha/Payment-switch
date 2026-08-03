@@ -49,8 +49,8 @@ spec:
                   key: RabbitMQ__UserName
             - name: RabbitMQ__Password
               valueFrom:
-                configMapKeyRef:
-                  name: payment-switch-config
+                secretKeyRef:
+                  name: payment-switch-secret
                   key: RabbitMQ__Password
           ports:
             - containerPort: 8080

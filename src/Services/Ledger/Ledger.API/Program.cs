@@ -1,5 +1,6 @@
 using Asp.Versioning.ApiExplorer;
 using BuildingBlocks.Shared;
+using BuildingBlocks.Shared.Configuration;
 using BuildingBlocks.Shared.Data;
 using BuildingBlocks.Shared.HealthChecks;
 using BuildingBlocks.Shared.Middleware;
@@ -24,6 +25,8 @@ using System.Reflection;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Configuration.ValidateSecuritySecrets("LedgerDb");
 
 builder.Host.UseSerilog((ctx, lc) => lc.ReadFrom.Configuration(ctx.Configuration));
 var otel = builder.AddPaymentSwitchObservability("Ledger");
