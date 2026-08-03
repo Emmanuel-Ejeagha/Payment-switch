@@ -1,4 +1,5 @@
 ﻿using BuildingBlocks.Shared.Results;
+using BuildingBlocks.Shared.Security;
 using Microsoft.Extensions.Logging;
 using Notification.Application.Interfaces;
 using NotificationEntity = Notification.Domain.Entities.Notification;
@@ -16,8 +17,7 @@ public class SmsSender : INotificationSender
 
     public Task<Result> SendAsync(NotificationEntity notification, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("SIMULATED SMS: To={Recipient}, Body={Body}",
-            notification.Recipient, notification.Body);
+        _logger.LogInformation("SIMULATED SMS: To={Recipient}", DataMasker.MaskEmail(notification.Recipient));
         return Task.FromResult(Result.Success());
     }
 }

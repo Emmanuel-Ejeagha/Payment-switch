@@ -1,5 +1,6 @@
 ﻿using BuildingBlocks.Shared.Events;
 using BuildingBlocks.Shared.Results;
+using BuildingBlocks.Shared.Security;
 using FluentValidation;
 using FluentValidation.Results;
 using Identity.Application.Interfaces;
@@ -31,7 +32,7 @@ public class LoginHandler
 
     public async Task<Result<LoginResponse>> Handle(LoginCommand command, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Handling {CommandName} for {Identifier}", nameof(LoginCommand), command.Email);
+        _logger.LogInformation("Handling {CommandName} for {Identifier}", nameof(LoginCommand), DataMasker.MaskEmail(command.Email));
         var validationResult = await _validator.ValidateAsync(command, cancellationToken);
         if (!validationResult.IsValid)
             return validationResult.Errors.Select(e => new Error(e.PropertyName, e.ErrorMessage)).ToList();

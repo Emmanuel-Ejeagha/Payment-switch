@@ -1,4 +1,5 @@
 ﻿using BuildingBlocks.Shared.Results;
+using BuildingBlocks.Shared.Security;
 using Identity.Application.DTOs;
 using Identity.Application.Interfaces;
 using Identity.Domain.DomainErrors;
@@ -19,7 +20,7 @@ public class GetUserByEmailHandler
 
     public async Task<Result<UserDto>> Handle(GetUserByEmailQuery query, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Handling {CommandName} for {Identifier}", nameof(GetUserByEmailQuery), query.Email);
+        _logger.LogInformation("Handling {CommandName} for {Identifier}", nameof(GetUserByEmailQuery), DataMasker.MaskEmail(query.Email));
         var user = await _userRepository.GetByEmailAsync(query.Email, cancellationToken);
         if (user == null)
             return IdentityErrors.InvalidCredentials;

@@ -1,5 +1,6 @@
 ﻿using BuildingBlocks.Shared.Events;
 using BuildingBlocks.Shared.Results;
+using BuildingBlocks.Shared.Security;
 using FluentValidation;
 using Identity.Application.Interfaces;
 using Identity.Domain.DomainErrors;
@@ -36,7 +37,7 @@ public class RegisterUserHandler
 
     public async Task<Result<RegisterUserResponse>> Handle(RegisterUserCommand command, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Handling {CommandName} for {Identifier}", nameof(RegisterUserCommand), command.Email);
+        _logger.LogInformation("Handling {CommandName} for {Identifier}", nameof(RegisterUserCommand), DataMasker.MaskEmail(command.Email));
         var validationResult = await _validator.ValidateAsync(command, cancellationToken);
 
         if (!validationResult.IsValid)
