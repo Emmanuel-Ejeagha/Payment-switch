@@ -26,7 +26,10 @@ public class NotificationApiFactory : WebApplicationFactory<Program>, IAsyncLife
                 ["ConnectionStrings:NotificationDb"] = _postgres.GetConnectionString(),
                 ["Jwt:Secret"] = "test-super-secret-key-minimum-32-bytes!!",
                 ["Jwt:Issuer"] = "NotificationService",
-                ["Jwt:Audience"] = "PaymentSwitch"
+                ["Jwt:Audience"] = "PaymentSwitch",
+                ["RabbitMQ:HostName"] = "localhost",
+                ["RabbitMQ:UserName"] = "test",
+                ["RabbitMQ:Password"] = "test-rabbit-password"
             });
         });
     }

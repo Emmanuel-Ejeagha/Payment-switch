@@ -6,10 +6,10 @@ services:
       - "5432:5432"
     environment:
       POSTGRES_USER: paymentswitch
-      POSTGRES_PASSWORD: paymentswitch
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-            - ./infra/postgres/init-multiple-databases.sql:/docker-entrypoint-initdb.d/init-multiple-databases.sql
+      - ./infra/postgres/init-multiple-databases.sql:/docker-entrypoint-initdb.d/init-multiple-databases.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U paymentswitch"]
       interval: 5s
@@ -34,8 +34,8 @@ services:
       - "5672:5672"
       - "15672:15672"
     environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:?Set RABBITMQ_DEFAULT_USER in .env}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:?Set RABBITMQ_DEFAULT_PASS in .env}
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:
@@ -62,8 +62,8 @@ services:
     image: grafana/grafana:10.4.3
     restart: always
     environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD in .env}
     volumes:
       - grafana_data:/var/lib/grafana
     networks:
@@ -80,13 +80,15 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://0.0.0.0:8080
       - RunMigrations=true
-      - ConnectionStrings__IdentityDb=Host=postgres;Database=IdentityDb;Username=paymentswitch;Password=paymentswitch
-      - Jwt__Secret=${JWT_SECRET:-your-super-secret-key-minimum-32-bytes!}
+      - ConnectionStrings__IdentityDb=Host=postgres;Database=IdentityDb;Username=paymentswitch;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      - Jwt__Secret=${JWT_SECRET:?Set JWT_SECRET in .env}
       - Jwt__Issuer=IdentityService
       - Jwt__Audience=PaymentSwitch
       - RabbitMQ__HostName=rabbitmq
-      - RabbitMQ__UserName=guest
-      - RabbitMQ__Password=guest
+      - RabbitMQ__UserName=${RABBITMQ_DEFAULT_USER:?Set RABBITMQ_DEFAULT_USER in .env}
+      - RabbitMQ__Password=${RABBITMQ_DEFAULT_PASS:?Set RABBITMQ_DEFAULT_PASS in .env}
+      - Seed__AdminEmail=${SEED_ADMIN_EMAIL:-admin@paymentswitch.com}
+      - Seed__AdminPassword=${SEED_ADMIN_PASSWORD:?Set SEED_ADMIN_PASSWORD in .env}
     depends_on:
       postgres:
         condition: service_healthy
@@ -106,13 +108,13 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://0.0.0.0:8080
       - RunMigrations=true
-      - ConnectionStrings__MerchantDb=Host=postgres;Database=MerchantDb;Username=paymentswitch;Password=paymentswitch
-      - Jwt__Secret=${JWT_SECRET:-your-super-secret-key-minimum-32-bytes!}
+      - ConnectionStrings__MerchantDb=Host=postgres;Database=MerchantDb;Username=paymentswitch;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      - Jwt__Secret=${JWT_SECRET:?Set JWT_SECRET in .env}
       - Jwt__Issuer=IdentityService
       - Jwt__Audience=PaymentSwitch
       - RabbitMQ__HostName=rabbitmq
-      - RabbitMQ__UserName=guest
-      - RabbitMQ__Password=guest
+      - RabbitMQ__UserName=${RABBITMQ_DEFAULT_USER:?Set RABBITMQ_DEFAULT_USER in .env}
+      - RabbitMQ__Password=${RABBITMQ_DEFAULT_PASS:?Set RABBITMQ_DEFAULT_PASS in .env}
     depends_on:
       postgres:
         condition: service_healthy
@@ -132,13 +134,13 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://0.0.0.0:8080
       - RunMigrations=true
-      - ConnectionStrings__PaymentDb=Host=postgres;Database=PaymentDb;Username=paymentswitch;Password=paymentswitch
-      - Jwt__Secret=${JWT_SECRET:-your-super-secret-key-minimum-32-bytes!}
+      - ConnectionStrings__PaymentDb=Host=postgres;Database=PaymentDb;Username=paymentswitch;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      - Jwt__Secret=${JWT_SECRET:?Set JWT_SECRET in .env}
       - Jwt__Issuer=IdentityService
       - Jwt__Audience=PaymentSwitch
       - RabbitMQ__HostName=rabbitmq
-      - RabbitMQ__UserName=guest
-      - RabbitMQ__Password=guest
+      - RabbitMQ__UserName=${RABBITMQ_DEFAULT_USER:?Set RABBITMQ_DEFAULT_USER in .env}
+      - RabbitMQ__Password=${RABBITMQ_DEFAULT_PASS:?Set RABBITMQ_DEFAULT_PASS in .env}
     depends_on:
       postgres:
         condition: service_healthy
@@ -158,13 +160,13 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://0.0.0.0:8080
       - RunMigrations=true
-      - ConnectionStrings__LedgerDb=Host=postgres;Database=LedgerDb;Username=paymentswitch;Password=paymentswitch
-      - Jwt__Secret=${JWT_SECRET:-your-super-secret-key-minimum-32-bytes!}
+      - ConnectionStrings__LedgerDb=Host=postgres;Database=LedgerDb;Username=paymentswitch;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      - Jwt__Secret=${JWT_SECRET:?Set JWT_SECRET in .env}
       - Jwt__Issuer=IdentityService
       - Jwt__Audience=PaymentSwitch
       - RabbitMQ__HostName=rabbitmq
-      - RabbitMQ__UserName=guest
-      - RabbitMQ__Password=guest
+      - RabbitMQ__UserName=${RABBITMQ_DEFAULT_USER:?Set RABBITMQ_DEFAULT_USER in .env}
+      - RabbitMQ__Password=${RABBITMQ_DEFAULT_PASS:?Set RABBITMQ_DEFAULT_PASS in .env}
     depends_on:
       postgres:
         condition: service_healthy
@@ -184,13 +186,13 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://0.0.0.0:8080
       - RunMigrations=true
-      - ConnectionStrings__NotificationDb=Host=postgres;Database=NotificationDb;Username=paymentswitch;Password=paymentswitch
-      - Jwt__Secret=${JWT_SECRET:-your-super-secret-key-minimum-32-bytes!}
+      - ConnectionStrings__NotificationDb=Host=postgres;Database=NotificationDb;Username=paymentswitch;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      - Jwt__Secret=${JWT_SECRET:?Set JWT_SECRET in .env}
       - Jwt__Issuer=IdentityService
       - Jwt__Audience=PaymentSwitch
       - RabbitMQ__HostName=rabbitmq
-      - RabbitMQ__UserName=guest
-      - RabbitMQ__Password=guest
+      - RabbitMQ__UserName=${RABBITMQ_DEFAULT_USER:?Set RABBITMQ_DEFAULT_USER in .env}
+      - RabbitMQ__Password=${RABBITMQ_DEFAULT_PASS:?Set RABBITMQ_DEFAULT_PASS in .env}
     depends_on:
       postgres:
         condition: service_healthy
@@ -210,13 +212,13 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://0.0.0.0:8080
       - RunMigrations=true
-      - ConnectionStrings__SettlementDb=Host=postgres;Database=SettlementDb;Username=paymentswitch;Password=paymentswitch
-      - Jwt__Secret=${JWT_SECRET:-your-super-secret-key-minimum-32-bytes!}
+      - ConnectionStrings__SettlementDb=Host=postgres;Database=SettlementDb;Username=paymentswitch;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      - Jwt__Secret=${JWT_SECRET:?Set JWT_SECRET in .env}
       - Jwt__Issuer=IdentityService
       - Jwt__Audience=PaymentSwitch
       - RabbitMQ__HostName=rabbitmq
-      - RabbitMQ__UserName=guest
-      - RabbitMQ__Password=guest
+      - RabbitMQ__UserName=${RABBITMQ_DEFAULT_USER:?Set RABBITMQ_DEFAULT_USER in .env}
+      - RabbitMQ__Password=${RABBITMQ_DEFAULT_PASS:?Set RABBITMQ_DEFAULT_PASS in .env}
     depends_on:
       postgres:
         condition: service_healthy
