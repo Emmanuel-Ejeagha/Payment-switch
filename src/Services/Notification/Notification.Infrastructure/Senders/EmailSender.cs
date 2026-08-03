@@ -1,4 +1,5 @@
 ﻿using BuildingBlocks.Shared.Results;
+using BuildingBlocks.Shared.Security;
 using MailKit.Net.Smtp;
 using MailKit.Security;
 using Microsoft.Extensions.Logging;
@@ -24,8 +25,8 @@ public class EmailSender : INotificationSender
     {
         if (string.IsNullOrWhiteSpace(_settings.Host))
         {
-            _logger.LogInformation("SIMULATED EMAIL: To={Recipient}, Subject={Subject}, Body={Body}",
-                notification.Recipient, notification.Subject, notification.Body);
+            _logger.LogInformation("SIMULATED EMAIL: To={Recipient}, Subject={Subject}",
+                DataMasker.MaskEmail(notification.Recipient), notification.Subject);
             return Result.Success();
         }
 
@@ -50,12 +51,12 @@ public class EmailSender : INotificationSender
             await client.SendAsync(message, cancellationToken);
             await client.DisconnectAsync(true, cancellationToken);
 
-            _logger.LogInformation("EMAIL SENT: To={Recipient}, Subject={Subject}", notification.Recipient, notification.Subject);
+            _logger.LogInformation("EMAIL SENT: To={Recipient}, Subject={Subject}", DataMasker.MaskEmail(notification.Recipient), notification.Subject);
             return Result.Success();
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "EMAIL FAILED: To={Recipient}, Subject={Subject}", notification.Recipient, notification.Subject);
+            _logger.LogError(ex, "EMAIL FAILED: To={Recipient}, Subject={Subject}", DataMasker.MaskEmail(notification.Recipient), notification.Subject);
             return new Error("Email.SendFailed", $"Failed to send email: {ex.Message}");
         }
     }

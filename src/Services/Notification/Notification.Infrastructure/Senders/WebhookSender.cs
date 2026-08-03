@@ -1,6 +1,7 @@
 ﻿using System.Text;
 using System.Text.Json;
 using BuildingBlocks.Shared.Results;
+using BuildingBlocks.Shared.Security;
 using Microsoft.Extensions.Logging;
 using Notification.Application.Interfaces;
 using NotificationEntity = Notification.Domain.Entities.Notification;
@@ -38,27 +39,26 @@ public class WebhookSender : INotificationSender
             cts.CancelAfter(TimeSpan.FromSeconds(15));
 
             var response = await _httpClient.PostAsync(notification.WebhookUrl, content, cts.Token);
-            var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
 
             if (response.IsSuccessStatusCode)
             {
                 _logger.LogInformation("WEBHOOK SENT: URL={Url}, StatusCode={StatusCode}",
-                    notification.WebhookUrl, (int)response.StatusCode);
+                    DataMasker.MaskUrl(notification.WebhookUrl), (int)response.StatusCode);
                 return Result.Success();
             }
 
-            _logger.LogWarning("WEBHOOK FAILED: URL={Url}, StatusCode={StatusCode}, Body={Body}",
-                notification.WebhookUrl, (int)response.StatusCode, responseBody);
-            return new Error("Webhook.Failed", $"Webhook returned {(int)response.StatusCode}: {responseBody}");
+            _logger.LogWarning("WEBHOOK FAILED: URL={Url}, StatusCode={StatusCode}",
+                DataMasker.MaskUrl(notification.WebhookUrl), (int)response.StatusCode);
+            return new Error("Webhook.Failed", $"Webhook returned {(int)response.StatusCode}");
         }
         catch (TaskCanceledException)
         {
-            _logger.LogWarning("WEBHOOK TIMEOUT: URL={Url}", notification.WebhookUrl);
+            _logger.LogWarning("WEBHOOK TIMEOUT: URL={Url}", DataMasker.MaskUrl(notification.WebhookUrl));
             return new Error("Webhook.Timeout", "Webhook request timed out after 15 seconds.");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "WEBHOOK ERROR: URL={Url}", notification.WebhookUrl);
+            _logger.LogError(ex, "WEBHOOK ERROR: URL={Url}", DataMasker.MaskUrl(notification.WebhookUrl));
             return new Error("Webhook.Error", $"Webhook request failed: {ex.Message}");
         }
     }
