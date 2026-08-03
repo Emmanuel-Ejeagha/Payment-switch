@@ -5,6 +5,7 @@ namespace BuildingBlocks.Shared.Middleware;
 public interface ICorrelationIdProvider
 {
     string CorrelationId { get; }
+    void Set(string correlationId);
 }
 
 public class CorrelationIdProvider : ICorrelationIdProvider

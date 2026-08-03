@@ -51,7 +51,7 @@ public class OutboxPublisherService : BackgroundService
         {
             try
             {
-                await eventBus.PublishAsync(message.EventType, message.Payload, cancellationToken);
+                await eventBus.PublishAsync(message.EventType, message.Payload, message.Id.ToString(), message.CorrelationId, cancellationToken);
                 message.MarkAsProcessed();
                 await db.SaveChangesAsync(cancellationToken);
                 _logger.LogInformation("Published outbox message {MessageId} of type {EventType}", message.Id, message.EventType);

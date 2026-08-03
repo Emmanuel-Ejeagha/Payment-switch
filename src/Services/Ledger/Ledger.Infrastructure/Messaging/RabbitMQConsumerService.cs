@@ -1,4 +1,5 @@
-﻿using Ledger.Application.Features.Commands.CaptureFunds;
+﻿using BuildingBlocks.Shared.Middleware;
+using Ledger.Application.Features.Commands.CaptureFunds;
 using Ledger.Application.Features.Commands.CreateLedgerAccount;
 using Ledger.Application.Features.Commands.RefundFunds;
 using Ledger.Application.Features.Commands.ReserveFunds;
@@ -20,15 +21,18 @@ public class RabbitMQConsumerService : BackgroundService
     private readonly IConnection _connection;
     private readonly IChannel _channel;
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly ICorrelationIdProvider _correlationIdProvider;
     private readonly ILogger<RabbitMQConsumerService> _logger;
     private readonly string _queueName = "ledger.payment.events";
 
     public RabbitMQConsumerService(
         IOptions<RabbitMQSettings> settings,
         IServiceScopeFactory scopeFactory,
+        ICorrelationIdProvider correlationIdProvider,
         ILogger<RabbitMQConsumerService> logger)
     {
         _scopeFactory = scopeFactory;
+        _correlationIdProvider = correlationIdProvider;
         _logger = logger;
 
         var factory = new ConnectionFactory
@@ -52,11 +56,17 @@ public class RabbitMQConsumerService : BackgroundService
         consumer.ReceivedAsync += async (sender, ea) =>
         {
             var messageId = ea.BasicProperties.MessageId ?? Guid.NewGuid().ToString();
+            var correlationId = ea.BasicProperties.CorrelationId;
             var eventType = ea.RoutingKey;
             var body = Encoding.UTF8.GetString(ea.Body.ToArray());
 
             try
             {
+                if (!string.IsNullOrWhiteSpace(correlationId))
+                {
+                    _correlationIdProvider.Set(correlationId);
+                }
+
                 using (var scope = _scopeFactory.CreateScope())
                 {
                     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -84,7 +94,7 @@ public class RabbitMQConsumerService : BackgroundService
                         using (var scope = _scopeFactory.CreateScope())
                         {
                             var handler = scope.ServiceProvider.GetRequiredService<ReserveFundsHandler>();
-                            var result = await handler.Handle(new ReserveFundsCommand(authEvent.MerchantId, authEvent.Amount.Amount, authEvent.Amount.Currency, $"PaymentAuth:{authEvent.IntentId}"), stoppingToken);
+                            var result = await handler.Handle(new ReserveFundsCommand(authEvent.MerchantId, authEvent.Amount.Amount, authEvent.Amount.Currency, correlationId ?? $"PaymentAuth:{authEvent.IntentId}"), stoppingToken);
                             if (result.IsFailure)
                             {
                                 _logger.LogWarning("ReserveFunds failed: {Errors}", string.Join("; ", result.Errors.Select(e => e.Message)));
@@ -99,7 +109,7 @@ public class RabbitMQConsumerService : BackgroundService
                         using (var scope = _scopeFactory.CreateScope())
                         {
                             var handler = scope.ServiceProvider.GetRequiredService<CaptureFundsHandler>();
-                            var result = await handler.Handle(new CaptureFundsCommand(captureEvent.MerchantId, captureEvent.Amount.Amount, captureEvent.Amount.Currency, $"PaymentCapt:{captureEvent.IntentId}"), stoppingToken);
+                            var result = await handler.Handle(new CaptureFundsCommand(captureEvent.MerchantId, captureEvent.Amount.Amount, captureEvent.Amount.Currency, correlationId ?? $"PaymentCapt:{captureEvent.IntentId}"), stoppingToken);
                             if (result.IsFailure)
                             {
                                 _logger.LogWarning("CaptureFunds failed: {Errors}", string.Join("; ", result.Errors.Select(e => e.Message)));
@@ -114,7 +124,7 @@ public class RabbitMQConsumerService : BackgroundService
                         using (var scope = _scopeFactory.CreateScope())
                         {
                             var handler = scope.ServiceProvider.GetRequiredService<RefundFundsHandler>();
-                            var result = await handler.Handle(new RefundFundsCommand(refundEvent.MerchantId, refundEvent.Amount.Amount, refundEvent.Amount.Currency, $"PaymentRef:{refundEvent.IntentId}"), stoppingToken);
+                            var result = await handler.Handle(new RefundFundsCommand(refundEvent.MerchantId, refundEvent.Amount.Amount, refundEvent.Amount.Currency, correlationId ?? $"PaymentRef:{refundEvent.IntentId}"), stoppingToken);
                             if (result.IsFailure)
                             {
                                 _logger.LogWarning("RefundFunds failed: {Errors}", string.Join("; ", result.Errors.Select(e => e.Message)));
