@@ -1,4 +1,5 @@
 ﻿using BuildingBlocks.Shared.Events;
+using BuildingBlocks.Shared.Exceptions;
 using BuildingBlocks.Shared.Results;
 using FluentValidation;
 using Payment.Application.Interfaces;
@@ -51,16 +52,28 @@ public class VoidPaymentHandler
         if (!gatewayResult.IsSuccess)
             return new Error("Payment.VoidFailed", gatewayResult.Errors.First().Message);
 
+        await _unitOfWork.BeginTransactionAsync(cancellationToken);
         try
         {
             intent.Void();
         }
         catch (InvalidOperationException)
         {
+            await _unitOfWork.RollbackAsync(cancellationToken);
             return PaymentErrors.InvalidStatusTransition(intent.Status.Value, "Voided");
         }
 
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            await _unitOfWork.CommitAsync(cancellationToken);
+        }
+        catch (ConcurrencyConflictException)
+        {
+            await _unitOfWork.RollbackAsync(cancellationToken);
+            return PaymentErrors.ConcurrencyConflict;
+        }
+
         await _dispatcher.DispatchAsync(intent.DomainEvents, cancellationToken);
 
         return new VoidPaymentResponse(intent.Status.Value);

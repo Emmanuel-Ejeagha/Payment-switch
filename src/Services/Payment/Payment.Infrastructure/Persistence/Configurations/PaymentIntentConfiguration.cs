@@ -73,6 +73,8 @@ public class PaymentIntentConfiguration : IEntityTypeConfiguration<PaymentIntent
         builder.Property(p => p.CreatedAt).IsRequired();
         builder.Property(p => p.UpdatedAt);
 
+        builder.Property(p => p.RowVersion).IsRowVersion();
+
         builder.Ignore(p => p.DomainEvents);
     }
 

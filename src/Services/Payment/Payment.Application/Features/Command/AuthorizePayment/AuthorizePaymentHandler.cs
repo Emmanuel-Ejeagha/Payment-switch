@@ -1,4 +1,5 @@
 ﻿using BuildingBlocks.Shared.Events;
+using BuildingBlocks.Shared.Exceptions;
 using BuildingBlocks.Shared.Results;
 using FluentValidation;
 using Payment.Application.Interfaces;
@@ -61,16 +62,28 @@ public class AuthorizePaymentHandler
         var authCode = new AuthorizationCode(gwResponse.AuthorizationCode!);
         var gatewayRef = new GatewayReference(gwResponse.GatewayReference!);
 
+        await _unitOfWork.BeginTransactionAsync(cancellationToken);
         try
         {
             intent.Authorize(authCode, gatewayRef);
         }
         catch (InvalidOperationException)
         {
+            await _unitOfWork.RollbackAsync(cancellationToken);
             return PaymentErrors.InvalidStatusTransition(intent.Status.Value, "Authorized");
         }
 
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            await _unitOfWork.CommitAsync(cancellationToken);
+        }
+        catch (ConcurrencyConflictException)
+        {
+            await _unitOfWork.RollbackAsync(cancellationToken);
+            return PaymentErrors.ConcurrencyConflict;
+        }
+
         await _dispatcher.DispatchAsync(intent.DomainEvents, cancellationToken);
 
         return new AuthorizePaymentResponse(authCode.Value, gatewayRef.Value, intent.Status.Value);

@@ -24,4 +24,7 @@ public static class PaymentErrors
 
     public static Error PaymentIntentNotFound(Guid intentId) =>
         new("Payment.PaymentIntentNotFound", $"Payment intent with Id '{intentId}' not found.");
+
+    public static Error ConcurrencyConflict =>
+        new("Payment.ConcurrencyConflict", "This payment was modified concurrently. Please retry.");
 }
