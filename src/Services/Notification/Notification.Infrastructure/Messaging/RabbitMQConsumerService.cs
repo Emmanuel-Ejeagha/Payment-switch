@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using BuildingBlocks.Shared.Messaging;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -21,6 +22,11 @@ public class RabbitMQConsumerService : BackgroundService
     private IConnection? _connection;
     private IChannel? _channel;
     private readonly string _queueName = "notification.events";
+    private readonly string _retryExchange = "notification.events.retry";
+    private readonly string _retryQueue = "notification.events.retry";
+    private readonly string _dlxExchange = "notification.events.dlx";
+    private readonly string _dlq = "notification.events.dlq";
+    private readonly string _sourceExchange = "payment.events";
 
 
     public RabbitMQConsumerService(
@@ -62,10 +68,24 @@ public class RabbitMQConsumerService : BackgroundService
         _connection = await factory.CreateConnectionAsync(cancellationToken);
         _channel = await _connection.CreateChannelAsync(cancellationToken: cancellationToken);
 
+        await _channel.ExchangeDeclareAsync(_retryExchange, ExchangeType.Topic, durable: true, cancellationToken: cancellationToken);
+        await _channel.ExchangeDeclareAsync(_dlxExchange, ExchangeType.Topic, durable: true, cancellationToken: cancellationToken);
+
+        var retryArgs = new Dictionary<string, object?>
+        {
+            ["x-message-ttl"] = (long)MessageRetryPolicy.RetryDelay.TotalMilliseconds,
+            ["x-dead-letter-exchange"] = _sourceExchange
+        };
+        await _channel.QueueDeclareAsync(_retryQueue, durable: true, exclusive: false, autoDelete: false, arguments: retryArgs, cancellationToken: cancellationToken);
+        await _channel.QueueBindAsync(_retryQueue, _retryExchange, "#", null, cancellationToken: cancellationToken);
+
+        await _channel.QueueDeclareAsync(_dlq, durable: true, exclusive: false, autoDelete: false, cancellationToken: cancellationToken);
+        await _channel.QueueBindAsync(_dlq, _dlxExchange, "#", null, cancellationToken: cancellationToken);
+
         await _channel.QueueDeclareAsync(_queueName, durable: true, exclusive: false, autoDelete: false, cancellationToken: cancellationToken);
-        await _channel.QueueBindAsync(_queueName, "payment.events", "PaymentAuthorizedDomainEvent", null, cancellationToken: cancellationToken);
-        await _channel.QueueBindAsync(_queueName, "payment.events", "PaymentCapturedDomainEvent", null, cancellationToken: cancellationToken);
-        await _channel.QueueBindAsync(_queueName, "payment.events", "PaymentRefundedDomainEvent", null, cancellationToken: cancellationToken);
+        await _channel.QueueBindAsync(_queueName, _sourceExchange, "PaymentAuthorizedDomainEvent", null, cancellationToken: cancellationToken);
+        await _channel.QueueBindAsync(_queueName, _sourceExchange, "PaymentCapturedDomainEvent", null, cancellationToken: cancellationToken);
+        await _channel.QueueBindAsync(_queueName, _sourceExchange, "PaymentRefundedDomainEvent", null, cancellationToken: cancellationToken);
 
         var consumer = new AsyncEventingBasicConsumer(_channel);
         consumer.ReceivedAsync += async (sender, ea) =>
@@ -84,16 +104,20 @@ public class RabbitMQConsumerService : BackgroundService
 
             try
             {
-                if (db.InboxMessages.Any(m => m.MessageId == messageId))
+                var existing = db.InboxMessages.FirstOrDefault(m => m.MessageId == messageId);
+                if (existing is not null && existing.ProcessedAt is not null)
                 {
                     _logger.LogWarning("Duplicate message {MessageId} ignored", messageId);
                     await _channel.BasicAckAsync(ea.DeliveryTag, false);
                     return;
                 }
 
-                var inboxMsg = new InboxMessage(messageId, eventType, body);
-                db.InboxMessages.Add(inboxMsg);
-                await db.SaveChangesAsync(cancellationToken);
+                if (existing is null)
+                {
+                    var inboxMsg = new InboxMessage(messageId, eventType, body);
+                    db.InboxMessages.Add(inboxMsg);
+                    await db.SaveChangesAsync(cancellationToken);
+                }
 
                 CreateNotificationCommand? command = null;
 
@@ -134,16 +158,23 @@ public class RabbitMQConsumerService : BackgroundService
                                 cancellationToken);
                         }
                     }
+                    else
+                    {
+                        _logger.LogWarning("CreateNotification failed: {Errors}", string.Join("; ", result.Errors.Select(e => e.Message)));
+                        await HandleFailureAsync(ea, messageId, cancellationToken);
+                        return;
+                    }
                 }
 
-                inboxMsg.MarkAsProcessed();
+                var msg = db.InboxMessages.First(m => m.MessageId == messageId);
+                msg.MarkAsProcessed();
                 await db.SaveChangesAsync(cancellationToken);
                 await _channel.BasicAckAsync(ea.DeliveryTag, false);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error processing message {MessageId}", messageId);
-                await _channel.BasicNackAsync(ea.DeliveryTag, false, false);
+                await HandleFailureAsync(ea, messageId, cancellationToken);
             }
         };
 
@@ -153,6 +184,61 @@ public class RabbitMQConsumerService : BackgroundService
         while (!cancellationToken.IsCancellationRequested)
         {
             await Task.Delay(1000, cancellationToken);
+        }
+    }
+
+    private async Task HandleFailureAsync(BasicDeliverEventArgs ea, string messageId, CancellationToken cancellationToken)
+    {
+        var retryCount = MessageRetryPolicy.GetRetryCount(ea.BasicProperties.Headers);
+
+        if (MessageRetryPolicy.ShouldRetry(retryCount))
+        {
+            var properties = new BasicProperties
+            {
+                Persistent = true,
+                ContentType = "application/json",
+                MessageId = ea.BasicProperties.MessageId,
+                CorrelationId = ea.BasicProperties.CorrelationId,
+                Headers = new Dictionary<string, object?>
+                {
+                    [MessageRetryPolicy.RetryCountHeader] = retryCount + 1
+                }
+            };
+
+            await _channel.BasicPublishAsync(
+                exchange: _retryExchange,
+                routingKey: ea.RoutingKey,
+                mandatory: false,
+                basicProperties: properties,
+                body: ea.Body,
+                cancellationToken: cancellationToken);
+            await _channel.BasicAckAsync(ea.DeliveryTag, false, cancellationToken);
+
+            _logger.LogWarning("Message {MessageId} failed; scheduled retry {RetryCount}/{MaxRetries}",
+                messageId, retryCount + 1, MessageRetryPolicy.MaxRetries);
+        }
+        else
+        {
+            var properties = new BasicProperties
+            {
+                Persistent = true,
+                ContentType = "application/json",
+                MessageId = ea.BasicProperties.MessageId,
+                CorrelationId = ea.BasicProperties.CorrelationId,
+                Headers = ea.BasicProperties.Headers
+            };
+
+            await _channel.BasicPublishAsync(
+                exchange: _dlxExchange,
+                routingKey: ea.RoutingKey,
+                mandatory: false,
+                basicProperties: properties,
+                body: ea.Body,
+                cancellationToken: cancellationToken);
+            await _channel.BasicAckAsync(ea.DeliveryTag, false, cancellationToken);
+
+            _logger.LogError("Message {MessageId} failed after {MaxRetries} retries; moved to DLQ",
+                messageId, MessageRetryPolicy.MaxRetries);
         }
     }
 
