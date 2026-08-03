@@ -9,5 +9,6 @@ public class RefundPaymentCommandValidator : AbstractValidator<RefundPaymentComm
         RuleFor(x => x.IntentId).NotEmpty();
         RuleFor(x => x.Amount).GreaterThan(0).When(x => x.Amount.HasValue)
             .WithMessage("Refund amount must be greater than zero.");
+        RuleFor(x => x.IdempotencyKey).MaximumLength(200);
     }
 }

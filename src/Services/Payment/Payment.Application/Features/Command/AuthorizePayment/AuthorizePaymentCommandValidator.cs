@@ -7,5 +7,6 @@ public class AuthorizePaymentCommandValidator : AbstractValidator<AuthorizePayme
     public AuthorizePaymentCommandValidator()
     {
         RuleFor(x => x.IntentId).NotEmpty();
+        RuleFor(x => x.IdempotencyKey).MaximumLength(200);
     }
 }

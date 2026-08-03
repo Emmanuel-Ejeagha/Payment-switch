@@ -41,7 +41,7 @@ public class PaymentIntent : AggregateRoot
         AddDomainEvent(new PaymentIntentCreatedDomainEvent(Id, MerchantId, Amount, IdempotencyKey.Value));
     }
 
-    public void Authorize(AuthorizationCode authorizationCode, GatewayReference gatewayReference)
+    public void Authorize(AuthorizationCode authorizationCode, GatewayReference gatewayReference, string? idempotencyKey = null)
     {
         if (Status != PaymentStatus.Pending)
             throw new InvalidOperationException($"Cannot authorize payment in '{Status}' status.");
@@ -51,13 +51,13 @@ public class PaymentIntent : AggregateRoot
         Status = PaymentStatus.Authorized;
         UpdatedAt = DateTime.UtcNow;
 
-        var transaction = new Transaction(TransactionType.Authorization, new Money(Amount.Amount, Amount.Currency), new GatewayReference(gatewayReference.Value));
+        var transaction = new Transaction(TransactionType.Authorization, new Money(Amount.Amount, Amount.Currency), new GatewayReference(gatewayReference.Value), idempotencyKey);
         _transactions.Add(transaction);
 
         AddDomainEvent(new PaymentAuthorizedDomainEvent(Id, MerchantId, authorizationCode.Value, Amount, gatewayReference.Value));
     }
 
-    public void Capture(Money? amount = null)
+    public void Capture(Money? amount = null, string? idempotencyKey = null)
     {
         if (Status != PaymentStatus.Authorized && Status != PaymentStatus.PartiallyCaptured)
             throw new InvalidOperationException($"Cannot capture payment in '{Status}' status.");
@@ -75,7 +75,7 @@ public class PaymentIntent : AggregateRoot
         if (captureAmount.Currency != Amount.Currency)
             throw new InvalidOperationException("Capture currency must match the original payment currency.");
 
-        var transaction = new Transaction(TransactionType.Capture, captureAmount);
+        var transaction = new Transaction(TransactionType.Capture, captureAmount, idempotencyKey: idempotencyKey);
         _transactions.Add(transaction);
 
         var newCapturedTotal = capturedSoFar + captureAmount.Amount;
@@ -88,7 +88,7 @@ public class PaymentIntent : AggregateRoot
         AddDomainEvent(new PaymentCapturedDomainEvent(Id, MerchantId, transaction.Id, captureAmount));
     }
 
-    public void Void()
+    public void Void(string? idempotencyKey = null)
     {
         if (Status != PaymentStatus.Authorized)
             throw new InvalidOperationException($"Cannot void payment in '{Status}' status.");
@@ -96,13 +96,13 @@ public class PaymentIntent : AggregateRoot
         Status = PaymentStatus.Voided;
         UpdatedAt = DateTime.UtcNow;
 
-        var transaction = new Transaction(TransactionType.Void, Amount);
+        var transaction = new Transaction(TransactionType.Void, Amount, idempotencyKey: idempotencyKey);
         _transactions.Add(transaction);
 
         AddDomainEvent(new PaymentVoidedDomainEvent(Id));
     }
 
-    public void Refund(Money? amount = null)
+    public void Refund(Money? amount = null, string? idempotencyKey = null)
     {
         if (Status != PaymentStatus.Captured && Status != PaymentStatus.PartiallyCaptured && Status != PaymentStatus.PartiallyRefunded)
             throw new InvalidOperationException($"Cannot refund payment in '{Status}' status.");
@@ -119,7 +119,7 @@ public class PaymentIntent : AggregateRoot
         if (refundAmount.Currency != Amount.Currency)
             throw new InvalidOperationException("Refund currency must match the original payment currency.");
 
-        var transaction = new Transaction(TransactionType.Refund, refundAmount);
+        var transaction = new Transaction(TransactionType.Refund, refundAmount, idempotencyKey: idempotencyKey);
         _transactions.Add(transaction);
 
         var newRefundedTotal = totalRefunded + refundAmount.Amount;

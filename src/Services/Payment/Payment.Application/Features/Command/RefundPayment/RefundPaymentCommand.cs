@@ -2,5 +2,6 @@
 
 public record RefundPaymentCommand(
     Guid IntentId,
-    long? Amount
+    long? Amount,
+    string? IdempotencyKey = null
 );

@@ -109,6 +109,25 @@ public class AuthorizePaymentHandlerTests
         Assert.Equal("Payment.ConcurrencyConflict", result.Errors[0].Code);
     }
 
+    [Fact]
+    public async Task Handle_ReplayedIdempotencyKey_ShouldReturnExistingAuthorization()
+    {
+        var intent = CreatePendingIntent();
+        intent.Authorize(new AuthorizationCode("AUTH123"), new GatewayReference("GW-1"), "auth-key");
+        intent.ClearDomainEvents();
+        var command = new AuthorizePaymentCommand(intent.Id, null, null, "auth-key");
+        SetupValidatorSuccess(command);
+        _repoMock.Setup(r => r.GetByIdAsync(intent.Id, It.IsAny<CancellationToken>())).ReturnsAsync(intent);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("AUTH123", result.Value.AuthorizationCode);
+        Assert.Equal("GW-1", result.Value.GatewayReference);
+        _gatewayMock.Verify(g => g.AuthorizeAsync(It.IsAny<Guid>(), It.IsAny<Money>(), It.IsAny<CardDetails>(), It.IsAny<CancellationToken>()), Times.Never);
+        _uowMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     private PaymentIntent CreatePendingIntent() =>
         new(Guid.NewGuid(), Guid.NewGuid(), new Money(100, "USD"), new IdempotencyKey("k"), PaymentMethod.Card);
 

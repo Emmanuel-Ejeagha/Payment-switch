@@ -86,16 +86,18 @@ public class CreatePaymentIntentHandlerTests
     }
 
     [Fact]
-    public async Task Handle_DuplicateIdempotencyKey_ShouldFail()
+    public async Task Handle_DuplicateIdempotencyKey_ShouldReturnExistingIntent()
     {
         var command = new CreatePaymentIntentCommand(Guid.NewGuid(), 100, "USD", "Card", "1234", "Visa", "dup-key");
         SetupValidatorSuccess(command);
-        _repoMock.Setup(r => r.GetByIdempotencyKeyAsync(command.MerchantId, command.IdempotencyKey, It.IsAny<CancellationToken>())).ReturnsAsync(new PaymentIntent(Guid.NewGuid(), command.MerchantId, new Money(100, "USD"), new IdempotencyKey("dup-key"), PaymentMethod.Card));
+        var existing = new PaymentIntent(Guid.NewGuid(), command.MerchantId, new Money(100, "USD"), new IdempotencyKey("dup-key"), PaymentMethod.Card);
+        _repoMock.Setup(r => r.GetByIdempotencyKeyAsync(command.MerchantId, command.IdempotencyKey, It.IsAny<CancellationToken>())).ReturnsAsync(existing);
 
         var result = await _handler.Handle(command);
 
-        Assert.True(result.IsFailure);
-        Assert.Equal("Payment.IdempotencyKeyViolation", result.Errors[0].Code);
+        Assert.True(result.IsSuccess);
+        Assert.Equal(existing.Id, result.Value.IntentId);
+        _repoMock.Verify(r => r.AddAsync(It.IsAny<PaymentIntent>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]

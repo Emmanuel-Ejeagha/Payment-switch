@@ -90,6 +90,24 @@ public class CapturePaymentHandlerTests
         Assert.Equal("Payment.CaptureExceedsAuthorized", result.Errors[0].Code);
     }
 
+    [Fact]
+    public async Task Handle_ReplayedIdempotencyKey_ShouldReturnExistingCapture()
+    {
+        var intent = CreateAuthorizedIntent();
+        intent.Capture(new Money(100, "USD"), "cap-key");
+        intent.ClearDomainEvents();
+        var command = new CapturePaymentCommand(intent.Id, null, "cap-key");
+        SetupValidatorSuccess(command);
+        _repoMock.Setup(r => r.GetByIdAsync(intent.Id, It.IsAny<CancellationToken>())).ReturnsAsync(intent);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Captured", result.Value.Status);
+        _gatewayMock.Verify(g => g.CaptureAsync(It.IsAny<Guid>(), It.IsAny<GatewayReference>(), It.IsAny<Money>(), It.IsAny<CancellationToken>()), Times.Never);
+        _uowMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     private PaymentIntent CreateAuthorizedIntent()
     {
         var intent = new PaymentIntent(Guid.NewGuid(), Guid.NewGuid(), new Money(100, "USD"), new IdempotencyKey("k"), PaymentMethod.Card);

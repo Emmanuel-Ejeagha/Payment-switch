@@ -46,6 +46,16 @@ public class RefundPaymentHandler
         if (intent is null)
             return PaymentErrors.PaymentIntentNotFound(command.IntentId);
 
+        if (!string.IsNullOrWhiteSpace(command.IdempotencyKey))
+        {
+            var replay = intent.Transactions.FirstOrDefault(t => t.Type == TransactionType.Refund && t.IdempotencyKey == command.IdempotencyKey);
+            if (replay is not null)
+            {
+                _logger.LogInformation("Replaying refund for Intent {IntentId} with key {Key}", intent.Id, command.IdempotencyKey);
+                return new RefundPaymentResponse(replay.Id, intent.Status.Value);
+            }
+        }
+
         if (intent.Status != PaymentStatus.Captured && intent.Status != PaymentStatus.PartiallyCaptured && intent.Status != PaymentStatus.PartiallyRefunded)
             return PaymentErrors.InvalidStatusTransition(intent.Status.Value, "Refunded");
 
@@ -59,7 +69,7 @@ public class RefundPaymentHandler
         await _unitOfWork.BeginTransactionAsync(cancellationToken);
         try
         {
-            intent.Refund(amount);
+            intent.Refund(amount, command.IdempotencyKey);
         }
         catch (InvalidOperationException ex)
         {

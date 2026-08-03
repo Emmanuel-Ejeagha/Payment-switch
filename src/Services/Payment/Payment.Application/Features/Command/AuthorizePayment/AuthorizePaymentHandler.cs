@@ -4,6 +4,7 @@ using BuildingBlocks.Shared.Results;
 using FluentValidation;
 using Payment.Application.Interfaces;
 using Payment.Domain;
+using Payment.Domain.Enums;
 using Payment.Domain.ValueObjects;
 using Microsoft.Extensions.Logging;
 
@@ -47,6 +48,16 @@ public class AuthorizePaymentHandler
         var intent = await _repository.GetByIdAsync(command.IntentId, cancellationToken);
         if (intent is null) return PaymentErrors.PaymentIntentNotFound(command.IntentId);
 
+        if (!string.IsNullOrWhiteSpace(command.IdempotencyKey))
+        {
+            var replay = intent.Transactions.FirstOrDefault(t => t.Type == TransactionType.Authorization && t.IdempotencyKey == command.IdempotencyKey);
+            if (replay is not null)
+            {
+                _logger.LogInformation("Replaying authorize for Intent {IntentId} with key {Key}", intent.Id, command.IdempotencyKey);
+                return new AuthorizePaymentResponse(intent.AuthorizationCode!.Value, intent.GatewayReference!.Value, intent.Status.Value);
+            }
+        }
+
         var statusResult = await _merchantService.GetMerchantStatusAsync(intent.MerchantId, cancellationToken);
         if (!statusResult.IsSuccess) return Result<AuthorizePaymentResponse>.Failure(statusResult.Errors);
         if (!string.Equals(statusResult.Value, "Active", StringComparison.OrdinalIgnoreCase)) return new Error("Payment.MerchantNotActive", "Merchant is not active.");
@@ -65,7 +76,7 @@ public class AuthorizePaymentHandler
         await _unitOfWork.BeginTransactionAsync(cancellationToken);
         try
         {
-            intent.Authorize(authCode, gatewayRef);
+            intent.Authorize(authCode, gatewayRef, command.IdempotencyKey);
         }
         catch (InvalidOperationException)
         {
