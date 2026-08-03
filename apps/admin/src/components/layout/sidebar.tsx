@@ -25,6 +25,13 @@ interface PaymentEvent {
   timestamp: string
 }
 
+async function getAccessToken(): Promise<string> {
+  const res = await fetch("/api/auth/token")
+  if (!res.ok) throw new Error("Not authenticated")
+  const data = (await res.json()) as { accessToken?: string }
+  return data.accessToken ?? ""
+}
+
 const navItems = [
   { label: "Dashboard", href: "/", icon: Home },
   { label: "Merchants", href: "/merchants", icon: Store },
@@ -51,8 +58,11 @@ export function Sidebar({ open, onClose }: SidebarProps) {
   useEffect(() => {
     const conn = new signalR.HubConnectionBuilder()
       .withUrl(
-        `${process.env.NEXT_PUBLIC_API_URL}/notification/hubs/payment-notifications?isAdmin=true`,
-        { withCredentials: false }
+        `${process.env.NEXT_PUBLIC_API_URL}/notification/hubs/payment-notifications`,
+        {
+          withCredentials: false,
+          accessTokenFactory: getAccessToken,
+        }
       )
       .withAutomaticReconnect()
       .configureLogging(signalR.LogLevel.Warning)
