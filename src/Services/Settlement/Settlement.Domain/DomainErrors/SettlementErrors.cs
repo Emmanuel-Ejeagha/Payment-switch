@@ -12,4 +12,7 @@ public static class SettlementErrors
 
     public static Error BatchNotFound(Guid batchId) =>
         new("Settlement.BatchNotFound", $"Settlement batch with Id '{batchId}' not found.");
+
+    public static Error ConcurrencyConflict =>
+        new("Settlement.ConcurrencyConflict", "The settlement batch was modified concurrently. Please retry.");
 }

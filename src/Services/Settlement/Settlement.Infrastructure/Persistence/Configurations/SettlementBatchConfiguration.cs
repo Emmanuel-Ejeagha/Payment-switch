@@ -17,6 +17,7 @@ public class SettlementBatchConfiguration : IEntityTypeConfiguration<SettlementB
         builder.Property(b => b.TotalAmount).IsRequired();
         builder.Property(b => b.CreatedAt).IsRequired();
         builder.Property(b => b.CompletedAt);
+        builder.Property(b => b.RowVersion).IsRowVersion();
 
         builder.OwnsMany(b => b.Payouts, p =>
         {

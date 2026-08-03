@@ -1,4 +1,5 @@
 ﻿using BuildingBlocks.Shared.Events;
+using BuildingBlocks.Shared.Exceptions;
 using BuildingBlocks.Shared.Results;
 using FluentValidation;
 using Payment.Application.Interfaces;
@@ -54,18 +55,30 @@ public class CapturePaymentHandler
         if (!gatewayResult.IsSuccess)
             return new Error("Payment.CaptureFailed", gatewayResult.Errors.First().Message);
 
+        await _unitOfWork.BeginTransactionAsync(cancellationToken);
         try
         {
             intent.Capture(amount);
         }
         catch (InvalidOperationException ex)
         {
+            await _unitOfWork.RollbackAsync(cancellationToken);
             if (ex.Message.Contains("exceeds remaining authorized amount", StringComparison.OrdinalIgnoreCase))
                 return PaymentErrors.CaptureExceedsAuthorized(amount?.Amount ?? intent.Amount.Amount, intent.Amount.Amount);
             return PaymentErrors.InvalidStatusTransition(intent.Status.Value, "Captured");
         }
 
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            await _unitOfWork.CommitAsync(cancellationToken);
+        }
+        catch (ConcurrencyConflictException)
+        {
+            await _unitOfWork.RollbackAsync(cancellationToken);
+            return PaymentErrors.ConcurrencyConflict;
+        }
+
         await _dispatcher.DispatchAsync(intent.DomainEvents, cancellationToken);
 
         var captureTx = intent.Transactions.Last(t => t.Type == TransactionType.Capture);

@@ -1,4 +1,5 @@
 ﻿using BuildingBlocks.Shared.Events;
+using BuildingBlocks.Shared.Exceptions;
 using BuildingBlocks.Shared.Results;
 using FluentValidation;
 using Payment.Application.DTOs;
@@ -67,8 +68,18 @@ public class CreatePaymentIntentHandler
         if (!authResult.IsSuccess)
         {
             intent.Fail();
+            await _unitOfWork.BeginTransactionAsync(cancellationToken);
             await _repository.AddAsync(intent, cancellationToken);
-            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            try
+            {
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
+                await _unitOfWork.CommitAsync(cancellationToken);
+            }
+            catch (ConcurrencyConflictException)
+            {
+                await _unitOfWork.RollbackAsync(cancellationToken);
+                return PaymentErrors.ConcurrencyConflict;
+            }
             await _dispatcher.DispatchAsync(intent.DomainEvents, cancellationToken);
             return new PaymentIntentResponse(intent.Id, intent.Status.Value, null);
         }
@@ -85,8 +96,18 @@ public class CreatePaymentIntentHandler
             clientSecret = intent.Transactions.Last(t => t.Type == TransactionType.Capture).Id.ToString();
         }
 
+        await _unitOfWork.BeginTransactionAsync(cancellationToken);
         await _repository.AddAsync(intent, cancellationToken);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            await _unitOfWork.CommitAsync(cancellationToken);
+        }
+        catch (ConcurrencyConflictException)
+        {
+            await _unitOfWork.RollbackAsync(cancellationToken);
+            return PaymentErrors.ConcurrencyConflict;
+        }
         await _dispatcher.DispatchAsync(intent.DomainEvents, cancellationToken);
 
         return new PaymentIntentResponse(intent.Id, intent.Status.Value, clientSecret);

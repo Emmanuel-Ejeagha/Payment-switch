@@ -16,7 +16,7 @@ public class LedgerAccount : AggregateRoot
     public string Currency { get; private set; } = default!;
     public IReadOnlyList<JournalEntry> Journal => _journal;
     private List<JournalEntry> _journal = new();
-
+    public uint RowVersion { get; private set; }
     private LedgerAccount() : base() { }
 
     public LedgerAccount(Guid id, Guid merchantId, string currency) : base(id)

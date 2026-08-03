@@ -1,4 +1,5 @@
 ﻿using BuildingBlocks.Shared.Events;
+using BuildingBlocks.Shared.Exceptions;
 using BuildingBlocks.Shared.Results;
 using FluentValidation;
 using Ledger.Application.Interfaces;
@@ -41,6 +42,7 @@ public class RefundFundsHandler
         if (account is null)
             return LedgerErrors.AccountNotFound(command.MerchantId);
 
+        await _unitOfWork.BeginTransactionAsync(cancellationToken);
         try
         {
             var amount = new Money(command.Amount, command.Currency);
@@ -49,10 +51,21 @@ public class RefundFundsHandler
         }
         catch (InvalidOperationException ex)
         {
+            await _unitOfWork.RollbackAsync(cancellationToken);
             return new Error("Ledger.RefundFailed", ex.Message);
         }
 
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            await _unitOfWork.CommitAsync(cancellationToken);
+        }
+        catch (ConcurrencyConflictException)
+        {
+            await _unitOfWork.RollbackAsync(cancellationToken);
+            return LedgerErrors.ConcurrencyConflict;
+        }
+
         await _dispatcher.DispatchAsync(account.DomainEvents, cancellationToken);
 
         return Result.Success();

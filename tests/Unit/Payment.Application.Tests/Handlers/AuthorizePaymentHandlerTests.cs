@@ -1,4 +1,5 @@
 ﻿using BuildingBlocks.Shared.Events;
+using BuildingBlocks.Shared.Exceptions;
 using BuildingBlocks.Shared.Results;
 using FluentValidation;
 using FluentValidation.Results;
@@ -85,6 +86,27 @@ public class AuthorizePaymentHandlerTests
 
         Assert.True(result.IsFailure);
         Assert.Equal("Payment.AuthorizationFailed", result.Errors[0].Code);
+    }
+
+    [Fact]
+    public async Task Handle_ConcurrencyConflict_ShouldFail()
+    {
+        var intent = CreatePendingIntent();
+        var command = new AuthorizePaymentCommand(intent.Id, null, null);
+        SetupValidatorSuccess(command);
+        _merchantServiceMock
+            .Setup(m => m.GetMerchantStatusAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<string>.Success("active"));
+        _repoMock.Setup(r => r.GetByIdAsync(intent.Id, It.IsAny<CancellationToken>())).ReturnsAsync(intent);
+        _gatewayMock.Setup(g => g.AuthorizeAsync(intent.MerchantId, intent.Amount, intent.CardDetails, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<GatewayResponse>.Success(new GatewayResponse(true, "AUTH123", "GW-1", null)));
+        _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new ConcurrencyConflictException());
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Payment.ConcurrencyConflict", result.Errors[0].Code);
     }
 
     private PaymentIntent CreatePendingIntent() =>

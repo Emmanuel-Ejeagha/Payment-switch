@@ -16,7 +16,7 @@ public class SettlementBatch : AggregateRoot
     private readonly List<Payout> _payouts = new();
     public DateTime CreatedAt { get; private set; }
     public DateTime? CompletedAt { get; private set; }
-
+    public uint RowVersion { get; private set; }
     private SettlementBatch() : base() { }
 
     public SettlementBatch(Guid id, DateTime batchDate) : base(id)

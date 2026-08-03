@@ -1,4 +1,5 @@
 ﻿using BuildingBlocks.Shared.Events;
+using BuildingBlocks.Shared.Exceptions;
 using BuildingBlocks.Shared.Results;
 using FluentValidation;
 using Payment.Application.Interfaces;
@@ -55,12 +56,14 @@ public class RefundPaymentHandler
         if (!gatewayResult.IsSuccess)
             return new Error("Payment.RefundFailed", gatewayResult.Errors.First().Message);
 
+        await _unitOfWork.BeginTransactionAsync(cancellationToken);
         try
         {
             intent.Refund(amount);
         }
         catch (InvalidOperationException ex)
         {
+            await _unitOfWork.RollbackAsync(cancellationToken);
             if (ex.Message.Contains("exceeds available refund amount", StringComparison.OrdinalIgnoreCase))
             {
                 var captured = intent.Transactions.Where(t => t.Type == TransactionType.Capture).Sum(t => t.Amount.Amount);
@@ -69,7 +72,17 @@ public class RefundPaymentHandler
             return PaymentErrors.InvalidStatusTransition(intent.Status.Value, "Refunded");
         }
 
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            await _unitOfWork.CommitAsync(cancellationToken);
+        }
+        catch (ConcurrencyConflictException)
+        {
+            await _unitOfWork.RollbackAsync(cancellationToken);
+            return PaymentErrors.ConcurrencyConflict;
+        }
+
         await _dispatcher.DispatchAsync(intent.DomainEvents, cancellationToken);
 
         var refundTx = intent.Transactions.Last(t => t.Type == TransactionType.Refund);

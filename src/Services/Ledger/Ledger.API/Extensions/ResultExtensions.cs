@@ -23,6 +23,7 @@ public static class ResultExtensions
         var statusCode = first.Code switch
         {
             "Ledger.AccountNotFound" => 404,
+            "Ledger.ConcurrencyConflict" => 409,
             "Ledger.InsufficientFunds" => 400,
             "Ledger.ReserveFailed" => 400,
             "Ledger.CaptureFailed" => 400,

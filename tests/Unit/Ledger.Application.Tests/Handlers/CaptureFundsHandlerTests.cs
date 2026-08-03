@@ -1,4 +1,5 @@
 ﻿using BuildingBlocks.Shared.Events;
+using BuildingBlocks.Shared.Exceptions;
 using FluentValidation;
 using FluentValidation.Results;
 using Ledger.Application.Features.Commands.CaptureFunds;
@@ -80,6 +81,26 @@ public class CaptureFundsHandlerTests
 
         Assert.True(result.IsFailure);
         Assert.Equal("Ledger.AccountNotFound", result.Errors[0].Code);
+    }
+
+    [Fact]
+    public async Task Handle_ConcurrencyConflict_ShouldFail()
+    {
+        var handler = CreateHandler(new LedgerOptions { FeeBasisPoints = 0 });
+        var account = new LedgerAccount(Guid.NewGuid(), Guid.NewGuid(), "USD");
+        account.PendingBalance = 200L;
+        account.ReservedBalance = 200L;
+
+        var command = new CaptureFundsCommand(account.MerchantId, 100L, "USD", "corr-2");
+        SetupValidatorSuccess(command);
+        _repoMock.Setup(r => r.GetByMerchantIdAndCurrencyAsync(account.MerchantId, "USD", It.IsAny<CancellationToken>())).ReturnsAsync(account);
+        _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new ConcurrencyConflictException());
+
+        var result = await handler.Handle(command);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Ledger.ConcurrencyConflict", result.Errors[0].Code);
     }
 
     private void SetupValidatorSuccess(CaptureFundsCommand command) =>

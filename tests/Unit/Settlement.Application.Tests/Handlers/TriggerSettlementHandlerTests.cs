@@ -1,4 +1,5 @@
 ﻿using BuildingBlocks.Shared.Events;
+using BuildingBlocks.Shared.Exceptions;
 using BuildingBlocks.Shared.Results;
 using FluentValidation;
 using FluentValidation.Results;
@@ -90,6 +91,26 @@ public class TriggerSettlementHandlerTests
 
         Assert.True(result.IsFailure);
         Assert.Contains(result.Errors, e => e.Code == "BatchDate");
+    }
+
+    [Fact]
+    public async Task Handle_ConcurrencyConflict_ShouldFail()
+    {
+        var command = new TriggerSettlementCommand(new DateTime(2026, 7, 3));
+        SetupValidatorSuccess(command);
+        _repoMock.Setup(r => r.GetByBatchDateAsync(command.BatchDate, It.IsAny<CancellationToken>())).ReturnsAsync((SettlementBatch?)null);
+        _ledgerMock.Setup(l => l.GetDailyPayoutDataAsync(command.BatchDate, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<List<MerchantPayoutData>>.Success(new List<MerchantPayoutData>
+            {
+                new(Guid.NewGuid(), 1000L, 20L, "USD")
+            }));
+        _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new ConcurrencyConflictException());
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Settlement.ConcurrencyConflict", result.Errors[0].Code);
     }
 
     private void SetupValidatorSuccess(TriggerSettlementCommand command) =>

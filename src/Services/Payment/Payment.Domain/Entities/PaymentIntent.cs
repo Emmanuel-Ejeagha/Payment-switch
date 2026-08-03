@@ -19,7 +19,7 @@ public class PaymentIntent : AggregateRoot
     private List<Transaction> _transactions = new();
     public DateTime CreatedAt { get; private set; }
     public DateTime? UpdatedAt { get; private set; }
-
+    public uint RowVersion { get; private set; }
     private PaymentIntent() : base() { }
 
     public PaymentIntent(

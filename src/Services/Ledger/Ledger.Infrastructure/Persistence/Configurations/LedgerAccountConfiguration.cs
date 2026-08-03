@@ -15,6 +15,7 @@ public class LedgerAccountConfiguration : IEntityTypeConfiguration<LedgerAccount
         builder.Property(a => a.PendingBalance).IsRequired();
         builder.Property(a => a.ReservedBalance).IsRequired();
         builder.Property(a => a.Currency).IsRequired().HasMaxLength(3);
+        builder.Property(a => a.RowVersion).IsRowVersion();
 
         builder.Navigation(a => a.Journal)
             .UsePropertyAccessMode(PropertyAccessMode.PreferField);

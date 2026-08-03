@@ -1,7 +1,9 @@
 ﻿using BuildingBlocks.Shared.Events;
+using BuildingBlocks.Shared.Exceptions;
 using BuildingBlocks.Shared.Results;
 using FluentValidation;
 using Ledger.Application.Interfaces;
+using Ledger.Domain.DomainErrors;
 using Ledger.Domain.Entities;
 using Ledger.Domain.ValueObjects;
 using Microsoft.Extensions.Logging;
@@ -45,6 +47,7 @@ public class ReserveFundsHandler
             await _repository.AddAsync(account, cancellationToken);
         }
 
+        await _unitOfWork.BeginTransactionAsync(cancellationToken);
         try
         {
             var amount = new Money(command.Amount, command.Currency);
@@ -53,10 +56,21 @@ public class ReserveFundsHandler
         }
         catch (InvalidOperationException ex)
         {
+            await _unitOfWork.RollbackAsync(cancellationToken);
             return new Error("Ledger.ReserveFailed", ex.Message);
         }
 
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            await _unitOfWork.CommitAsync(cancellationToken);
+        }
+        catch (ConcurrencyConflictException)
+        {
+            await _unitOfWork.RollbackAsync(cancellationToken);
+            return LedgerErrors.ConcurrencyConflict;
+        }
+
         await _dispatcher.DispatchAsync(account.DomainEvents, cancellationToken);
 
         return Result.Success();

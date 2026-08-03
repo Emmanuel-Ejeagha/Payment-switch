@@ -1,8 +1,10 @@
 ﻿using BuildingBlocks.Shared.Events;
+using BuildingBlocks.Shared.Exceptions;
 using BuildingBlocks.Shared.Results;
 using FluentValidation;
 using Microsoft.Extensions.Logging;
 using Settlement.Application.Interfaces;
+using Settlement.Domain.DomainErrors;
 using Settlement.Domain.Entities;
 using Settlement.Domain.ValueObjects;
 
@@ -62,8 +64,18 @@ public class TriggerSettlementHandler
 
         batch.Complete();
 
+        await _unitOfWork.BeginTransactionAsync(cancellationToken);
         await _repository.AddAsync(batch, cancellationToken);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            await _unitOfWork.CommitAsync(cancellationToken);
+        }
+        catch (ConcurrencyConflictException)
+        {
+            await _unitOfWork.RollbackAsync(cancellationToken);
+            return SettlementErrors.ConcurrencyConflict;
+        }
         await _dispatcher.DispatchAsync(batch.DomainEvents, cancellationToken);
 
         return batch.Id;

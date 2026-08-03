@@ -1,6 +1,8 @@
-﻿using BuildingBlocks.Shared.Results;
+﻿using BuildingBlocks.Shared.Exceptions;
+using BuildingBlocks.Shared.Results;
 using FluentValidation;
 using Ledger.Application.Interfaces;
+using Ledger.Domain.DomainErrors;
 using Ledger.Domain.Entities;
 using Microsoft.Extensions.Logging;
 
@@ -37,8 +39,18 @@ public class CreateLedgerAccountHandler
             return Result.Success(); 
 
         var account = new LedgerAccount(Guid.NewGuid(), command.MerchantId, command.Currency);
+        await _unitOfWork.BeginTransactionAsync(cancellationToken);
         await _repository.AddAsync(account, cancellationToken);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            await _unitOfWork.CommitAsync(cancellationToken);
+        }
+        catch (ConcurrencyConflictException)
+        {
+            await _unitOfWork.RollbackAsync(cancellationToken);
+            return LedgerErrors.ConcurrencyConflict;
+        }
 
         return Result.Success();
     }
