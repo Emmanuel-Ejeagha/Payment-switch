@@ -1,9 +1,11 @@
 ﻿using BuildingBlocks.Shared.Events;
 using BuildingBlocks.Shared.Results;
+using BuildingBlocks.Shared.Security;
 using FluentValidation;
 using Identity.Application.Interfaces;
 using Identity.Domain.DomainErrors;
 using Microsoft.Extensions.Logging;
+using System.Security.Cryptography;
 
 namespace Identity.Application.Commands.ApiKey;
 
@@ -35,8 +37,8 @@ public class GenerateApiKeyHandler
         if (user == null)
             return IdentityErrors.UserNotFound(query.UserId);
 
-        var plainTextKey = GenerateRandomKey();
-        var keyHash = HashKey(plainTextKey);
+        var plainTextKey = GenerateRandomKey(query.Environment);
+        var keyHash = ApiKeyHasher.Hash(plainTextKey);
 
         var apiKey = user.GenerateApiKey(keyHash, query.Environment);
         await _userRepository.AddApiKeyAsync(user, apiKey, cancellationToken);
@@ -46,6 +48,9 @@ public class GenerateApiKeyHandler
         return new ApiKeyResponse(apiKey.Id, plainTextKey, query.Environment, apiKey.CreatedAt);
     }
 
-    private string GenerateRandomKey() => Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N");
-    private string HashKey(string key) => Convert.ToBase64String(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(key)));
+    private string GenerateRandomKey(string environment)
+    {
+        var prefix = environment == "live" ? "sk_live_" : "sk_test_";
+        return prefix + Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
+    }
 }

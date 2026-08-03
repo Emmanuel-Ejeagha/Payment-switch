@@ -11,5 +11,6 @@ public record MerchantApiKeyDto(
 public record MerchantKeyResolution(
     Guid MerchantId,
     string Status,
-    string Environment
+    string Environment,
+    string KeyHash
 );

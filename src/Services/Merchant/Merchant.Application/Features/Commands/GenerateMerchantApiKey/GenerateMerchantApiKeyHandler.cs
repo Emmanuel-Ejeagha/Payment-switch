@@ -1,3 +1,4 @@
+using BuildingBlocks.Shared.Security;
 using Microsoft.Extensions.Logging;
 using System.Security.Cryptography;
 
@@ -37,6 +38,9 @@ public class GenerateMerchantApiKeyHandler
         if (!command.Caller.CanAccess(merchant.OwnerId))
             return MerchantErrors.Unauthorized();
 
+        if (merchant.Status != MerchantStatus.Active)
+            return MerchantErrors.MerchantNotActive();
+
         var (plainTextKey, prefix, keyHash) = GenerateKey(command.Environment);
         var apiKey = merchant.GenerateApiKey(keyHash, prefix, command.Environment);
 
@@ -51,10 +55,7 @@ public class GenerateMerchantApiKeyHandler
         var prefix = environment == "live" ? "sk_live_" : "sk_test_";
         var secret = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
         var plainTextKey = prefix + secret;
-        var keyHash = HashKey(plainTextKey);
+        var keyHash = ApiKeyHasher.Hash(plainTextKey);
         return (plainTextKey, prefix, keyHash);
     }
-
-    internal static string HashKey(string key) =>
-        Convert.ToBase64String(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(key)));
 }
