@@ -10,6 +10,7 @@ using Payment.Infrastructure.Outbox;
 using Payment.Infrastructure.Persistence;
 using Payment.Infrastructure.Persistence.Repositories;
 using Payment.Infrastructure.Services;
+using Payment.Infrastructure.Services.Gateways;
 using PaymentSwitch.Protos.Merchant;
 
 
@@ -31,8 +32,14 @@ public static class DependencyInjection
                    .AddInterceptors(interceptor);
         });
 
-        services.AddScoped<IPaymentGatewayService, MockPaymentGatewayService>();
+        services.AddScoped<IPaymentGatewayService, ResilientPaymentGatewayService>();
+        services.AddSingleton<IPaymentGatewayProvider, PaystackMockGatewayProvider>();
+        services.AddSingleton<IPaymentGatewayProvider, StripeMockGatewayProvider>();
+        services.AddSingleton<GatewayProviderRegistry>();
+        services.AddSingleton<GatewayRouter>();
         services.AddScoped<IPaymentIntentRepository, PaymentIntentRepository>();
+        services.AddScoped<ICardTokenRepository, CardTokenRepository>();
+        services.AddScoped<IPaymentLinkRepository, PaymentLinkRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IMerchantService, GrpcMerchantService>();
 
