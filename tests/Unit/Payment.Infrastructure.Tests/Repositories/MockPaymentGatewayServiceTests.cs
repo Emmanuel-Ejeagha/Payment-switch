@@ -77,6 +77,37 @@ public class MockPaymentGatewayServiceTests
     }
 
     [Fact]
+    public async Task AuthorizeAsync_ShouldRequireChallengeFor3DSCards()
+    {
+        var service = CreateService(out _, out _);
+
+        // stripe (Visa route) challenges 3001 -> RequiresChallenge, no auth code yet
+        var result = await service.AuthorizeAsync(Guid.NewGuid(), new Money(50, "USD"), new CardDetails("3001", "Visa"));
+
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value!.RequiresChallenge);
+        Assert.Null(result.Value.AuthorizationCode);
+        Assert.NotNull(result.Value.GatewayReference);
+    }
+
+    [Fact]
+    public async Task ConfirmChallengeAsync_ShouldReturnAuthCodeAfter3DS()
+    {
+        var service = CreateService(out _, out _);
+        var card = new CardDetails("3001", "Visa");
+
+        var challenge = await service.AuthorizeAsync(Guid.NewGuid(), new Money(50, "USD"), card);
+        Assert.True(challenge.Value!.RequiresChallenge);
+
+        var confirmed = await service.ConfirmChallengeAsync(Guid.NewGuid(), new Money(50, "USD"), card, challenge.Value.GatewayReference!);
+
+        Assert.True(confirmed.IsSuccess);
+        Assert.False(confirmed.Value!.RequiresChallenge);
+        Assert.StartsWith("stripe-", confirmed.Value.AuthorizationCode);
+        Assert.Equal(challenge.Value.GatewayReference, confirmed.Value.GatewayReference);
+    }
+
+    [Fact]
     public async Task AuthorizeAsync_ShouldOpenCircuitAfterRepeatedFailures()
     {
         var providers = new IPaymentGatewayProvider[] { new PaystackMockGatewayProvider() };

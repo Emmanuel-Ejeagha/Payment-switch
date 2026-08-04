@@ -83,6 +83,8 @@ public class PaymentIntentConfiguration : IEntityTypeConfiguration<PaymentIntent
     private static PaymentStatus ResolveStatus(string value) => value switch
     {
         "Pending" => PaymentStatus.Pending,
+        "RequiresAction" => PaymentStatus.RequiresAction,
+        "Processing" => PaymentStatus.Processing,
         "Authorized" => PaymentStatus.Authorized,
         "Captured" => PaymentStatus.Captured,
         "PartiallyCaptured" => PaymentStatus.PartiallyCaptured,

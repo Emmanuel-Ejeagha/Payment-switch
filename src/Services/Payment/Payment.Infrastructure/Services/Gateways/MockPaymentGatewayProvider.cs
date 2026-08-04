@@ -6,11 +6,12 @@ namespace Payment.Infrastructure.Services.Gateways;
 public abstract class MockPaymentGatewayProvider : IPaymentGatewayProvider
 {
     private readonly string _declinedLastFour;
-    private readonly string _ref = "GW-";
+    private readonly string _challengeLastFour;
 
-    protected MockPaymentGatewayProvider(string declinedLastFour)
+    protected MockPaymentGatewayProvider(string declinedLastFour, string challengeLastFour)
     {
         _declinedLastFour = declinedLastFour;
+        _challengeLastFour = challengeLastFour;
     }
 
     public abstract string Name { get; }
@@ -19,6 +20,14 @@ public abstract class MockPaymentGatewayProvider : IPaymentGatewayProvider
     {
         if (IsDeclined(cardDetails))
             return Task.FromResult(new GatewayResponse(false, null, null, $"Card ending {cardDetails!.LastFour} was declined by {Name}."));
+
+        if (RequiresChallenge(cardDetails))
+            return Task.FromResult(new GatewayResponse(
+                true,
+                null,
+                $"{Name}-GW-{Guid.NewGuid().ToString("N")[..8]}",
+                null,
+                RequiresChallenge: true));
 
         return Task.FromResult(new GatewayResponse(
             true,
@@ -42,9 +51,27 @@ public abstract class MockPaymentGatewayProvider : IPaymentGatewayProvider
         return Task.FromResult(new GatewayResponse(true, null, $"{Name}-REF-{Guid.NewGuid().ToString("N")[..8]}", null));
     }
 
+    public Task<GatewayResponse> ConfirmChallengeAsync(Guid merchantId, Money amount, CardDetails? cardDetails, string gatewayReference, CancellationToken cancellationToken = default)
+    {
+        if (IsDeclined(cardDetails))
+            return Task.FromResult(new GatewayResponse(false, null, null, $"Card ending {cardDetails!.LastFour} was declined by {Name}."));
+
+        return Task.FromResult(new GatewayResponse(
+            true,
+            $"{Name}-AUTH-{Guid.NewGuid().ToString("N")[..8]}",
+            gatewayReference,
+            null));
+    }
+
     private bool IsDeclined(CardDetails? cardDetails)
     {
         if (cardDetails is null) return false;
         return cardDetails.LastFour == _declinedLastFour;
+    }
+
+    private bool RequiresChallenge(CardDetails? cardDetails)
+    {
+        if (cardDetails is null) return false;
+        return cardDetails.LastFour == _challengeLastFour;
     }
 }

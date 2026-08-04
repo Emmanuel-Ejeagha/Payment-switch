@@ -70,13 +70,20 @@ public class AuthorizePaymentHandler
             return new Error("Payment.AuthorizationFailed", gatewayResult.Errors.First().Message);
 
         var gwResponse = gatewayResult.Value!;
-        var authCode = new AuthorizationCode(gwResponse.AuthorizationCode!);
         var gatewayRef = new GatewayReference(gwResponse.GatewayReference!);
 
         await _unitOfWork.BeginTransactionAsync(cancellationToken);
         try
         {
-            intent.Authorize(authCode, gatewayRef, command.IdempotencyKey);
+            if (gwResponse.RequiresChallenge)
+            {
+                intent.RequireAction(gatewayRef);
+            }
+            else
+            {
+                var authCode = new AuthorizationCode(gwResponse.AuthorizationCode!);
+                intent.Authorize(authCode, gatewayRef, command.IdempotencyKey);
+            }
         }
         catch (InvalidOperationException)
         {
@@ -97,6 +104,6 @@ public class AuthorizePaymentHandler
 
         await _dispatcher.DispatchAsync(intent.DomainEvents, cancellationToken);
 
-        return new AuthorizePaymentResponse(authCode.Value, gatewayRef.Value, intent.Status.Value);
+        return new AuthorizePaymentResponse(intent.AuthorizationCode?.Value ?? gwResponse.GatewayReference!, gwResponse.GatewayReference!, intent.Status.Value);
     }
 }

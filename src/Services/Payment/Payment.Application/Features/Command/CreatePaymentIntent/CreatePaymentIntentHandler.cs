@@ -103,12 +103,20 @@ public class CreatePaymentIntentHandler
         }
 
         var gwResponse = authResult.Value!;
-        var authCode = new AuthorizationCode(gwResponse.AuthorizationCode!);
         var gatewayRef = new GatewayReference(gwResponse.GatewayReference!);
-        intent.Authorize(authCode, gatewayRef);
 
-        if (configResult.Value.AutoCapture)
-            intent.Capture();
+        if (gwResponse.RequiresChallenge)
+        {
+            intent.RequireAction(gatewayRef);
+        }
+        else
+        {
+            var authCode = new AuthorizationCode(gwResponse.AuthorizationCode!);
+            intent.Authorize(authCode, gatewayRef);
+
+            if (configResult.Value.AutoCapture)
+                intent.Capture();
+        }
 
         await _unitOfWork.BeginTransactionAsync(cancellationToken);
         await _repository.AddAsync(intent, cancellationToken);

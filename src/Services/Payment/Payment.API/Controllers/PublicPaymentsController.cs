@@ -2,6 +2,7 @@ using Asp.Versioning;
 using Microsoft.AspNetCore.Mvc;
 using Payment.API.Extensions;
 using Payment.Application.DTOs;
+using Payment.Application.Features.Command.ConfirmPaymentIntent;
 using Payment.Application.Features.Command.CreateCardToken;
 using Payment.Application.Features.Command.CreatePaymentIntent;
 using Payment.Application.Features.Queries.GetPaymentIntentById;
@@ -81,9 +82,31 @@ public class PublicPaymentsController : ControllerBase
     }
 
     /// <summary>
-    /// Retrieve a payment intent by ID (public API, authenticated with a secret key).
+    /// Confirm a payment intent that requires 3DS/SCA action (public API, authenticated with a secret key).
     /// </summary>
     /// <param name="id">Payment intent unique identifier.</param>
+    /// <param name="handler">Handler injected via DI.</param>
+    /// <returns>The confirmed payment intent.</returns>
+    [HttpPost("{id:guid}/confirm")]
+    [ProducesResponseType(typeof(ConfirmPaymentIntentResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> ConfirmIntent(
+        Guid id,
+        [FromServices] ConfirmPaymentIntentHandler handler)
+    {
+        if (!_httpContextAccessor.HttpContext!.Items.TryGetValue("MerchantId", out var merchantIdObj) || merchantIdObj is not Guid merchantId)
+            return Unauthorized();
+
+        var idempotencyKey = Request.Headers["Idempotency-Key"].FirstOrDefault();
+        var result = await handler.Handle(new ConfirmPaymentIntentCommand(merchantId, id, idempotencyKey));
+
+        return result.ToActionResult();
+    }
+
+    /// <summary>
+    /// Retrieve a payment intent by ID (public API, authenticated with a secret key).
+    /// </summary>    /// <param name="id">Payment intent unique identifier.</param>
     /// <param name="handler">Handler injected via DI.</param>
     /// <returns>The payment intent details.</returns>
     [HttpGet("{id:guid}")]
