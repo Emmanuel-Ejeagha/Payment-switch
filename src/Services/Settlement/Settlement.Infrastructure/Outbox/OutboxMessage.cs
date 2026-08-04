@@ -8,6 +8,8 @@ public class OutboxMessage
     public DateTime OccurredOn { get; private set; }
     public bool Processed { get; private set; }
     public string? CorrelationId { get; private set; }
+    public Guid? LeaseToken { get; private set; }
+    public DateTime? LeaseExpiresAt { get; private set; }
 
     private OutboxMessage() { }
 
@@ -21,8 +23,22 @@ public class OutboxMessage
         CorrelationId = correlationId;
     }
 
+    public void AcquireLease(Guid token, DateTime expiresAt)
+    {
+        LeaseToken = token;
+        LeaseExpiresAt = expiresAt;
+    }
+
     public void MarkAsProcessed()
     {
         Processed = true;
+        LeaseToken = null;
+        LeaseExpiresAt = null;
+    }
+
+    public void ReleaseLease()
+    {
+        LeaseToken = null;
+        LeaseExpiresAt = null;
     }
 }

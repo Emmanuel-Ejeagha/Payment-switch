@@ -12,6 +12,7 @@ public class OutboxPublisherService : BackgroundService
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<OutboxPublisherService> _logger;
     private readonly TimeSpan _pollingInterval = TimeSpan.FromSeconds(2);
+    private readonly TimeSpan _leaseDuration = TimeSpan.FromSeconds(30);
 
     public OutboxPublisherService(IServiceScopeFactory scopeFactory, ILogger<OutboxPublisherService> logger)
     {
@@ -42,25 +43,43 @@ public class OutboxPublisherService : BackgroundService
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var eventBus = scope.ServiceProvider.GetRequiredService<IEventBus>();
 
-        var messages = await db.OutboxMessages
-            .Where(m => !m.Processed)
-            .OrderBy(m => m.OccurredOn)
-            .Take(10)
-            .ToListAsync(cancellationToken);
+        var leaseToken = Guid.NewGuid();
+        var leaseUntil = DateTime.UtcNow.Add(_leaseDuration);
 
-        foreach (var message in messages)
+        await db.OutboxMessages
+            .Where(m => !m.Processed && (m.LeaseExpiresAt == null || m.LeaseExpiresAt < DateTime.UtcNow))
+            .ExecuteUpdateAsync(
+                s => s.SetProperty(m => m.LeaseToken, leaseToken)
+                      .SetProperty(m => m.LeaseExpiresAt, leaseUntil),
+                cancellationToken);
+
+        while (true)
         {
-            try
+            var messages = await db.OutboxMessages
+                .Where(m => m.LeaseToken == leaseToken)
+                .OrderBy(m => m.OccurredOn)
+                .Take(10)
+                .ToListAsync(cancellationToken);
+
+            if (messages.Count == 0)
+                break;
+
+            foreach (var message in messages)
             {
-                await eventBus.PublishAsync(message.EventType, message.Payload, message.Id.ToString(), message.CorrelationId, cancellationToken);
-                message.MarkAsProcessed();
-                await db.SaveChangesAsync(cancellationToken);
-                _logger.LogInformation("Published outbox message {MessageId} of type {EventType}", message.Id, message.EventType);
+                try
+                {
+                    await eventBus.PublishAsync(message.EventType, message.Payload, message.Id.ToString(), message.CorrelationId, cancellationToken);
+                    message.MarkAsProcessed();
+                    _logger.LogInformation("Published outbox message {MessageId} of type {EventType}", message.Id, message.EventType);
+                }
+                catch (Exception ex)
+                {
+                    message.ReleaseLease();
+                    _logger.LogError(ex, "Failed to publish outbox message {MessageId}", message.Id);
+                }
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to publish outbox message {MessageId}", message.Id);
-            }
+
+            await db.SaveChangesAsync(cancellationToken);
         }
     }
 }
