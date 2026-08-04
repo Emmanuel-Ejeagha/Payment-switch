@@ -2,6 +2,7 @@ using Asp.Versioning;
 using Microsoft.AspNetCore.Mvc;
 using Payment.API.Extensions;
 using Payment.Application.DTOs;
+using Payment.Application.Features.Command.CreateCardToken;
 using Payment.Application.Features.Command.CreatePaymentIntent;
 using Payment.Application.Features.Queries.GetPaymentIntentById;
 
@@ -45,7 +46,35 @@ public class PublicPaymentsController : ControllerBase
             request.PaymentMethod,
             request.CardLastFour,
             request.CardBrand,
-            idempotencyKey);
+            idempotencyKey,
+            request.CardToken);
+
+        var result = await handler.Handle(command);
+        return result.ToActionResult();
+    }
+
+    /// <summary>
+    /// Tokenize a card (public API, authenticated with a secret key).
+    /// </summary>
+    /// <param name="request">Card number, expiry month/year and CVC.</param>
+    /// <param name="handler">Handler injected via DI.</param>
+    /// <returns>A reusable card token.</returns>
+    [HttpPost("tokens")]
+    [ProducesResponseType(typeof(CreateCardTokenResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> CreateToken(
+        [FromBody] CreateCardTokenRequest request,
+        [FromServices] CreateCardTokenHandler handler)
+    {
+        if (!_httpContextAccessor.HttpContext!.Items.TryGetValue("MerchantId", out var merchantIdObj) || merchantIdObj is not Guid merchantId)
+            return Unauthorized();
+
+        var command = new CreateCardTokenCommand(
+            merchantId,
+            request.CardNumber,
+            request.ExpiryMonth,
+            request.ExpiryYear);
 
         var result = await handler.Handle(command);
         return result.ToActionResult();
@@ -81,5 +110,12 @@ public record PublicCreatePaymentIntentRequest(
     string Currency,
     string PaymentMethod,
     string? CardLastFour = null,
-    string? CardBrand = null
+    string? CardBrand = null,
+    string? CardToken = null
+);
+
+public record CreateCardTokenRequest(
+    string CardNumber,
+    int ExpiryMonth,
+    int ExpiryYear
 );

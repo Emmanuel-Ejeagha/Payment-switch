@@ -14,8 +14,16 @@ public class CreatePaymentIntentCommandValidator : AbstractValidator<CreatePayme
         RuleFor(x => x.IdempotencyKey).NotEmpty().WithMessage("Idempotency key is required.");
         When(x => x.PaymentMethod == "Card", () =>
         {
-            RuleFor(x => x.CardLastFour).NotEmpty().Length(4);
-            RuleFor(x => x.CardBrand).NotEmpty();
+            When(x => x.CardToken is null, () =>
+            {
+                RuleFor(x => x.CardLastFour).NotEmpty().Length(4);
+                RuleFor(x => x.CardBrand).NotEmpty();
+            });
+            When(x => x.CardToken is not null, () =>
+            {
+                RuleFor(x => x.CardToken).Matches("^card_[a-z0-9]+$")
+                    .WithMessage("Card token must be in the form card_<hex>.");
+            });
         });
     }
 }

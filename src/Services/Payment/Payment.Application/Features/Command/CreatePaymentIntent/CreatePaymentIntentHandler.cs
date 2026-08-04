@@ -17,6 +17,7 @@ public class CreatePaymentIntentHandler
     private readonly IPaymentIntentRepository _repository;
     private readonly IPaymentGatewayService _gateway;
     private readonly IMerchantService _merchantService;
+    private readonly ICardTokenRepository _cardTokenRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IDomainEventDispatcher _dispatcher;
     private readonly IValidator<CreatePaymentIntentCommand> _validator;
@@ -26,6 +27,7 @@ public class CreatePaymentIntentHandler
         IPaymentIntentRepository repository,
         IPaymentGatewayService gateway,
         IMerchantService merchantService,
+        ICardTokenRepository cardTokenRepository,
         IUnitOfWork unitOfWork,
         IDomainEventDispatcher dispatcher,
         IValidator<CreatePaymentIntentCommand> validator,
@@ -34,6 +36,7 @@ public class CreatePaymentIntentHandler
         _repository = repository;
         _gateway = gateway;
         _merchantService = merchantService;
+        _cardTokenRepository = cardTokenRepository;
         _unitOfWork = unitOfWork;
         _dispatcher = dispatcher;
         _validator = validator;
@@ -59,7 +62,19 @@ public class CreatePaymentIntentHandler
         var idempotencyKey = new IdempotencyKey(command.IdempotencyKey);
         CardDetails? cardDetails = null;
         if (paymentMethod == PaymentMethod.Card)
-            cardDetails = new CardDetails(command.CardLastFour!, command.CardBrand!);
+        {
+            if (!string.IsNullOrWhiteSpace(command.CardToken))
+            {
+                var token = await _cardTokenRepository.GetByTokenAsync(command.MerchantId, command.CardToken, cancellationToken);
+                if (token is null)
+                    return new Error("Payment.InvalidCardToken", "The provided card token is invalid or does not belong to this merchant.");
+                cardDetails = new CardDetails(token.LastFour, token.Brand, token.Token);
+            }
+            else
+            {
+                cardDetails = new CardDetails(command.CardLastFour!, command.CardBrand!);
+            }
+        }
 
         var intent = new PaymentIntent(Guid.NewGuid(), command.MerchantId, amount, idempotencyKey, paymentMethod, cardDetails);
 

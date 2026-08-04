@@ -16,6 +16,7 @@ public class CreatePaymentIntentHandlerTests
     private readonly Mock<IPaymentIntentRepository> _repoMock = new();
     private readonly Mock<IPaymentGatewayService> _gatewayMock = new();
     private readonly Mock<IMerchantService> _merchantServiceMock = new();
+    private readonly Mock<ICardTokenRepository> _cardTokenRepoMock = new();
     private readonly Mock<IUnitOfWork> _uowMock = new();
     private readonly Mock<IDomainEventDispatcher> _dispatcherMock = new();
     private readonly Mock<IValidator<CreatePaymentIntentCommand>> _validatorMock = new();
@@ -24,7 +25,7 @@ public class CreatePaymentIntentHandlerTests
 
     public CreatePaymentIntentHandlerTests()
     {
-        _handler = new CreatePaymentIntentHandler(_repoMock.Object, _gatewayMock.Object, _merchantServiceMock.Object, _uowMock.Object, _dispatcherMock.Object, _validatorMock.Object, _loggerMock.Object);
+        _handler = new CreatePaymentIntentHandler(_repoMock.Object, _gatewayMock.Object, _merchantServiceMock.Object, _cardTokenRepoMock.Object, _uowMock.Object, _dispatcherMock.Object, _validatorMock.Object, _loggerMock.Object);
     }
 
     [Fact]
@@ -69,8 +70,7 @@ public class CreatePaymentIntentHandlerTests
 
     [Fact]
     public async Task Handle_GatewayDeclines_ShouldFailIntent()
-    {
-        var command = new CreatePaymentIntentCommand(Guid.NewGuid(), 100, "USD", "Card", "1234", "Visa", "declined-key");
+    {        var command = new CreatePaymentIntentCommand(Guid.NewGuid(), 100, "USD", "Card", "1234", "Visa", "declined-key");
         SetupValidatorSuccess(command);
         _repoMock.Setup(r => r.GetByIdempotencyKeyAsync(command.MerchantId, command.IdempotencyKey, It.IsAny<CancellationToken>())).ReturnsAsync((PaymentIntent?)null);
         SetupMerchantConfig(autoCapture: true);
@@ -101,9 +101,43 @@ public class CreatePaymentIntentHandlerTests
     }
 
     [Fact]
-    public async Task Handle_InvalidCommand_ShouldReturnValidationErrors()
+    public async Task Handle_ValidCardToken_ShouldResolveCardFromVault()
     {
-        var command = new CreatePaymentIntentCommand(Guid.Empty, 0, "", "", null, null, "");
+        var merchantId = Guid.NewGuid();
+        var command = new CreatePaymentIntentCommand(merchantId, 100, "USD", "Card", null, null, "token-key", "card_abc123");
+        SetupValidatorSuccess(command);
+        _repoMock.Setup(r => r.GetByIdempotencyKeyAsync(command.MerchantId, command.IdempotencyKey, It.IsAny<CancellationToken>())).ReturnsAsync((PaymentIntent?)null);
+        var vaultCard = new CardToken(merchantId, "card_abc123", "4242", "Visa", 12, 2030);
+        _cardTokenRepoMock.Setup(r => r.GetByTokenAsync(merchantId, "card_abc123", It.IsAny<CancellationToken>())).ReturnsAsync(vaultCard);
+        SetupMerchantConfig(autoCapture: true);
+        _gatewayMock.Setup(g => g.AuthorizeAsync(merchantId, It.IsAny<Money>(), It.IsAny<CardDetails?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<GatewayResponse>.Success(new GatewayResponse(true, "AUTH123", "GW-1", null)));
+        _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsSuccess);
+        _gatewayMock.Verify(g => g.AuthorizeAsync(merchantId, It.IsAny<Money>(), It.Is<CardDetails>(c => c.LastFour == "4242" && c.Brand == "Visa" && c.Token == "card_abc123"), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_UnknownCardToken_ShouldFail()
+    {
+        var command = new CreatePaymentIntentCommand(Guid.NewGuid(), 100, "USD", "Card", null, null, "bad-token-key", "card_doesnotexist");
+        SetupValidatorSuccess(command);
+        _repoMock.Setup(r => r.GetByIdempotencyKeyAsync(command.MerchantId, command.IdempotencyKey, It.IsAny<CancellationToken>())).ReturnsAsync((PaymentIntent?)null);
+        _cardTokenRepoMock.Setup(r => r.GetByTokenAsync(command.MerchantId, "card_doesnotexist", It.IsAny<CancellationToken>())).ReturnsAsync((CardToken?)null);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsFailure);
+        Assert.Contains(result.Errors, e => e.Code == "Payment.InvalidCardToken");
+        _repoMock.Verify(r => r.AddAsync(It.IsAny<PaymentIntent>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_InvalidCommand_ShouldReturnValidationErrors()
+    {        var command = new CreatePaymentIntentCommand(Guid.Empty, 0, "", "", null, null, "");
         SetupValidatorFailure(command, "Amount", "Amount must be greater than zero.");
 
         var result = await _handler.Handle(command);
