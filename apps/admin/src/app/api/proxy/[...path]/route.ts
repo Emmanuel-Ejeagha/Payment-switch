@@ -14,6 +14,11 @@ async function handler(request: NextRequest, { params }: { params: Promise<{ pat
   const headers: Record<string, string> = {}
   if (contentType) headers["content-type"] = contentType
 
+  // Payment commands dedupe on this header. Dropping it turns every retry, and every
+  // double-click, into a second authorization, capture or refund.
+  const idempotencyKey = request.headers.get("idempotency-key")
+  if (idempotencyKey) headers["idempotency-key"] = idempotencyKey
+
   if (cookie) {
     const accessToken = cookie.split("; ").find(c => c.startsWith("access_token="))?.split("=")[1]
     if (accessToken) headers["authorization"] = `Bearer ${accessToken}`

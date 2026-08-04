@@ -39,19 +39,29 @@ export default function HostedCheckoutPage() {
     setSubmitting(true)
     setError(null)
     try {
-      const [expMonth, expYear] = expiry.split("/").map((s) => parseInt(s.trim(), 10))
-      if (!expMonth || !expYear) {
+      const [rawMonth, rawYear] = expiry.split("/").map((s) => parseInt(s.trim(), 10))
+      if (!rawMonth || !rawYear || rawMonth < 1 || rawMonth > 12) {
         setError("Enter expiry as MM/YY")
+        return
+      }
+      // Accept both MM/YY and MM/YYYY; only two-digit years need the century added.
+      const expiryYear = rawYear < 100 ? 2000 + rawYear : rawYear
+
+      if (!/^\d{3,4}$/.test(cvc)) {
+        setError("Enter the 3 or 4 digit security code")
         return
       }
 
       const tokenRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/payment/v1/checkout/links/${code}/tokenize`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        // The CVC is deliberately not transmitted: the token vault is PCI-scoped and
+        // persists only brand, last four and expiry. Forwarding the CVC to the acquirer
+        // at authorization time is not implemented server-side.
         body: JSON.stringify({
           cardNumber: cardNumber.replace(/\s+/g, ""),
-          expiryMonth: expMonth,
-          expiryYear: 2000 + (expYear < 100 ? expYear : expYear),
+          expiryMonth: rawMonth,
+          expiryYear,
         }),
       })
       if (!tokenRes.ok) {
@@ -165,7 +175,7 @@ export default function HostedCheckoutPage() {
               </div>
               <button
                 onClick={pay}
-                disabled={submitting || !cardNumber || !expiry}
+                disabled={submitting || !cardNumber || !expiry || !cvc}
                 className="w-full rounded-lg bg-primary py-3 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
               >
                 {submitting ? "Processing..." : `Pay ${(link.amount / 100).toFixed(2)} ${link.currency}`}
