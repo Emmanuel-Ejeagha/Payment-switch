@@ -7,5 +7,6 @@ public record CreatePaymentIntentCommand(
     string PaymentMethod,
     string? CardLastFour,
     string? CardBrand,
-    string IdempotencyKey
+    string IdempotencyKey,
+    string? CardToken = null
 );
