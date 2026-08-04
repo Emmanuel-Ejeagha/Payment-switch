@@ -89,3 +89,19 @@ export interface UserDto {
   isActive: boolean
   roles: string[]
 }
+
+export interface PaymentLinkDto {
+  id: string
+  amount: number
+  currency: string
+  code: string
+  description?: string
+  active: boolean
+  createdAt?: string
+}
+
+export interface CheckoutPaymentDto {
+  intentId: string
+  status: string
+  clientSecret?: string | null
+}
