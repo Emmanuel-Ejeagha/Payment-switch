@@ -1,9 +1,8 @@
 using Merchant.Infrastructure.Persistence;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using PaymentSwitch.IntegrationTests.Shared;
 using Testcontainers.PostgreSql;
 
 namespace Merchant.API.IntegrationTests;
@@ -14,29 +13,15 @@ public class MerchantApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         .WithImage("postgres:16-alpine")
         .WithDatabase("MerchantDb")
         .WithUsername("paymentswitch")
-        .WithPassword("paymentswitch")
+        .WithPassword(TestSecrets.PostgresPassword)
         .Build();
 
-    protected override void ConfigureWebHost(IWebHostBuilder builder)
-    {
-        builder.ConfigureAppConfiguration((context, config) =>
-        {
-            config.AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["ConnectionStrings:MerchantDb"] = _postgres.GetConnectionString(),
-                ["Jwt:Secret"] = "test-super-secret-key-minimum-32-bytes!!",
-                ["Jwt:Issuer"] = "MerchantService",
-                ["Jwt:Audience"] = "PaymentSwitch",
-                ["RabbitMQ:HostName"] = "localhost",
-                ["RabbitMQ:UserName"] = "test",
-                ["RabbitMQ:Password"] = "test-rabbit-password"
-            });
-        });
-    }
+    public MerchantApiFactory() => TestSecrets.ApplyEnvironment("MerchantService");
 
     public async Task InitializeAsync()
     {
         await _postgres.StartAsync();
+        TestSecrets.ApplyConnectionString("MerchantDb", _postgres.GetConnectionString());
 
         using var scope = Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();

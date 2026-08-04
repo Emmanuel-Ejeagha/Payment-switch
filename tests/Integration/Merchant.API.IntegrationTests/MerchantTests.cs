@@ -16,6 +16,7 @@ public class MerchantTests : IClassFixture<MerchantApiFactory>
     {
         var response = await _client.PostAsJsonAsync("/api/v1/merchants", new
         {
+            OwnerId = Guid.NewGuid(),
             BusinessName = "Test Corp",
             Email = $"corp-{Guid.NewGuid()}@example.com"
         });

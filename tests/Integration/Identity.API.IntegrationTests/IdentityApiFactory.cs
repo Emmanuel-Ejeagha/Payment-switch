@@ -1,9 +1,8 @@
 using Identity.Infrastructure.Persistence;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using PaymentSwitch.IntegrationTests.Shared;
 using Testcontainers.PostgreSql;
 
 namespace Identity.API.IntegrationTests;
@@ -14,30 +13,19 @@ public class IdentityApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         .WithImage("postgres:16-alpine")
         .WithDatabase("IdentityDb")
         .WithUsername("paymentswitch")
-        .WithPassword("paymentswitch")
+        .WithPassword(TestSecrets.PostgresPassword)
         .Build();
 
-    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    public IdentityApiFactory()
     {
-        builder.ConfigureAppConfiguration((context, config) =>
-        {
-            config.AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["ConnectionStrings:IdentityDb"] = _postgres.GetConnectionString(),
-                ["Jwt:Secret"] = "test-super-secret-key-minimum-32-bytes!!",
-                ["Jwt:Issuer"] = "IdentityService",
-                ["Jwt:Audience"] = "PaymentSwitch",
-                ["RabbitMQ:HostName"] = "localhost",
-                ["RabbitMQ:UserName"] = "test",
-                ["RabbitMQ:Password"] = "test-rabbit-password",
-                ["Seed:AdminPassword"] = "test-admin-password"
-            });
-        });
+        TestSecrets.ApplyEnvironment("IdentityService");
+        Environment.SetEnvironmentVariable("Seed__AdminPassword", "integration-test-admin-password");
     }
 
     public async Task InitializeAsync()
     {
         await _postgres.StartAsync();
+        TestSecrets.ApplyConnectionString("IdentityDb", _postgres.GetConnectionString());
 
         using var scope = Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();

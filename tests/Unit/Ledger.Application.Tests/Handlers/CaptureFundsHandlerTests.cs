@@ -8,6 +8,7 @@ using Ledger.Application.Options;
 using Ledger.Domain.DomainEvents;
 using Ledger.Domain.Entities;
 using Ledger.Domain.Enums;
+using Microsoft.Extensions.Options;
 using Moq;
 
 namespace Ledger.Application.Tests.Handlers;
@@ -21,7 +22,7 @@ public class CaptureFundsHandlerTests
     private readonly Mock<ILogger<CaptureFundsHandler>> _loggerMock = new();
 
     private CaptureFundsHandler CreateHandler(LedgerOptions options)
-        => new(_repoMock.Object, _uowMock.Object, _dispatcherMock.Object, _validatorMock.Object, options, _loggerMock.Object);
+        => new(_repoMock.Object, _uowMock.Object, _dispatcherMock.Object, _validatorMock.Object, Microsoft.Extensions.Options.Options.Create(options), _loggerMock.Object);
 
     [Fact]
     public async Task Handle_ValidCommand_ShouldCaptureFunds()
