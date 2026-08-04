@@ -19,11 +19,12 @@ namespace Ledger.Infrastructure.Messaging;
 
 public class RabbitMQConsumerService : BackgroundService
 {
-    private readonly IConnection _connection;
-    private readonly IChannel _channel;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ICorrelationIdProvider _correlationIdProvider;
     private readonly ILogger<RabbitMQConsumerService> _logger;
+    private readonly RabbitMQSettings _settings;
+    private IConnection? _connection;
+    private IChannel? _channel;
     private readonly string _queueName = "ledger.payment.events";
     private readonly string _retryExchange = "ledger.payment.events.retry";
     private readonly string _retryQueue = "ledger.payment.events.retry";
@@ -40,38 +41,57 @@ public class RabbitMQConsumerService : BackgroundService
         _scopeFactory = scopeFactory;
         _correlationIdProvider = correlationIdProvider;
         _logger = logger;
+        _settings = settings.Value;
+    }
 
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            try
+            {
+                await TryConnectAndConsume(stoppingToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "RabbitMQ consumer error. Retrying in 10 seconds...");
+            }
+
+            await Task.Delay(10_000, stoppingToken);
+        }
+    }
+
+    private async Task TryConnectAndConsume(CancellationToken cancellationToken)
+    {
         var factory = new ConnectionFactory
         {
-            HostName = settings.Value.HostName,
-            UserName = settings.Value.UserName,
-            Password = settings.Value.Password
+            HostName = _settings.HostName,
+            UserName = _settings.UserName,
+            Password = _settings.Password
         };
-        _connection = factory.CreateConnectionAsync().GetAwaiter().GetResult();
-        _channel = _connection.CreateChannelAsync().GetAwaiter().GetResult();
 
-        _channel.ExchangeDeclareAsync(_retryExchange, ExchangeType.Topic, durable: true).GetAwaiter().GetResult();
-        _channel.ExchangeDeclareAsync(_dlxExchange, ExchangeType.Topic, durable: true).GetAwaiter().GetResult();
+        _connection = await factory.CreateConnectionAsync(cancellationToken);
+        _channel = await _connection.CreateChannelAsync(cancellationToken: cancellationToken);
+
+        await _channel.ExchangeDeclareAsync(_retryExchange, ExchangeType.Topic, durable: true, cancellationToken: cancellationToken);
+        await _channel.ExchangeDeclareAsync(_dlxExchange, ExchangeType.Topic, durable: true, cancellationToken: cancellationToken);
 
         var retryArgs = new Dictionary<string, object?>
         {
             ["x-message-ttl"] = (long)MessageRetryPolicy.RetryDelay.TotalMilliseconds,
             ["x-dead-letter-exchange"] = _sourceExchange
         };
-        _channel.QueueDeclareAsync(_retryQueue, durable: true, exclusive: false, autoDelete: false, arguments: retryArgs).GetAwaiter().GetResult();
-        _channel.QueueBindAsync(_retryQueue, _retryExchange, "#").GetAwaiter().GetResult();
+        await _channel.QueueDeclareAsync(_retryQueue, durable: true, exclusive: false, autoDelete: false, arguments: retryArgs, cancellationToken: cancellationToken);
+        await _channel.QueueBindAsync(_retryQueue, _retryExchange, "#", null, cancellationToken: cancellationToken);
 
-        _channel.QueueDeclareAsync(_dlq, durable: true, exclusive: false, autoDelete: false).GetAwaiter().GetResult();
-        _channel.QueueBindAsync(_dlq, _dlxExchange, "#").GetAwaiter().GetResult();
+        await _channel.QueueDeclareAsync(_dlq, durable: true, exclusive: false, autoDelete: false, cancellationToken: cancellationToken);
+        await _channel.QueueBindAsync(_dlq, _dlxExchange, "#", null, cancellationToken: cancellationToken);
 
-        _channel.QueueDeclareAsync(_queueName, durable: true, exclusive: false, autoDelete: false).GetAwaiter().GetResult();
-        _channel.QueueBindAsync(_queueName, _sourceExchange, "PaymentAuthorizedDomainEvent", null).GetAwaiter().GetResult();
-        _channel.QueueBindAsync(_queueName, _sourceExchange, "PaymentCapturedDomainEvent", null).GetAwaiter().GetResult();
-        _channel.QueueBindAsync(_queueName, _sourceExchange, "PaymentRefundedDomainEvent", null).GetAwaiter().GetResult();
-    }
+        await _channel.QueueDeclareAsync(_queueName, durable: true, exclusive: false, autoDelete: false, cancellationToken: cancellationToken);
+        await _channel.QueueBindAsync(_queueName, _sourceExchange, "PaymentAuthorizedDomainEvent", null, cancellationToken: cancellationToken);
+        await _channel.QueueBindAsync(_queueName, _sourceExchange, "PaymentCapturedDomainEvent", null, cancellationToken: cancellationToken);
+        await _channel.QueueBindAsync(_queueName, _sourceExchange, "PaymentRefundedDomainEvent", null, cancellationToken: cancellationToken);
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-    {
         var consumer = new AsyncEventingBasicConsumer(_channel);
         consumer.ReceivedAsync += async (sender, ea) =>
         {
@@ -101,7 +121,7 @@ public class RabbitMQConsumerService : BackgroundService
                     if (existing is null)
                     {
                         db.InboxMessages.Add(new InboxMessage(messageId, eventType, body));
-                        await db.SaveChangesAsync(stoppingToken);
+                        await db.SaveChangesAsync(cancellationToken);
                     }
                 }
 
@@ -112,16 +132,16 @@ public class RabbitMQConsumerService : BackgroundService
                         using (var scope = _scopeFactory.CreateScope())
                         {
                             var handler = scope.ServiceProvider.GetRequiredService<CreateLedgerAccountHandler>();
-                            await handler.Handle(new CreateLedgerAccountCommand(authEvent.MerchantId, authEvent.Amount.Currency), stoppingToken);
+                            await handler.Handle(new CreateLedgerAccountCommand(authEvent.MerchantId, authEvent.Amount.Currency), cancellationToken);
                         }
                         using (var scope = _scopeFactory.CreateScope())
                         {
                             var handler = scope.ServiceProvider.GetRequiredService<ReserveFundsHandler>();
-                            var result = await handler.Handle(new ReserveFundsCommand(authEvent.MerchantId, authEvent.Amount.Amount, authEvent.Amount.Currency, correlationId ?? $"PaymentAuth:{authEvent.IntentId}"), stoppingToken);
+                            var result = await handler.Handle(new ReserveFundsCommand(authEvent.MerchantId, authEvent.Amount.Amount, authEvent.Amount.Currency, correlationId ?? $"PaymentAuth:{authEvent.IntentId}"), cancellationToken);
                             if (result.IsFailure)
                             {
                                 _logger.LogWarning("ReserveFunds failed: {Errors}", string.Join("; ", result.Errors.Select(e => e.Message)));
-                                await HandleFailureAsync(ea, messageId, stoppingToken);
+                                await HandleFailureAsync(ea, messageId, cancellationToken);
                                 return;
                             }
                         }
@@ -132,11 +152,11 @@ public class RabbitMQConsumerService : BackgroundService
                         using (var scope = _scopeFactory.CreateScope())
                         {
                             var handler = scope.ServiceProvider.GetRequiredService<CaptureFundsHandler>();
-                            var result = await handler.Handle(new CaptureFundsCommand(captureEvent.MerchantId, captureEvent.Amount.Amount, captureEvent.Amount.Currency, correlationId ?? $"PaymentCapt:{captureEvent.IntentId}"), stoppingToken);
+                            var result = await handler.Handle(new CaptureFundsCommand(captureEvent.MerchantId, captureEvent.Amount.Amount, captureEvent.Amount.Currency, correlationId ?? $"PaymentCapt:{captureEvent.IntentId}"), cancellationToken);
                             if (result.IsFailure)
                             {
                                 _logger.LogWarning("CaptureFunds failed: {Errors}", string.Join("; ", result.Errors.Select(e => e.Message)));
-                                await HandleFailureAsync(ea, messageId, stoppingToken);
+                                await HandleFailureAsync(ea, messageId, cancellationToken);
                                 return;
                             }
                         }
@@ -147,11 +167,11 @@ public class RabbitMQConsumerService : BackgroundService
                         using (var scope = _scopeFactory.CreateScope())
                         {
                             var handler = scope.ServiceProvider.GetRequiredService<RefundFundsHandler>();
-                            var result = await handler.Handle(new RefundFundsCommand(refundEvent.MerchantId, refundEvent.Amount.Amount, refundEvent.Amount.Currency, correlationId ?? $"PaymentRef:{refundEvent.IntentId}"), stoppingToken);
+                            var result = await handler.Handle(new RefundFundsCommand(refundEvent.MerchantId, refundEvent.Amount.Amount, refundEvent.Amount.Currency, correlationId ?? $"PaymentRef:{refundEvent.IntentId}"), cancellationToken);
                             if (result.IsFailure)
                             {
                                 _logger.LogWarning("RefundFunds failed: {Errors}", string.Join("; ", result.Errors.Select(e => e.Message)));
-                                await HandleFailureAsync(ea, messageId, stoppingToken);
+                                await HandleFailureAsync(ea, messageId, cancellationToken);
                                 return;
                             }
                         }
@@ -167,7 +187,7 @@ public class RabbitMQConsumerService : BackgroundService
                     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
                     var msg = db.InboxMessages.First(m => m.MessageId == messageId);
                     msg.MarkAsProcessed();
-                    await db.SaveChangesAsync(stoppingToken);
+                    await db.SaveChangesAsync(cancellationToken);
                 }
 
                 await _channel.BasicAckAsync(ea.DeliveryTag, false);
@@ -176,15 +196,16 @@ public class RabbitMQConsumerService : BackgroundService
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error processing message {MessageId}", messageId);
-                await HandleFailureAsync(ea, messageId, stoppingToken);
+                await HandleFailureAsync(ea, messageId, cancellationToken);
             }
         };
 
-        await _channel.BasicConsumeAsync(_queueName, autoAck: false, consumer: consumer, cancellationToken: stoppingToken);
+        await _channel.BasicConsumeAsync(_queueName, autoAck: false, consumer: consumer, cancellationToken: cancellationToken);
 
-        while (!stoppingToken.IsCancellationRequested)
+        // Keep the connection alive until cancelled
+        while (!cancellationToken.IsCancellationRequested)
         {
-            await Task.Delay(1000, stoppingToken);
+            await Task.Delay(1000, cancellationToken);
         }
     }
 
