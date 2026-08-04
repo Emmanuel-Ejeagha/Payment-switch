@@ -39,6 +39,7 @@ public static class DependencyInjection
         services.AddSingleton<GatewayRouter>();
         services.AddScoped<IPaymentIntentRepository, PaymentIntentRepository>();
         services.AddScoped<ICardTokenRepository, CardTokenRepository>();
+        services.AddScoped<ICustomerRepository, CustomerRepository>();
         services.AddScoped<IPaymentLinkRepository, PaymentLinkRepository>();
         services.AddScoped<IWebhookEventRepository, WebhookEventRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();

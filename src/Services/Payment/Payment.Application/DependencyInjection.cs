@@ -7,14 +7,19 @@ using Payment.Application.Features.Command.CheckoutPayment;
 using Payment.Application.Features.Command.CheckoutTokenize;
 using Payment.Application.Features.Command.ConfirmPaymentIntent;
 using Payment.Application.Features.Command.CreateCardToken;
+using Payment.Application.Features.Command.CreateCustomer;
 using Payment.Application.Features.Command.CreatePaymentIntent;
 using Payment.Application.Features.Command.CreatePaymentLink;
+using Payment.Application.Features.Command.DeleteCustomer;
 using Payment.Application.Features.Command.RefundPayment;
 using Payment.Application.Features.Command.ReplayWebhookEvent;
 using Payment.Application.Features.Command.SendTestWebhookEvent;
+using Payment.Application.Features.Command.UpdateCustomer;
 using Payment.Application.Features.Command.VoidPayment;
+using Payment.Application.Features.Queries.GetCustomerById;
 using Payment.Application.Features.Queries.GetPaymentIntentById;
 using Payment.Application.Features.Queries.GetPaymentLinkByCode;
+using Payment.Application.Features.Queries.ListCustomersByMerchant;
 using Payment.Application.Features.Queries.ListPaymentIntentsByMerchant;
 using Payment.Application.Features.Queries.ListPaymentLinksByMerchant;
 using Payment.Application.Features.Queries.ListWebhookEvents;
@@ -42,6 +47,12 @@ public static class DependencyInjection
         services.AddScoped<ListWebhookEventsHandler>();
         services.AddScoped<ReplayWebhookEventHandler>();
         services.AddScoped<SendTestWebhookEventHandler>();
+
+        services.AddScoped<CreateCustomerHandler>();
+        services.AddScoped<UpdateCustomerHandler>();
+        services.AddScoped<DeleteCustomerHandler>();
+        services.AddScoped<GetCustomerByIdHandler>();
+        services.AddScoped<ListCustomersByMerchantHandler>();
 
         services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
 
