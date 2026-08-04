@@ -24,4 +24,10 @@ public static class PaymentErrors
 
     public static Error ConcurrencyConflict =>
         new("Payment.ConcurrencyConflict", "This payment was modified concurrently. Please retry.");
+
+    public static Error CustomerNotFound(Guid customerId) =>
+        new("Payment.CustomerNotFound", $"Customer with Id '{customerId}' not found.");
+
+    public static Error CustomerEmailAlreadyInUse(string email) =>
+        new("Payment.CustomerEmailAlreadyInUse", $"A customer with email '{email}' already exists for this merchant.");
 }
