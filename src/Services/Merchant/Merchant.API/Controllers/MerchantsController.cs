@@ -2,6 +2,8 @@
 using Merchant.Application.DTOs;
 using Merchant.Application.Features.Commands.ActivateMerchant;
 using Merchant.Application.Features.Commands.OnboardMerchant;
+using Merchant.Application.Features.Commands.RevokeMerchantApiKey;
+using Merchant.Application.Features.Commands.RotateWebhookSecret;
 using Merchant.Application.Features.Commands.SuspendMerchant;
 using Merchant.Application.Features.Commands.UpdateMerchantConfig;
 using Merchant.Application.Features.Queries.GetMerchantByEmail;
@@ -130,6 +132,23 @@ public class MerchantsController : BaseApiController
     {
         command = new UpdateMerchantConfigurationCommand(id, command.WebhookUrl, command.PaymentMethods, command.AutoCapture, User.ToCallerContext());
         var result = await handler.Handle(command);
+        return result.ToActionResult();
+    }
+
+    /// <summary>
+    /// Rotate the merchant webhook signing secret (authenticated users only).
+    /// </summary>
+    /// <param name="id">Merchant unique identifier.</param>
+    /// <param name="handler">Handler injected via DI.</param>
+    /// <returns>The new webhook secret.</returns>
+    [HttpPost("{id:guid}/webhook-secret/rotate")]
+    [ProducesResponseType(typeof(string), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> RotateWebhookSecret(
+        Guid id,
+        [FromServices] RotateWebhookSecretHandler handler)
+    {
+        var result = await handler.Handle(new RotateWebhookSecretCommand(id, User.ToCallerContext()));
         return result.ToActionResult();
     }
 

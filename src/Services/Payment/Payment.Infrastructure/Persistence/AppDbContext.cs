@@ -11,6 +11,7 @@ public class AppDbContext : DbContext
     public DbSet<PaymentIntent> PaymentIntents { get; set; }
     public DbSet<CardToken> CardTokens { get; set; }
     public DbSet<PaymentLink> PaymentLinks { get; set; }
+    public DbSet<WebhookEvent> WebhookEvents { get; set; }
     public DbSet<OutboxMessage> OutboxMessages { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

@@ -6,6 +6,7 @@ public record MerchantDto(
     string Email,
     string Status,
     string? WebhookUrl,
+    string? WebhookSecret,
     List<string> EnabledPaymentMethods,
     bool AutoCapture = true
 );

@@ -27,7 +27,8 @@ public class GrpcMerchantService : IMerchantService
         var response = await _client.GetMerchantConfigAsync(request, cancellationToken: cancellationToken);
         return Result<MerchantConfig>.Success(new MerchantConfig(
             string.IsNullOrEmpty(response.WebhookUrl) ? null : response.WebhookUrl,
-            response.AutoCapture));
+            response.AutoCapture,
+            string.IsNullOrEmpty(response.WebhookSecret) ? null : response.WebhookSecret));
     }
 
     public async Task<Result<MerchantKeyResolution>> ResolveApiKeyAsync(string keyPrefix, string keyValue, CancellationToken cancellationToken = default)

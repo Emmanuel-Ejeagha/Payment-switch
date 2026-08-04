@@ -2,6 +2,7 @@
 using Merchant.Application.Features.Commands.GenerateMerchantApiKey;
 using Merchant.Application.Features.Commands.OnboardMerchant;
 using Merchant.Application.Features.Commands.RevokeMerchantApiKey;
+using Merchant.Application.Features.Commands.RotateWebhookSecret;
 using Merchant.Application.Features.Commands.SuspendMerchant;
 using Merchant.Application.Features.Commands.UpdateMerchantConfig;
 using Merchant.Application.Features.Queries.GetMerchantApiKeys;
@@ -22,6 +23,7 @@ public static class DependencyInjection
         services.AddScoped<UpdateMerchantConfigurationHandler>();
         services.AddScoped<GenerateMerchantApiKeyHandler>();
         services.AddScoped<RevokeMerchantApiKeyHandler>();
+        services.AddScoped<RotateWebhookSecretHandler>();
         services.AddScoped<GetMerchantByIdHandler>();
         services.AddScoped<GetMerchantByEmailHandler>();
         services.AddScoped<ListMerchantsHandler>();

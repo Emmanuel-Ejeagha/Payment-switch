@@ -42,6 +42,7 @@ public class MerchantGrpcService : MerchantService.MerchantServiceBase
             resp.WebhookUrl = merchant.WebhookUrl?.Value ?? string.Empty;
             resp.EnabledPaymentMethods.AddRange(merchant.EnabledPaymentMethods);
             resp.AutoCapture = merchant.AutoCapture;
+            resp.WebhookSecret = merchant.WebhookSecret?.Value ?? string.Empty;
         }
         return resp;
     }

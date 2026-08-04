@@ -26,6 +26,7 @@ message GetMerchantConfigResponse {
   string webhook_url = 1;
   repeated string enabled_payment_methods = 2;
   bool auto_capture = 3;
+  string webhook_secret = 4;
 }
 
 message ResolveApiKeyRequest {

@@ -2,12 +2,24 @@
 using BuildingBlocks.Shared.Middleware;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Payment.Domain.Entities;
 using System.Text.Json;
 
 namespace Payment.Infrastructure.Outbox;
 
 public class OutboxInterceptor : SaveChangesInterceptor
 {
+    private static readonly HashSet<string> WebhookEventTypes = new()
+    {
+        "PaymentIntentCreatedDomainEvent",
+        "PaymentAuthorizedDomainEvent",
+        "PaymentRequiresActionDomainEvent",
+        "PaymentProcessingDomainEvent",
+        "PaymentCapturedDomainEvent",
+        "PaymentRefundedDomainEvent",
+        "PaymentVoidedDomainEvent"
+    };
+
     private readonly ICorrelationIdProvider _correlationIdProvider;
 
     public OutboxInterceptor(ICorrelationIdProvider correlationIdProvider)
@@ -43,11 +55,23 @@ public class OutboxInterceptor : SaveChangesInterceptor
         {
             foreach (var domainEvent in entry.Entity.DomainEvents)
             {
+                var payload = JsonSerializer.Serialize(domainEvent, domainEvent.GetType());
                 var outboxMessage = new OutboxMessage(
                     domainEvent.GetType().Name,
-                    JsonSerializer.Serialize(domainEvent, domainEvent.GetType()),
+                    payload,
                     correlationId);
                 dbContext.Set<OutboxMessage>().Add(outboxMessage);
+
+                if (entry.Entity is PaymentIntent intent
+                    && WebhookEventTypes.Contains(domainEvent.GetType().Name))
+                {
+                    dbContext.Set<WebhookEvent>().Add(new WebhookEvent(
+                        Guid.NewGuid(),
+                        intent.MerchantId,
+                        domainEvent.GetType().Name,
+                        payload,
+                        correlationId));
+                }
             }
             entry.Entity.ClearDomainEvents();
         }

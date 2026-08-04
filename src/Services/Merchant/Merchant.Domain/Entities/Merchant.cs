@@ -11,6 +11,7 @@ public class Merchant : AggregateRoot
     public MerchantEmail Email { get; private set; } = default!;
     public MerchantStatus Status { get; private set; } = default!;
     public WebhookUrl? WebhookUrl { get; private set; } = default!;
+    public WebhookSecret? WebhookSecret { get; private set; } = default!;
     public IReadOnlyList<string> EnabledPaymentMethods => _paymentMethods.AsReadOnly();
     private readonly List<string> _paymentMethods = new();
     public IReadOnlyList<MerchantApiKey> ApiKeys => _apiKeys.AsReadOnly();
@@ -28,6 +29,7 @@ public class Merchant : AggregateRoot
         Email = email ?? throw new ArgumentNullException(nameof(email));
         Status = MerchantStatus.Pending;
         AutoCapture = true;
+        WebhookSecret = WebhookSecret.Generate();
         CreatedAt = DateTime.UtcNow;
         AddDomainEvent(new MerchantOnboardedEvent(Id, businessName.Value, email.Value));
     }
@@ -70,8 +72,18 @@ public class Merchant : AggregateRoot
         if (autoCapture.HasValue)
             AutoCapture = autoCapture.Value;
 
+        WebhookSecret ??= WebhookSecret.Generate();
+
         UpdatedAt = DateTime.UtcNow;
         AddDomainEvent(new MerchantConfigurationUpdatedEvent(Id));
+    }
+
+    public WebhookSecret RotateWebhookSecret()
+    {
+        WebhookSecret = WebhookSecret.Generate();
+        UpdatedAt = DateTime.UtcNow;
+        AddDomainEvent(new MerchantConfigurationUpdatedEvent(Id));
+        return WebhookSecret;
     }
 
     public MerchantApiKey GenerateApiKey(string keyHash, string keyPrefix, string environment)
