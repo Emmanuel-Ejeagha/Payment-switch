@@ -14,5 +14,8 @@ public class OutboxMessageConfiguration : IEntityTypeConfiguration<OutboxMessage
         builder.Property(m => m.OccurredOn).IsRequired();
         builder.Property(m => m.Processed).IsRequired();
         builder.Property(m => m.CorrelationId).HasMaxLength(200);
+        builder.Property(m => m.LeaseToken);
+        builder.Property(m => m.LeaseExpiresAt);
+        builder.HasIndex(m => m.Processed);
     }
 }
