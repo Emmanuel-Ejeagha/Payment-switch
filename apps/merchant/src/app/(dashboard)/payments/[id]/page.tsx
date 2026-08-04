@@ -11,6 +11,7 @@ export default function PaymentDetailPage() {
   const [payment, setPayment] = useState<PaymentIntentDto | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [pendingAction, setPendingAction] = useState<string | null>(null)
 
   const fetchPayment = async () => {
     setLoading(true)
@@ -28,18 +29,31 @@ export default function PaymentDetailPage() {
   useEffect(() => { fetchPayment() }, [id])
 
   const doAction = async (action: string, extra?: Record<string, unknown>) => {
+    // These endpoints move money. Without the in-flight guard a double-click sends two
+    // refunds, and without the idempotency key a retried request is a second refund too.
+    if (pendingAction) return
+    setPendingAction(action)
     setError(null)
-    const res = await fetch(`/api/proxy/payment/api/v1/payments/${id}/${action}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: extra ? JSON.stringify(extra) : undefined,
-    })
-    if (!res.ok) {
-      const body = await res.json()
-      setError(body.message ?? body.detail ?? `${action} failed`)
-      return
+    try {
+      const res = await fetch(`/api/proxy/payment/api/v1/payments/${id}/${action}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": crypto.randomUUID(),
+        },
+        body: extra ? JSON.stringify(extra) : undefined,
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        setError(body.message ?? body.detail ?? `${action} failed`)
+        return
+      }
+      await fetchPayment()
+    } catch {
+      setError(`${action} failed`)
+    } finally {
+      setPendingAction(null)
     }
-    fetchPayment()
   }
 
   if (loading) {
@@ -104,17 +118,39 @@ export default function PaymentDetailPage() {
           <ActionButton
             icon={CheckCircle}
             label="Authorize"
+            pending={pendingAction === "authorize"}
+            disabled={pendingAction !== null}
             onClick={() => doAction("authorize", { cardLastFour: payment.cardLastFour, cardBrand: payment.cardBrand })}
           />
         )}
         {canCapture && (
-          <ActionButton icon={CheckCircle} label="Capture" onClick={() => doAction("capture", { amount: payment.amount })} />
+          <ActionButton
+            icon={CheckCircle}
+            label="Capture"
+            pending={pendingAction === "capture"}
+            disabled={pendingAction !== null}
+            onClick={() => doAction("capture", { amount: payment.amount })}
+          />
         )}
         {canVoid && (
-          <ActionButton icon={Ban} label="Void" variant="destructive" onClick={() => doAction("void")} />
+          <ActionButton
+            icon={Ban}
+            label="Void"
+            variant="destructive"
+            pending={pendingAction === "void"}
+            disabled={pendingAction !== null}
+            onClick={() => doAction("void")}
+          />
         )}
         {canRefund && (
-          <ActionButton icon={RotateCcw} label="Refund" variant="destructive" onClick={() => doAction("refund", { amount: payment.amount })} />
+          <ActionButton
+            icon={RotateCcw}
+            label="Refund"
+            variant="destructive"
+            pending={pendingAction === "refund"}
+            disabled={pendingAction !== null}
+            onClick={() => doAction("refund", { amount: payment.amount })}
+          />
         )}
       </div>
 
@@ -155,22 +191,28 @@ function ActionButton({
   icon: Icon,
   label,
   variant,
+  pending,
+  disabled,
   onClick,
 }: {
   icon: React.ComponentType<{ className?: string }>
   label: string
   variant?: "destructive"
+  pending?: boolean
+  disabled?: boolean
   onClick: () => void
 }) {
   return (
     <button
       onClick={onClick}
-      className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:bg-accent ${
+      disabled={disabled}
+      aria-busy={pending}
+      className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent ${
         variant === "destructive" ? "border-destructive/50 text-destructive hover:bg-destructive/10" : ""
       }`}
     >
-      <Icon className="h-4 w-4" />
-      {label}
+      <Icon className={`h-4 w-4 ${pending ? "animate-spin" : ""}`} />
+      {pending ? `${label}...` : label}
     </button>
   )
 }

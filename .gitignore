@@ -4,7 +4,9 @@ obj/
 *.user
 *.suo
 *.cache
-packages/
+# Legacy NuGet restore folder. Scoped to the solution root so it does not swallow
+# the npm workspace at /packages (packages/shared, packages/ui are real source).
+/packages/*.nupkg
 *.nupkg
 **/Properties/launchSettings.json
 
@@ -12,6 +14,7 @@ node_modules/
 npm-debug.log*
 .next
 dist/
+*.tsbuildinfo
 
 docker-compose.override.yml
 *.orig
