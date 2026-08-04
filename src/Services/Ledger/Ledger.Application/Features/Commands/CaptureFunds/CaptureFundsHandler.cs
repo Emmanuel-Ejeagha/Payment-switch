@@ -8,6 +8,7 @@ using Ledger.Application.Options;
 using Ledger.Domain.DomainErrors;
 using Ledger.Domain.ValueObjects;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Ledger.Application.Features.Commands.CaptureFunds;
 
@@ -25,14 +26,14 @@ public class CaptureFundsHandler
         IUnitOfWork unitOfWork,
         IDomainEventDispatcher dispatcher,
         IValidator<CaptureFundsCommand> validator,
-        LedgerOptions options,
+        IOptions<LedgerOptions> options,
         ILogger<CaptureFundsHandler> logger)
     {
         _repository = repository;
         _unitOfWork = unitOfWork;
         _dispatcher = dispatcher;
         _validator = validator;
-        _options = options;
+        _options = options.Value;
         _logger = logger;
     }
 

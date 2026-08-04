@@ -1,9 +1,8 @@
 using Ledger.Infrastructure.Persistence;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using PaymentSwitch.IntegrationTests.Shared;
 using Testcontainers.PostgreSql;
 
 namespace Ledger.API.IntegrationTests;
@@ -14,29 +13,15 @@ public class LedgerApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         .WithImage("postgres:16-alpine")
         .WithDatabase("LedgerDb")
         .WithUsername("paymentswitch")
-        .WithPassword("paymentswitch")
+        .WithPassword(TestSecrets.PostgresPassword)
         .Build();
 
-    protected override void ConfigureWebHost(IWebHostBuilder builder)
-    {
-        builder.ConfigureAppConfiguration((context, config) =>
-        {
-            config.AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["ConnectionStrings:LedgerDb"] = _postgres.GetConnectionString(),
-                ["Jwt:Secret"] = "test-super-secret-key-minimum-32-bytes!!",
-                ["Jwt:Issuer"] = "LedgerService",
-                ["Jwt:Audience"] = "PaymentSwitch",
-                ["RabbitMQ:HostName"] = "localhost",
-                ["RabbitMQ:UserName"] = "test",
-                ["RabbitMQ:Password"] = "test-rabbit-password"
-            });
-        });
-    }
+    public LedgerApiFactory() => TestSecrets.ApplyEnvironment("LedgerService");
 
     public async Task InitializeAsync()
     {
         await _postgres.StartAsync();
+        TestSecrets.ApplyConnectionString("LedgerDb", _postgres.GetConnectionString());
 
         using var scope = Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();

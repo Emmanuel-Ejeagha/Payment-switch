@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -22,6 +22,10 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\Services\Ledger\Ledger.API\Ledger.API.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Shared\TestSecrets.cs" Link="TestSecrets.cs" />
   </ItemGroup>
 
 </Project>
