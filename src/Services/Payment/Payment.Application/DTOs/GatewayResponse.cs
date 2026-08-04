@@ -1,3 +1,8 @@
 ﻿namespace Payment.Application.DTOs;
 
-public record GatewayResponse(bool Success, string? AuthorizationCode, string? GatewayReference, string? ErrorMessage);
+public record GatewayResponse(
+    bool Success,
+    string? AuthorizationCode,
+    string? GatewayReference,
+    string? ErrorMessage,
+    bool RequiresChallenge = false);

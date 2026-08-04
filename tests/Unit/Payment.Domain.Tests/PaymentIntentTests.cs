@@ -157,13 +157,85 @@ public class PaymentIntentTests
         var intent = CreatePendingIntent();
         intent.Fail();
         Assert.Equal(PaymentStatus.Failed, intent.Status);
-    }
-
-    [Fact]
+    }    [Fact]
     public void Fail_FromAuthorized_Throws()
     {
         var intent = CreateAuthorizedIntent();
         Assert.Throws<InvalidOperationException>(() => intent.Fail());
+    }
+
+    [Fact]
+    public void RequireAction_FromPending_ShouldSetRequiresActionAndRaiseEvent()
+    {
+        var intent = CreatePendingIntent();
+        var gatewayRef = new GatewayReference("GTW-3DS");
+
+        intent.RequireAction(gatewayRef);
+
+        Assert.Equal(PaymentStatus.RequiresAction, intent.Status);
+        Assert.Equal(gatewayRef, intent.GatewayReference);
+        Assert.Contains(intent.DomainEvents, e => e is PaymentRequiresActionDomainEvent);
+    }
+
+    [Fact]
+    public void RequireAction_FromNonPending_Throws()
+    {
+        var intent = CreateAuthorizedIntent();
+        Assert.Throws<InvalidOperationException>(() => intent.RequireAction(new GatewayReference("G")));
+    }
+
+    [Fact]
+    public void MarkProcessing_FromRequiresAction_ShouldSetProcessingAndRaiseEvent()
+    {
+        var intent = CreateRequiresActionIntent();
+
+        intent.MarkProcessing();
+
+        Assert.Equal(PaymentStatus.Processing, intent.Status);
+        Assert.Contains(intent.DomainEvents, e => e is PaymentProcessingDomainEvent);
+    }
+
+    [Fact]
+    public void MarkProcessing_FromPending_Throws()
+    {
+        var intent = CreatePendingIntent();
+        Assert.Throws<InvalidOperationException>(() => intent.MarkProcessing());
+    }
+
+    [Fact]
+    public void ConfirmAction_FromRequiresAction_ShouldAuthorizeAndRaiseEvent()
+    {
+        var intent = CreateRequiresActionIntent();
+        var authCode = new AuthorizationCode("AUTH-3DS");
+        var gatewayRef = new GatewayReference("GTW-3DS");
+
+        intent.ConfirmAction(authCode, gatewayRef);
+
+        Assert.Equal(PaymentStatus.Authorized, intent.Status);
+        Assert.Equal(authCode, intent.AuthorizationCode);
+        Assert.Equal(gatewayRef, intent.GatewayReference);
+        Assert.Single(intent.Transactions, t => t.Type == TransactionType.Authorization);
+        Assert.Contains(intent.DomainEvents, e => e is PaymentAuthorizedDomainEvent);
+    }
+
+    [Fact]
+    public void ConfirmAction_FromProcessing_ShouldAuthorize()
+    {
+        var intent = CreateRequiresActionIntent();
+        intent.MarkProcessing();
+        intent.ClearDomainEvents();
+
+        intent.ConfirmAction(new AuthorizationCode("AUTH-3DS"), new GatewayReference("GTW-3DS"));
+
+        Assert.Equal(PaymentStatus.Authorized, intent.Status);
+        Assert.Contains(intent.DomainEvents, e => e is PaymentAuthorizedDomainEvent);
+    }
+
+    [Fact]
+    public void ConfirmAction_FromPending_Throws()
+    {
+        var intent = CreatePendingIntent();
+        Assert.Throws<InvalidOperationException>(() => intent.ConfirmAction(new AuthorizationCode("A"), new GatewayReference("G")));
     }
 
     [Fact]
@@ -195,6 +267,14 @@ public class PaymentIntentTests
     // Helper methods
     private PaymentIntent CreatePendingIntent() =>
         new(Guid.NewGuid(), _merchantId, _amount, _idempotencyKey, PaymentMethod.Card);
+
+    private PaymentIntent CreateRequiresActionIntent()
+    {
+        var intent = CreatePendingIntent();
+        intent.RequireAction(new GatewayReference("GTW-3DS"));
+        intent.ClearDomainEvents();
+        return intent;
+    }
 
     private PaymentIntent CreateAuthorizedIntent()
     {

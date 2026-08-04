@@ -9,6 +9,8 @@ public class PaymentStatus : ValueObject
     private PaymentStatus(string value) => Value = value;
 
     public static readonly PaymentStatus Pending = new("Pending");
+    public static readonly PaymentStatus RequiresAction = new("RequiresAction");
+    public static readonly PaymentStatus Processing = new("Processing");
     public static readonly PaymentStatus Authorized = new("Authorized");
     public static readonly PaymentStatus Captured = new("Captured");
     public static readonly PaymentStatus PartiallyCaptured = new("PartiallyCaptured");

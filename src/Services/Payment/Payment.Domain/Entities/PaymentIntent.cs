@@ -57,6 +57,45 @@ public class PaymentIntent : AggregateRoot
         AddDomainEvent(new PaymentAuthorizedDomainEvent(Id, MerchantId, authorizationCode.Value, Amount, gatewayReference.Value));
     }
 
+    public void RequireAction(GatewayReference gatewayReference)
+    {
+        if (Status != PaymentStatus.Pending)
+            throw new InvalidOperationException($"Cannot require action for payment in '{Status}' status.");
+
+        GatewayReference = gatewayReference;
+        Status = PaymentStatus.RequiresAction;
+        UpdatedAt = DateTime.UtcNow;
+
+        AddDomainEvent(new PaymentRequiresActionDomainEvent(Id, MerchantId, Amount, gatewayReference.Value));
+    }
+
+    public void MarkProcessing(string status = "Processing")
+    {
+        if (Status != PaymentStatus.RequiresAction)
+            throw new InvalidOperationException($"Cannot mark '{status}' payment as processing from '{Status}' status.");
+
+        Status = PaymentStatus.Processing;
+        UpdatedAt = DateTime.UtcNow;
+
+        AddDomainEvent(new PaymentProcessingDomainEvent(Id, MerchantId, status));
+    }
+
+    public void ConfirmAction(AuthorizationCode authorizationCode, GatewayReference gatewayReference, string? idempotencyKey = null)
+    {
+        if (Status != PaymentStatus.RequiresAction && Status != PaymentStatus.Processing)
+            throw new InvalidOperationException($"Cannot confirm payment in '{Status}' status.");
+
+        AuthorizationCode = authorizationCode;
+        GatewayReference = gatewayReference;
+        Status = PaymentStatus.Authorized;
+        UpdatedAt = DateTime.UtcNow;
+
+        var transaction = new Transaction(TransactionType.Authorization, new Money(Amount.Amount, Amount.Currency), new GatewayReference(gatewayReference.Value), idempotencyKey);
+        _transactions.Add(transaction);
+
+        AddDomainEvent(new PaymentAuthorizedDomainEvent(Id, MerchantId, authorizationCode.Value, Amount, gatewayReference.Value));
+    }
+
     public void Capture(Money? amount = null, string? idempotencyKey = null)
     {
         if (Status != PaymentStatus.Authorized && Status != PaymentStatus.PartiallyCaptured)

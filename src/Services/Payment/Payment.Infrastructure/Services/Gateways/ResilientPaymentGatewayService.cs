@@ -56,6 +56,40 @@ public class ResilientPaymentGatewayService : IPaymentGatewayService
         return new Error("Payment.GatewayUnavailable", "All payment gateways are unavailable.");
     }
 
+    public async Task<Result<GatewayResponse>> ConfirmChallengeAsync(Guid merchantId, Money amount, CardDetails? cardDetails, string gatewayReference, CancellationToken cancellationToken = default)
+    {
+        var ordered = _router.Resolve(amount, cardDetails, _registry.All);
+
+        foreach (var entry in ordered)
+        {
+            if (!entry.CircuitBreaker.CanProceed())
+            {
+                _logger.LogWarning("Gateway {Gateway} is open; skipping", entry.Provider.Name);
+                continue;
+            }
+
+            try
+            {
+                var response = await entry.Provider.ConfirmChallengeAsync(merchantId, amount, cardDetails, gatewayReference, cancellationToken);
+                if (response.Success)
+                {
+                    entry.CircuitBreaker.RecordSuccess();
+                    return Result<GatewayResponse>.Success(response);
+                }
+
+                entry.CircuitBreaker.RecordFailure();
+                _logger.LogWarning("Gateway {Gateway} declined challenge confirm: {Error}", entry.Provider.Name, response.ErrorMessage);
+            }
+            catch (Exception ex)
+            {
+                entry.CircuitBreaker.RecordFailure();
+                _logger.LogError(ex, "Gateway {Gateway} threw during challenge confirm", entry.Provider.Name);
+            }
+        }
+
+        return new Error("Payment.GatewayUnavailable", "All payment gateways are unavailable.");
+    }
+
     public async Task<Result<GatewayResponse>> CaptureAsync(Guid merchantId, GatewayReference gatewayRef, Money amount, CancellationToken cancellationToken = default)
     {
         var ordered = _router.Resolve(amount, null, _registry.All);
