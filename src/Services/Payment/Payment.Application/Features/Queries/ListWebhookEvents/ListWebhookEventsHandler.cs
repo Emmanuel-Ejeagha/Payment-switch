@@ -1,0 +1,35 @@
+using BuildingBlocks.Shared.Results;
+using Microsoft.Extensions.Logging;
+using Payment.Application.Interfaces;
+
+namespace Payment.Application.Features.Queries.ListWebhookEvents;
+
+public class ListWebhookEventsHandler
+{
+    private readonly IWebhookEventRepository _repository;
+    private readonly ILogger<ListWebhookEventsHandler> _logger;
+
+    public ListWebhookEventsHandler(IWebhookEventRepository repository, ILogger<ListWebhookEventsHandler> logger)
+    {
+        _repository = repository;
+        _logger = logger;
+    }
+
+    public async Task<Result<List<WebhookEventDto>>> Handle(ListWebhookEventsQuery query, CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("Handling {QueryName} for Merchant {MerchantId}", nameof(ListWebhookEventsQuery), query.MerchantId);
+
+        var events = await _repository.ListByMerchantAsync(query.MerchantId, query.Skip, query.Take, cancellationToken);
+        var dtos = events.Select(e => new WebhookEventDto(
+            e.Id,
+            e.EventType,
+            e.Status,
+            e.Attempts,
+            e.CreatedAt,
+            e.LastAttemptAt,
+            e.LastError,
+            e.CorrelationId)).ToList();
+
+        return Result<List<WebhookEventDto>>.Success(dtos);
+    }
+}

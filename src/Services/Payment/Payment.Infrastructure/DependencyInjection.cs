@@ -40,8 +40,15 @@ public static class DependencyInjection
         services.AddScoped<IPaymentIntentRepository, PaymentIntentRepository>();
         services.AddScoped<ICardTokenRepository, CardTokenRepository>();
         services.AddScoped<IPaymentLinkRepository, PaymentLinkRepository>();
+        services.AddScoped<IWebhookEventRepository, WebhookEventRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IMerchantService, GrpcMerchantService>();
+        services.AddScoped<WebhookDispatcher>();
+        services.AddHttpClient("webhook")
+            .ConfigureHttpClient(c =>
+            {
+                c.Timeout = TimeSpan.FromSeconds(30);
+            });
 
         services.AddServiceTokenProvider(configuration, "Payment");
 
@@ -50,6 +57,7 @@ public static class DependencyInjection
             "RabbitMQ HostName is required");
         services.AddScoped<IEventBus, RabbitMQEventBus>();
         services.AddHostedService<OutboxPublisherService>();
+        services.AddHostedService<WebhookDispatchWorker>();
 
         services.AddGrpcClient<MerchantService.MerchantServiceClient>(o =>
         {

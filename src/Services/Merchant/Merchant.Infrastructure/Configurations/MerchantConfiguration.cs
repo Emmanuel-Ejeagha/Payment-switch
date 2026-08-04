@@ -29,6 +29,11 @@ public class MerchantConfiguration : IEntityTypeConfiguration<MerchantEntity>
             wh.Property(w => w.Value).HasColumnName("WebhookUrl").HasMaxLength(500);
         });
 
+        builder.OwnsOne(m => m.WebhookSecret, ws =>
+        {
+            ws.Property(w => w.Value).HasColumnName("WebhookSecret").HasMaxLength(128);
+        });
+
         builder.OwnsOne(m => m.Status, st =>
         {
             st.Property(s => s.Value).HasColumnName("Status").IsRequired().HasMaxLength(50);

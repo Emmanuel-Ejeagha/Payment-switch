@@ -1,3 +1,3 @@
 namespace Payment.Application.DTOs;
 
-public record MerchantConfig(string? WebhookUrl, bool AutoCapture);
+public record MerchantConfig(string? WebhookUrl, bool AutoCapture, string? WebhookSecret = null);

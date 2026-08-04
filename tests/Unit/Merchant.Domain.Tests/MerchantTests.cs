@@ -20,6 +20,8 @@ public class MerchantTests
         Assert.Equal(email, merchant.Email);
         Assert.Equal(MerchantStatus.Pending, merchant.Status);
         Assert.Null(merchant.WebhookUrl);
+        Assert.NotNull(merchant.WebhookSecret);
+        Assert.NotEmpty(merchant.WebhookSecret.Value);
         Assert.Empty(merchant.EnabledPaymentMethods);
         Assert.NotEmpty(merchant.DomainEvents);
         Assert.Contains(merchant.DomainEvents, e => e is MerchantOnboardedEvent);
@@ -87,6 +89,20 @@ public class MerchantTests
         merchant.Suspend();
 
         Assert.Throws<InvalidOperationException>(() => merchant.UpdateConfiguration("https://hook.com", null));
+    }
+
+    [Fact]
+    public void RotateWebhookSecret_ShouldGenerateNewSecret()
+    {
+        var merchant = CreatePendingMerchant();
+        merchant.ClearDomainEvents();
+        var original = merchant.WebhookSecret!.Value;
+
+        var rotated = merchant.RotateWebhookSecret();
+
+        Assert.NotEqual(original, rotated.Value);
+        Assert.Equal(rotated, merchant.WebhookSecret);
+        Assert.Contains(merchant.DomainEvents, e => e is MerchantConfigurationUpdatedEvent);
     }
 
     private MerchantEntity CreatePendingMerchant() =>
