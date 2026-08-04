@@ -12,6 +12,9 @@ public class AppDbContext : DbContext
     public DbSet<CardToken> CardTokens { get; set; }
     public DbSet<Customer> Customers { get; set; }
     public DbSet<PaymentLink> PaymentLinks { get; set; }
+    public DbSet<Plan> Plans { get; set; }
+    public DbSet<Subscription> Subscriptions { get; set; }
+    public DbSet<Invoice> Invoices { get; set; }
     public DbSet<WebhookEvent> WebhookEvents { get; set; }
     public DbSet<OutboxMessage> OutboxMessages { get; set; }
 

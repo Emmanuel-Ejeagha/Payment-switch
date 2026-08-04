@@ -40,6 +40,9 @@ public static class DependencyInjection
         services.AddScoped<IPaymentIntentRepository, PaymentIntentRepository>();
         services.AddScoped<ICardTokenRepository, CardTokenRepository>();
         services.AddScoped<ICustomerRepository, CustomerRepository>();
+        services.AddScoped<IPlanRepository, PlanRepository>();
+        services.AddScoped<ISubscriptionRepository, SubscriptionRepository>();
+        services.AddScoped<IInvoiceRepository, InvoiceRepository>();
         services.AddScoped<IPaymentLinkRepository, PaymentLinkRepository>();
         services.AddScoped<IWebhookEventRepository, WebhookEventRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
@@ -59,6 +62,7 @@ public static class DependencyInjection
         services.AddScoped<IEventBus, RabbitMQEventBus>();
         services.AddHostedService<OutboxPublisherService>();
         services.AddHostedService<WebhookDispatchWorker>();
+        services.AddHostedService<SubscriptionBillingWorker>();
 
         services.AddGrpcClient<MerchantService.MerchantServiceClient>(o =>
         {

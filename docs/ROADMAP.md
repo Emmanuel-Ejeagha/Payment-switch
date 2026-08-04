@@ -43,7 +43,7 @@ Phase A → B → C are the non-negotiable foundation (each item is independentl
 - [x] **D21. 3DS/SCA states** — add `RequiresAction`/`Processing` states + async confirmation events.
 - [x] **D22. Real webhooks** — HMAC signatures (per-merchant secret), retry with backoff, event log + replay endpoint, "send test event" API (WebhookUrl is currently fetched but never used).
 - [x] **D23. Customers** — entity + CRUD API.
-- [ ] **D24. Subscriptions** — plan → subscription → invoice → recurring charge.
+- [x] **D24. Subscriptions** — plan → subscription → invoice → recurring charge.
 - [ ] **D25. Disputes/chargebacks** — raise, evidence, respond, ledger reversal.
 - [ ] **D26. Reconciliation jobs** — gateway↔internal tie-out; ledger balance↔journal verification.
 

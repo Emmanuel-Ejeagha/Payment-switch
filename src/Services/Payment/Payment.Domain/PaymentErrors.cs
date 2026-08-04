@@ -30,4 +30,22 @@ public static class PaymentErrors
 
     public static Error CustomerEmailAlreadyInUse(string email) =>
         new("Payment.CustomerEmailAlreadyInUse", $"A customer with email '{email}' already exists for this merchant.");
+
+    public static Error PlanNotFound(Guid planId) =>
+        new("Payment.PlanNotFound", $"Plan with Id '{planId}' not found.");
+
+    public static Error PlanInactive(Guid planId) =>
+        new("Payment.PlanInactive", $"Plan '{planId}' is archived and cannot be subscribed to.");
+
+    public static Error SubscriptionNotFound(Guid subscriptionId) =>
+        new("Payment.SubscriptionNotFound", $"Subscription with Id '{subscriptionId}' not found.");
+
+    public static Error SubscriptionAlreadyCanceled(Guid subscriptionId) =>
+        new("Payment.SubscriptionAlreadyCanceled", $"Subscription '{subscriptionId}' is already canceled.");
+
+    public static Error InvoiceNotFound(Guid invoiceId) =>
+        new("Payment.InvoiceNotFound", $"Invoice with Id '{invoiceId}' not found.");
+
+    public static Error PlanCurrencyMismatch =>
+        new("Payment.PlanCurrencyMismatch", "Plan currency does not match the subscription currency.");
 }
