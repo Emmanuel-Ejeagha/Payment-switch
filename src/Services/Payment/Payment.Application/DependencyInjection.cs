@@ -2,14 +2,19 @@
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using Payment.Application.Features.Command.AuthorizePayment;
+using Payment.Application.Features.Command.ArchivePlan;
+using Payment.Application.Features.Command.CancelSubscription;
 using Payment.Application.Features.Command.CapturePayment;
 using Payment.Application.Features.Command.CheckoutPayment;
 using Payment.Application.Features.Command.CheckoutTokenize;
+using Payment.Application.Features.Command.CollectSubscriptionCycle;
 using Payment.Application.Features.Command.ConfirmPaymentIntent;
 using Payment.Application.Features.Command.CreateCardToken;
 using Payment.Application.Features.Command.CreateCustomer;
 using Payment.Application.Features.Command.CreatePaymentIntent;
 using Payment.Application.Features.Command.CreatePaymentLink;
+using Payment.Application.Features.Command.CreatePlan;
+using Payment.Application.Features.Command.CreateSubscription;
 using Payment.Application.Features.Command.DeleteCustomer;
 using Payment.Application.Features.Command.RefundPayment;
 using Payment.Application.Features.Command.ReplayWebhookEvent;
@@ -19,9 +24,13 @@ using Payment.Application.Features.Command.VoidPayment;
 using Payment.Application.Features.Queries.GetCustomerById;
 using Payment.Application.Features.Queries.GetPaymentIntentById;
 using Payment.Application.Features.Queries.GetPaymentLinkByCode;
+using Payment.Application.Features.Queries.GetSubscriptionById;
 using Payment.Application.Features.Queries.ListCustomersByMerchant;
+using Payment.Application.Features.Queries.ListInvoices;
 using Payment.Application.Features.Queries.ListPaymentIntentsByMerchant;
 using Payment.Application.Features.Queries.ListPaymentLinksByMerchant;
+using Payment.Application.Features.Queries.ListPlansByMerchant;
+using Payment.Application.Features.Queries.ListSubscriptionsByMerchant;
 using Payment.Application.Features.Queries.ListWebhookEvents;
 
 namespace Payment.Application;
@@ -53,6 +62,16 @@ public static class DependencyInjection
         services.AddScoped<DeleteCustomerHandler>();
         services.AddScoped<GetCustomerByIdHandler>();
         services.AddScoped<ListCustomersByMerchantHandler>();
+
+        services.AddScoped<CreatePlanHandler>();
+        services.AddScoped<ArchivePlanHandler>();
+        services.AddScoped<ListPlansByMerchantHandler>();
+        services.AddScoped<CreateSubscriptionHandler>();
+        services.AddScoped<CancelSubscriptionHandler>();
+        services.AddScoped<CollectSubscriptionCycleHandler>();
+        services.AddScoped<GetSubscriptionByIdHandler>();
+        services.AddScoped<ListSubscriptionsByMerchantHandler>();
+        services.AddScoped<ListInvoicesHandler>();
 
         services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
 
