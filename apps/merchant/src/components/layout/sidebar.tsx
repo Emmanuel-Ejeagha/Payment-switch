@@ -16,6 +16,10 @@ import {
   Moon,
   Bell,
   Link2,
+  Users,
+  Package,
+  RefreshCw,
+  Webhook,
 } from "lucide-react"
 import { useTheme } from "@/components/theme-provider"
 import { useNotifications } from "@/components/use-notifications"
@@ -25,6 +29,10 @@ const navItems = [
   { label: "Dashboard", href: "/", icon: Home },
   { label: "Payments", href: "/payments", icon: CreditCard },
   { label: "Payment Links", href: "/payment-links", icon: Link2 },
+  { label: "Customers", href: "/customers", icon: Users },
+  { label: "Plans", href: "/plans", icon: Package },
+  { label: "Subscriptions", href: "/subscriptions", icon: RefreshCw },
+  { label: "Webhooks", href: "/webhooks", icon: Webhook },
   { label: "Ledger", href: "/ledger", icon: BookOpen },
   { label: "API Keys", href: "/api-keys", icon: Key },
   { label: "Profile", href: "/profile", icon: User },
