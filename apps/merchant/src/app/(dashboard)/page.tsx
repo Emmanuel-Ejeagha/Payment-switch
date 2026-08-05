@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, useCallback, useMemo } from "react"
+import { useRouter } from "next/navigation"
 import { Wallet, Clock, Lock, CreditCard, ChevronDown } from "lucide-react"
 import { StatsCard } from "@paymentswitch/ui"
 import type { UserDto, MerchantDto, BalanceDto, PaymentIntentDto } from "@paymentswitch/shared"
@@ -12,6 +13,7 @@ function zeroBalance(currency: string, merchantId: string): BalanceDto {
 }
 
 export default function MerchantDashboardPage() {
+  const router = useRouter()
   const [user, setUser] = useState<UserDto | null>(null)
   const [merchant, setMerchant] = useState<MerchantDto | null>(null)
   const [balances, setBalances] = useState<BalanceDto[]>([])
@@ -45,7 +47,12 @@ export default function MerchantDashboardPage() {
         setUser(userData)
 
         const merchantRes = await fetch(`/api/proxy/merchant/api/v1/merchants/by-email/${encodeURIComponent(userData.email)}`)
-        if (!merchantRes.ok) { setError("Failed to load merchant profile"); setLoading(false); return }
+        if (!merchantRes.ok) {
+          // Signed in but never onboarded (or onboarding failed at registration).
+          // Send them somewhere they can fix it rather than a dead-end error.
+          if (merchantRes.status === 404) { router.replace("/onboarding"); return }
+          setError("Failed to load merchant profile"); setLoading(false); return
+        }
         const merchantData: MerchantDto = await merchantRes.json()
         setMerchant(merchantData)
 
@@ -64,7 +71,7 @@ export default function MerchantDashboardPage() {
     }
 
     load()
-  }, [])
+  }, [router])
 
   useEffect(() => {
     if (!merchant) return
