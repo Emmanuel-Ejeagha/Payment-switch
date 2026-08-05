@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { ArrowLeft, CheckCircle, XCircle, Ban, RotateCcw } from "lucide-react"
 import type { PaymentIntentDto, TransactionDto } from "@paymentswitch/shared"
@@ -13,7 +13,7 @@ export default function PaymentDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [pendingAction, setPendingAction] = useState<string | null>(null)
 
-  const fetchPayment = async () => {
+  const fetchPayment = useCallback(async () => {
     setLoading(true)
     try {
       const res = await fetch(`/api/proxy/payment/api/v1/payments/${id}`)
@@ -24,9 +24,11 @@ export default function PaymentDetailPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [id])
 
-  useEffect(() => { fetchPayment() }, [id])
+  useEffect(() => {
+    fetchPayment()
+  }, [fetchPayment])
 
   const doAction = async (action: string, extra?: Record<string, unknown>) => {
     // These endpoints move money. Without the in-flight guard a double-click sends two
