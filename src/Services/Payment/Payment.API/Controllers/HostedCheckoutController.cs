@@ -58,7 +58,7 @@ public class HostedCheckoutController : ControllerBase
         [FromServices] CheckoutPaymentHandler handler)
     {
         var idempotencyKey = Request.Headers["Idempotency-Key"].FirstOrDefault() ?? request.IdempotencyKey;
-        var command = new CheckoutPaymentCommand(code, request.CardToken, idempotencyKey);
+        var command = new CheckoutPaymentCommand(code, request.CardToken, idempotencyKey, request.SecurityCode);
         var result = await handler.Handle(command);
         return result.ToActionResult();
     }
@@ -66,4 +66,10 @@ public class HostedCheckoutController : ControllerBase
 
 public record CheckoutTokenizeRequest(string CardNumber, int ExpiryMonth, int ExpiryYear);
 
-public record CheckoutPaymentRequest(string CardToken, string? IdempotencyKey = null);
+/// <param name="SecurityCode">
+/// CVC/CVV/CID. Sent on pay rather than tokenize because it is only valid for the
+/// single authorization it accompanies and is never stored (PCI DSS 3.2).
+/// </param>
+/// <param name="CardToken">Token minted by the tokenize call.</param>
+/// <param name="IdempotencyKey">Fallback when the Idempotency-Key header is absent.</param>
+public record CheckoutPaymentRequest(string CardToken, string? IdempotencyKey = null, string? SecurityCode = null);

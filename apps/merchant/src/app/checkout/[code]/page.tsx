@@ -55,9 +55,9 @@ export default function HostedCheckoutPage() {
       const tokenRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/payment/v1/checkout/links/${code}/tokenize`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // The CVC is deliberately not transmitted: the token vault is PCI-scoped and
-        // persists only brand, last four and expiry. Forwarding the CVC to the acquirer
-        // at authorization time is not implemented server-side.
+        // No CVC here: the token vault is PCI-scoped and persists only brand, last four
+        // and expiry. The CVC travels with /pay instead, where it is forwarded to the
+        // acquirer for that one authorization and never stored.
         body: JSON.stringify({
           cardNumber: cardNumber.replace(/\s+/g, ""),
           expiryMonth: rawMonth,
@@ -77,7 +77,7 @@ export default function HostedCheckoutPage() {
           "Content-Type": "application/json",
           "Idempotency-Key": crypto.randomUUID(),
         },
-        body: JSON.stringify({ cardToken: token }),
+        body: JSON.stringify({ cardToken: token, securityCode: cvc }),
       })
       if (!payRes.ok) {
         const body = await payRes.json()

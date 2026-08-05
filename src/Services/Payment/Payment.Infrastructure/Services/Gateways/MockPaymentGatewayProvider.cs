@@ -16,7 +16,7 @@ public abstract class MockPaymentGatewayProvider : IPaymentGatewayProvider
 
     public abstract string Name { get; }
 
-    public Task<GatewayResponse> AuthorizeAsync(Guid merchantId, Money amount, CardDetails? cardDetails, CancellationToken cancellationToken = default)
+    public Task<GatewayResponse> AuthorizeAsync(Guid merchantId, Money amount, CardDetails? cardDetails, CardSecurityCode? securityCode = null, CancellationToken cancellationToken = default)
     {
         if (IsDeclined(cardDetails))
             return Task.FromResult(new GatewayResponse(false, null, null, $"Card ending {cardDetails!.LastFour} was declined by {Name}."));
@@ -51,7 +51,7 @@ public abstract class MockPaymentGatewayProvider : IPaymentGatewayProvider
         return Task.FromResult(new GatewayResponse(true, null, $"{Name}-REF-{Guid.NewGuid().ToString("N")[..8]}", null));
     }
 
-    public Task<GatewayResponse> ConfirmChallengeAsync(Guid merchantId, Money amount, CardDetails? cardDetails, string gatewayReference, CancellationToken cancellationToken = default)
+    public Task<GatewayResponse> ConfirmChallengeAsync(Guid merchantId, Money amount, CardDetails? cardDetails, string gatewayReference, CardSecurityCode? securityCode = null, CancellationToken cancellationToken = default)
     {
         if (IsDeclined(cardDetails))
             return Task.FromResult(new GatewayResponse(false, null, null, $"Card ending {cardDetails!.LastFour} was declined by {Name}."));
