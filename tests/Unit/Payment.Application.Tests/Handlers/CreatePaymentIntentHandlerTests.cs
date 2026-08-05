@@ -35,7 +35,7 @@ public class CreatePaymentIntentHandlerTests
         SetupValidatorSuccess(command);
         _repoMock.Setup(r => r.GetByIdempotencyKeyAsync(command.MerchantId, command.IdempotencyKey, It.IsAny<CancellationToken>())).ReturnsAsync((PaymentIntent?)null);
         SetupMerchantConfig(autoCapture: true);
-        _gatewayMock.Setup(g => g.AuthorizeAsync(command.MerchantId, It.IsAny<Money>(), It.IsAny<CardDetails?>(), It.IsAny<CancellationToken>()))
+        _gatewayMock.Setup(g => g.AuthorizeAsync(command.MerchantId, It.IsAny<Money>(), It.IsAny<CardDetails?>(), It.IsAny<CardSecurityCode?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<GatewayResponse>.Success(new GatewayResponse(true, "AUTH123", "GW-1", null)));
         _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
@@ -57,7 +57,7 @@ public class CreatePaymentIntentHandlerTests
         SetupValidatorSuccess(command);
         _repoMock.Setup(r => r.GetByIdempotencyKeyAsync(command.MerchantId, command.IdempotencyKey, It.IsAny<CancellationToken>())).ReturnsAsync((PaymentIntent?)null);
         SetupMerchantConfig(autoCapture: false);
-        _gatewayMock.Setup(g => g.AuthorizeAsync(command.MerchantId, It.IsAny<Money>(), It.IsAny<CardDetails?>(), It.IsAny<CancellationToken>()))
+        _gatewayMock.Setup(g => g.AuthorizeAsync(command.MerchantId, It.IsAny<Money>(), It.IsAny<CardDetails?>(), It.IsAny<CardSecurityCode?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<GatewayResponse>.Success(new GatewayResponse(true, "AUTH123", "GW-1", null)));
         _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
@@ -74,7 +74,7 @@ public class CreatePaymentIntentHandlerTests
         SetupValidatorSuccess(command);
         _repoMock.Setup(r => r.GetByIdempotencyKeyAsync(command.MerchantId, command.IdempotencyKey, It.IsAny<CancellationToken>())).ReturnsAsync((PaymentIntent?)null);
         SetupMerchantConfig(autoCapture: true);
-        _gatewayMock.Setup(g => g.AuthorizeAsync(command.MerchantId, It.IsAny<Money>(), It.IsAny<CardDetails?>(), It.IsAny<CancellationToken>()))
+        _gatewayMock.Setup(g => g.AuthorizeAsync(command.MerchantId, It.IsAny<Money>(), It.IsAny<CardDetails?>(), It.IsAny<CardSecurityCode?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<GatewayResponse>.Failure(new Error("Gateway.Declined", "Card declined.")));
         _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
@@ -110,14 +110,14 @@ public class CreatePaymentIntentHandlerTests
         var vaultCard = new CardToken(merchantId, "card_abc123", "4242", "Visa", 12, 2030);
         _cardTokenRepoMock.Setup(r => r.GetByTokenAsync(merchantId, "card_abc123", It.IsAny<CancellationToken>())).ReturnsAsync(vaultCard);
         SetupMerchantConfig(autoCapture: true);
-        _gatewayMock.Setup(g => g.AuthorizeAsync(merchantId, It.IsAny<Money>(), It.IsAny<CardDetails?>(), It.IsAny<CancellationToken>()))
+        _gatewayMock.Setup(g => g.AuthorizeAsync(merchantId, It.IsAny<Money>(), It.IsAny<CardDetails?>(), It.IsAny<CardSecurityCode?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<GatewayResponse>.Success(new GatewayResponse(true, "AUTH123", "GW-1", null)));
         _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
         var result = await _handler.Handle(command);
 
         Assert.True(result.IsSuccess);
-        _gatewayMock.Verify(g => g.AuthorizeAsync(merchantId, It.IsAny<Money>(), It.Is<CardDetails>(c => c.LastFour == "4242" && c.Brand == "Visa" && c.Token == "card_abc123"), It.IsAny<CancellationToken>()), Times.Once);
+        _gatewayMock.Verify(g => g.AuthorizeAsync(merchantId, It.IsAny<Money>(), It.Is<CardDetails>(c => c.LastFour == "4242" && c.Brand == "Visa" && c.Token == "card_abc123"), It.IsAny<CardSecurityCode?>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

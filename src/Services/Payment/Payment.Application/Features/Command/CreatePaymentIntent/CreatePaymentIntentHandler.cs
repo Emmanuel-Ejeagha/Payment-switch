@@ -78,11 +78,17 @@ public class CreatePaymentIntentHandler
 
         var intent = new PaymentIntent(Guid.NewGuid(), command.MerchantId, amount, idempotencyKey, paymentMethod, cardDetails);
 
+        // Deliberately a local: the CVC goes to the gateway and dies with this scope.
+        // It is never assigned to `intent`, which is what gets persisted.
+        var securityCode = CardSecurityCode.IsValid(command.SecurityCode)
+            ? new CardSecurityCode(command.SecurityCode!)
+            : null;
+
         var configResult = await _merchantService.GetMerchantConfigAsync(command.MerchantId, cancellationToken);
         if (!configResult.IsSuccess)
             return new Error("Payment.MerchantConfigRetrievalFailed", "Unable to retrieve merchant configuration.");
 
-        var authResult = await _gateway.AuthorizeAsync(intent.MerchantId, intent.Amount, intent.CardDetails, cancellationToken);
+        var authResult = await _gateway.AuthorizeAsync(intent.MerchantId, intent.Amount, intent.CardDetails, securityCode, cancellationToken);
         if (!authResult.IsSuccess)
         {
             intent.Fail();

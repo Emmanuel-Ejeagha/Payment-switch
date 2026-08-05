@@ -44,7 +44,7 @@ public class ConfirmPaymentIntentHandlerTests
         SetupValidatorSuccess(command);
         SetupMerchantConfig(autoCapture: false);
         _repoMock.Setup(r => r.GetByIdAsync(intent.Id, It.IsAny<CancellationToken>())).ReturnsAsync(intent);
-        _gatewayMock.Setup(g => g.ConfirmChallengeAsync(intent.MerchantId, intent.Amount, intent.CardDetails, intent.GatewayReference!.Value, It.IsAny<CancellationToken>()))
+        _gatewayMock.Setup(g => g.ConfirmChallengeAsync(intent.MerchantId, intent.Amount, intent.CardDetails, intent.GatewayReference!.Value, It.IsAny<CardSecurityCode?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<GatewayResponse>.Success(new GatewayResponse(true, "AUTH-3DS", intent.GatewayReference!.Value, null)));
         _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
@@ -64,7 +64,7 @@ public class ConfirmPaymentIntentHandlerTests
         SetupValidatorSuccess(command);
         SetupMerchantConfig(autoCapture: true);
         _repoMock.Setup(r => r.GetByIdAsync(intent.Id, It.IsAny<CancellationToken>())).ReturnsAsync(intent);
-        _gatewayMock.Setup(g => g.ConfirmChallengeAsync(intent.MerchantId, intent.Amount, intent.CardDetails, intent.GatewayReference!.Value, It.IsAny<CancellationToken>()))
+        _gatewayMock.Setup(g => g.ConfirmChallengeAsync(intent.MerchantId, intent.Amount, intent.CardDetails, intent.GatewayReference!.Value, It.IsAny<CardSecurityCode?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<GatewayResponse>.Success(new GatewayResponse(true, "AUTH-3DS", intent.GatewayReference!.Value, null)));
         _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
@@ -124,7 +124,7 @@ public class ConfirmPaymentIntentHandlerTests
         SetupValidatorSuccess(command);
         SetupMerchantConfig(autoCapture: false);
         _repoMock.Setup(r => r.GetByIdAsync(intent.Id, It.IsAny<CancellationToken>())).ReturnsAsync(intent);
-        _gatewayMock.Setup(g => g.ConfirmChallengeAsync(intent.MerchantId, intent.Amount, intent.CardDetails, intent.GatewayReference!.Value, It.IsAny<CancellationToken>()))
+        _gatewayMock.Setup(g => g.ConfirmChallengeAsync(intent.MerchantId, intent.Amount, intent.CardDetails, intent.GatewayReference!.Value, It.IsAny<CardSecurityCode?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<GatewayResponse>.Failure(new Error("Gateway.Declined", "Challenge failed.")));
 
         var result = await _handler.Handle(command);
@@ -141,7 +141,7 @@ public class ConfirmPaymentIntentHandlerTests
         SetupValidatorSuccess(command);
         SetupMerchantConfig(autoCapture: false);
         _repoMock.Setup(r => r.GetByIdAsync(intent.Id, It.IsAny<CancellationToken>())).ReturnsAsync(intent);
-        _gatewayMock.Setup(g => g.ConfirmChallengeAsync(intent.MerchantId, intent.Amount, intent.CardDetails, intent.GatewayReference!.Value, It.IsAny<CancellationToken>()))
+        _gatewayMock.Setup(g => g.ConfirmChallengeAsync(intent.MerchantId, intent.Amount, intent.CardDetails, intent.GatewayReference!.Value, It.IsAny<CardSecurityCode?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<GatewayResponse>.Success(new GatewayResponse(true, "AUTH-3DS", intent.GatewayReference!.Value, null)));
         _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ThrowsAsync(new ConcurrencyConflictException());
 

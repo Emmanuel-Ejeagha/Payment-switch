@@ -1,4 +1,5 @@
 ﻿using FluentValidation;
+using Payment.Domain.ValueObjects;
 
 namespace Payment.Application.Features.Command.CreatePaymentIntent;
 
@@ -25,5 +26,11 @@ public class CreatePaymentIntentCommandValidator : AbstractValidator<CreatePayme
                     .WithMessage("Card token must be in the form card_<hex>.");
             });
         });
+        // Optional: absent for merchant-initiated and recurring charges. When supplied
+        // it must be well-formed, so a typo fails here instead of at the acquirer.
+        RuleFor(x => x.SecurityCode)
+            .Must(CardSecurityCode.IsValid)
+            .When(x => x.SecurityCode is not null)
+            .WithMessage("Security code must be 3 or 4 digits.");
     }
 }

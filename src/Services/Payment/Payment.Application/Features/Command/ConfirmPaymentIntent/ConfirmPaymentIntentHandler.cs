@@ -59,7 +59,9 @@ public class ConfirmPaymentIntentHandler
         if (!configResult.IsSuccess)
             return new Error("Payment.MerchantConfigRetrievalFailed", "Unable to retrieve merchant configuration.");
 
-        var gatewayResult = await _gateway.ConfirmChallengeAsync(intent.MerchantId, intent.Amount, intent.CardDetails, intent.GatewayReference!.Value, cancellationToken);
+        // No CVC here: the code was collected on the original authorization and is not
+        // retained, so a challenge confirm is always cardholder-not-present to us.
+        var gatewayResult = await _gateway.ConfirmChallengeAsync(intent.MerchantId, intent.Amount, intent.CardDetails, intent.GatewayReference!.Value, cancellationToken: cancellationToken);
         if (!gatewayResult.IsSuccess)
             return new Error("Payment.ChallengeConfirmationFailed", gatewayResult.Errors.First().Message);
 

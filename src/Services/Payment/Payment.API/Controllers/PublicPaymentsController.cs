@@ -48,7 +48,8 @@ public class PublicPaymentsController : ControllerBase
             request.CardLastFour,
             request.CardBrand,
             idempotencyKey,
-            request.CardToken);
+            request.CardToken,
+            request.SecurityCode);
 
         var result = await handler.Handle(command);
         return result.ToActionResult();
@@ -134,7 +135,10 @@ public record PublicCreatePaymentIntentRequest(
     string PaymentMethod,
     string? CardLastFour = null,
     string? CardBrand = null,
-    string? CardToken = null
+    string? CardToken = null,
+    // CVC/CVV/CID for a cardholder-present authorization. Forwarded to the acquirer
+    // and never stored (PCI DSS 3.2). Omit for merchant-initiated or recurring charges.
+    string? SecurityCode = null
 );
 
 public record CreateCardTokenRequest(

@@ -47,7 +47,8 @@ public class CheckoutPaymentHandler
             null,
             null,
             command.IdempotencyKey,
-            command.CardToken);
+            command.CardToken,
+            command.SecurityCode);
 
         var result = await _createIntentHandler.Handle(createCommand, cancellationToken);
         if (!result.IsSuccess)

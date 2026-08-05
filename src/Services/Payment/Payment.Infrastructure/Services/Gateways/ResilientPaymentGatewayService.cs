@@ -22,7 +22,7 @@ public class ResilientPaymentGatewayService : IPaymentGatewayService
         _logger = logger;
     }
 
-    public async Task<Result<GatewayResponse>> AuthorizeAsync(Guid merchantId, Money amount, CardDetails? cardDetails, CancellationToken cancellationToken = default)
+    public async Task<Result<GatewayResponse>> AuthorizeAsync(Guid merchantId, Money amount, CardDetails? cardDetails, CardSecurityCode? securityCode = null, CancellationToken cancellationToken = default)
     {
         var ordered = _router.Resolve(amount, cardDetails, _registry.All);
 
@@ -36,7 +36,7 @@ public class ResilientPaymentGatewayService : IPaymentGatewayService
 
             try
             {
-                var response = await entry.Provider.AuthorizeAsync(merchantId, amount, cardDetails, cancellationToken);
+                var response = await entry.Provider.AuthorizeAsync(merchantId, amount, cardDetails, securityCode, cancellationToken);
                 if (response.Success)
                 {
                     entry.CircuitBreaker.RecordSuccess();
@@ -56,7 +56,7 @@ public class ResilientPaymentGatewayService : IPaymentGatewayService
         return new Error("Payment.GatewayUnavailable", "All payment gateways are unavailable.");
     }
 
-    public async Task<Result<GatewayResponse>> ConfirmChallengeAsync(Guid merchantId, Money amount, CardDetails? cardDetails, string gatewayReference, CancellationToken cancellationToken = default)
+    public async Task<Result<GatewayResponse>> ConfirmChallengeAsync(Guid merchantId, Money amount, CardDetails? cardDetails, string gatewayReference, CardSecurityCode? securityCode = null, CancellationToken cancellationToken = default)
     {
         var ordered = _router.Resolve(amount, cardDetails, _registry.All);
 
@@ -70,7 +70,7 @@ public class ResilientPaymentGatewayService : IPaymentGatewayService
 
             try
             {
-                var response = await entry.Provider.ConfirmChallengeAsync(merchantId, amount, cardDetails, gatewayReference, cancellationToken);
+                var response = await entry.Provider.ConfirmChallengeAsync(merchantId, amount, cardDetails, gatewayReference, securityCode, cancellationToken);
                 if (response.Success)
                 {
                     entry.CircuitBreaker.RecordSuccess();

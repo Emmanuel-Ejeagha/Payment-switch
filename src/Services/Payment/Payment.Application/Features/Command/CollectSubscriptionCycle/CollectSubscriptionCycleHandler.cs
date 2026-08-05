@@ -109,6 +109,8 @@ public class CollectSubscriptionCycleHandler
                 null,
                 null,
                 idempotencyKey,
+                // No CVC: recurring cycles run without the cardholder, and the code from
+                // the first charge is never retained.
                 subscription.CardToken),
             cancellationToken);
 
