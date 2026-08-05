@@ -210,7 +210,7 @@ export default function AdminPage() {
 
             {newKey && (
               <div className="rounded-lg border border-emerald-500/50 bg-emerald-500/10 p-3">
-                <p className="text-xs font-medium text-emerald-600 mb-1">Copy your new API key now — it won't be shown again:</p>
+                <p className="text-xs font-medium text-emerald-600 mb-1">Copy your new API key now — it won&apos;t be shown again:</p>
                 <div className="flex items-center gap-2">
                   <code className="flex-1 truncate rounded bg-background px-2 py-1 text-xs font-mono">{newKey}</code>
                   <button

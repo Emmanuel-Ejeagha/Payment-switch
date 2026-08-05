@@ -68,7 +68,6 @@ export default function MerchantDashboardPage() {
 
   useEffect(() => {
     if (!merchant) return
-    loadData()
     const interval = setInterval(loadData, 30000)
     return () => clearInterval(interval)
   }, [merchant, loadData])
