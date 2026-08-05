@@ -13,8 +13,9 @@ export default function PaymentDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [pendingAction, setPendingAction] = useState<string | null>(null)
 
+  // No synchronous setLoading here: the skeleton only needs to show on first mount, and
+  // refreshes after an action are already covered by the pendingAction button guard.
   const fetchPayment = useCallback(async () => {
-    setLoading(true)
     try {
       const res = await fetch(`/api/proxy/payment/api/v1/payments/${id}`)
       if (!res.ok) { setError("Payment not found"); return }
@@ -27,7 +28,10 @@ export default function PaymentDetailPage() {
   }, [id])
 
   useEffect(() => {
-    fetchPayment()
+    async function load() {
+      await fetchPayment()
+    }
+    load()
   }, [fetchPayment])
 
   const doAction = async (action: string, extra?: Record<string, unknown>) => {

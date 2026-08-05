@@ -105,3 +105,75 @@ export interface CheckoutPaymentDto {
   status: string
   clientSecret?: string | null
 }
+
+export interface CustomerDto {
+  id: string
+  merchantId: string
+  code: string
+  email: string
+  name?: string | null
+  phone?: string | null
+  description?: string | null
+  createdAt: string
+  updatedAt?: string | null
+}
+
+export interface PlanDto {
+  id: string
+  merchantId: string
+  code: string
+  name: string
+  amount: number
+  currency: string
+  intervalUnit: string
+  intervalCount: number
+  description?: string | null
+  active: boolean
+  createdAt: string
+}
+
+export interface SubscriptionDto {
+  id: string
+  merchantId: string
+  customerId: string
+  planId: string
+  code: string
+  status: string
+  currentPeriodStart: string
+  currentPeriodEnd: string
+  nextBillingAt?: string | null
+  cancelAtPeriodEnd: boolean
+  canceledAt?: string | null
+  createdAt: string
+}
+
+export interface InvoiceDto {
+  id: string
+  merchantId: string
+  customerId: string
+  subscriptionId: string
+  code: string
+  amount: number
+  currency: string
+  status: string
+  periodStart: string
+  periodEnd: string
+  paymentIntentId?: string | null
+  attemptCount: number
+  lastError?: string | null
+  paidAt?: string | null
+  createdAt: string
+}
+
+export interface WebhookEventDto {
+  id: string
+  merchantId: string
+  eventType: string
+  payload: string
+  status: string
+  deliveredAt?: string | null
+  failureReason?: string | null
+  attemptCount: number
+  nextRetryAt?: string | null
+  createdAt: string
+}
