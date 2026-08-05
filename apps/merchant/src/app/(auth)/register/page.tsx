@@ -79,7 +79,9 @@ export default function RegisterPage() {
       )
 
       if (!onboardRes.ok) {
-        setError("Account created but merchant onboarding failed. Please contact support.")
+        // The identity account exists, so signing in works — /onboarding lets them
+        // retry the merchant profile instead of stranding them here.
+        setError("Account created, but merchant setup did not finish. Sign in to complete it.")
         return
       }
 
