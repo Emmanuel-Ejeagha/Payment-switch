@@ -39,8 +39,8 @@ public class SendTestWebhookEventHandlerTests
         var result = await _handler.Handle(command);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal("test.event", result.Value.EventType);
-        Assert.Equal(WebhookEvent.StatusPending, result.Value.Status);
+        Assert.Equal("test.event", result.Value!.EventType);
+        Assert.Equal(WebhookEvent.StatusPending, result.Value!.Status);
         _repoMock.Verify(r => r.AddAsync(It.IsAny<WebhookEvent>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -152,7 +152,7 @@ public class ListWebhookEventsHandlerTests
         var result = await _handler.Handle(new ListWebhookEventsQuery(merchantId));
 
         Assert.True(result.IsSuccess);
-        var dto = Assert.Single(result.Value);
+        var dto = Assert.Single(result.Value!);
         Assert.Equal(webhookEvent.Id, dto.Id);
         Assert.Equal(WebhookEvent.StatusSucceeded, dto.Status);
     }

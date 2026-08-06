@@ -27,9 +27,9 @@ public class PaymentLinkHandlerTests
         var result = await handler.Handle(new CreatePaymentLinkCommand(Guid.NewGuid(), 500, "USD", "Test link"));
 
         Assert.True(result.IsSuccess);
-        Assert.StartsWith("pl_", result.Value.Code);
-        Assert.Equal(500, result.Value.Amount);
-        Assert.True(result.Value.Active);
+        Assert.StartsWith("pl_", result.Value!.Code);
+        Assert.Equal(500, result.Value!.Amount);
+        Assert.True(result.Value!.Active);
         repoMock.Verify(r => r.AddAsync(It.IsAny<PaymentLink>(), It.IsAny<CancellationToken>()), Times.Once);
         uowMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
@@ -59,9 +59,9 @@ public class PaymentLinkHandlerTests
         var result = await handler.Handle(new GetPaymentLinkByCodeQuery("pl_abc123"));
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(2500, result.Value.Amount);
-        Assert.Equal("NGN", result.Value.Currency);
-        Assert.True(result.Value.Active);
+        Assert.Equal(2500, result.Value!.Amount);
+        Assert.Equal("NGN", result.Value!.Currency);
+        Assert.True(result.Value!.Active);
     }
 
     [Fact]
@@ -111,9 +111,9 @@ public class PaymentLinkHandlerTests
         var result = await handler.Handle(new CheckoutTokenizeCommand("pl_tokenize", "4242424242424242", 12, 2030));
 
         Assert.True(result.IsSuccess);
-        Assert.StartsWith("card_", result.Value.Token);
-        Assert.Equal("4242", result.Value.LastFour);
-        Assert.Equal("Visa", result.Value.Brand);
+        Assert.StartsWith("card_", result.Value!.Token);
+        Assert.Equal("4242", result.Value!.LastFour);
+        Assert.Equal("Visa", result.Value!.Brand);
         cardTokenRepoMock.Verify(r => r.AddAsync(It.Is<CardToken>(t => t.MerchantId == merchantId), It.IsAny<CancellationToken>()), Times.Once);
     }
 

@@ -50,6 +50,13 @@ public static class TestSecrets
     {
         lock (Sync)
         {
+            // Disable the Testcontainers Resource Reaper (Ryuk). When the full
+            // solution's integration test assemblies start their Postgres
+            // containers in parallel, concurrent Ryuk startups on Docker
+            // Desktop time out on the named pipe (System.TimeoutException in
+            // ResourceReaper.GetAndStartNewAsync). Containers are always torn
+            // down by DisposeAsync, so the reaper is unnecessary here.
+            Environment.SetEnvironmentVariable("TESTCONTAINERS_RYUK_DISABLED", "true");
             Environment.SetEnvironmentVariable("Jwt__Secret", JwtSecret);
             Environment.SetEnvironmentVariable("Jwt__Issuer", jwtIssuer);
             Environment.SetEnvironmentVariable("Jwt__Audience", JwtAudience);

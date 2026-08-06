@@ -21,8 +21,8 @@ public class GetSettlementBatchHandlerTests
         var result = await handler.Handle(new GetSettlementBatchQuery(batch.Id));
 
         Assert.True(result.IsSuccess);
-        Assert.Single(result.Value.Payouts);
-        Assert.Equal(95L, result.Value.TotalAmount);
+        Assert.Single(result.Value!.Payouts);
+        Assert.Equal(95L, result.Value!.TotalAmount);
     }
 
     [Fact]

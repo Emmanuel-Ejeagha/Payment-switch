@@ -30,7 +30,7 @@ public class WebhookDispatcher
         if (!configResult.IsSuccess)
             return (false, "Unable to retrieve merchant configuration.");
 
-        var config = configResult.Value;
+        var config = configResult.Value!;
         if (string.IsNullOrWhiteSpace(config.WebhookUrl))
             return (false, "No webhook endpoint configured.");
 

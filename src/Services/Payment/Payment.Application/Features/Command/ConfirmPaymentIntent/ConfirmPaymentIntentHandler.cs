@@ -75,7 +75,7 @@ public class ConfirmPaymentIntentHandler
             intent.MarkProcessing();
             intent.ConfirmAction(authCode, gatewayRef, command.IdempotencyKey);
 
-            if (configResult.Value.AutoCapture)
+            if (configResult.Value!.AutoCapture)
                 intent.Capture();
         }
         catch (InvalidOperationException)

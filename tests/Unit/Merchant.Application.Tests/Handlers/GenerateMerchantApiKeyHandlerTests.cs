@@ -28,10 +28,10 @@ public class GenerateMerchantApiKeyHandlerTests
         var result = await _handler.Handle(command);
 
         Assert.True(result.IsSuccess);
-        Assert.StartsWith("sk_test_", result.Value.PlainTextKey);
+        Assert.StartsWith("sk_test_", result.Value!.PlainTextKey);
         Assert.Single(merchant.ApiKeys);
         Assert.Equal("test", merchant.ApiKeys[0].Environment);
-        Assert.NotEqual(result.Value.PlainTextKey, merchant.ApiKeys[0].KeyHash);
+        Assert.NotEqual(result.Value!.PlainTextKey, merchant.ApiKeys[0].KeyHash);
     }
 
     [Fact]
@@ -46,7 +46,7 @@ public class GenerateMerchantApiKeyHandlerTests
         var result = await _handler.Handle(command);
 
         Assert.True(result.IsSuccess);
-        Assert.StartsWith("sk_live_", result.Value.PlainTextKey);
+        Assert.StartsWith("sk_live_", result.Value!.PlainTextKey);
     }
 
     [Fact]

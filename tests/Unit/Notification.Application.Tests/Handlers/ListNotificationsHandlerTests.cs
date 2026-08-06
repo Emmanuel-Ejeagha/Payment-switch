@@ -19,6 +19,6 @@ public class ListNotificationsHandlerTests
         var result = await handler.Handle(new ListNotificationsQuery(null, null, null, 0, 10));
 
         Assert.True(result.IsSuccess);
-        Assert.Single(result.Value);
+        Assert.Single(result.Value!);
     }
 }

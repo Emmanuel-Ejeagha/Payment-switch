@@ -54,6 +54,6 @@ public class CheckoutPaymentHandler
         if (!result.IsSuccess)
             return Result<CheckoutPaymentResponse>.Failure(result.Errors);
 
-        return new CheckoutPaymentResponse(result.Value.IntentId, result.Value.Status, result.Value.ClientSecret);
+        return new CheckoutPaymentResponse(result.Value!.IntentId, result.Value!.Status, result.Value!.ClientSecret);
     }
 }

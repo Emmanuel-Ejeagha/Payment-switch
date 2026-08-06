@@ -58,7 +58,9 @@ public class HostedCheckoutController : ControllerBase
         [FromServices] CheckoutPaymentHandler handler)
     {
         var idempotencyKey = Request.Headers["Idempotency-Key"].FirstOrDefault() ?? request.IdempotencyKey;
-        var command = new CheckoutPaymentCommand(code, request.CardToken, idempotencyKey, request.SecurityCode);
+        // A missing idempotency key is rejected by CheckoutPaymentCommandValidator
+        // (NotEmpty); the null-forgiving operator documents that intent here.
+        var command = new CheckoutPaymentCommand(code, request.CardToken, idempotencyKey!, request.SecurityCode);
         var result = await handler.Handle(command);
         return result.ToActionResult();
     }

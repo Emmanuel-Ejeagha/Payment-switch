@@ -45,9 +45,9 @@ public class GenerateApiKeyHandlerTests
 
         // Assert
         Assert.True(result.IsSuccess);
-        Assert.Equal("live", result.Value.Environment);
-        Assert.StartsWith("sk_live_", result.Value.PlainTextKey);
-        Assert.NotEmpty(result.Value.PlainTextKey);
+        Assert.Equal("live", result.Value!.Environment);
+        Assert.StartsWith("sk_live_", result.Value!.PlainTextKey);
+        Assert.NotEmpty(result.Value!.PlainTextKey);
         Assert.Single(user.ApiKeys);
     }
 
@@ -69,7 +69,7 @@ public class GenerateApiKeyHandlerTests
 
         // Assert
         Assert.True(result.IsSuccess);
-        Assert.StartsWith("sk_test_", result.Value.PlainTextKey);
+        Assert.StartsWith("sk_test_", result.Value!.PlainTextKey);
     }
 
     [Fact]

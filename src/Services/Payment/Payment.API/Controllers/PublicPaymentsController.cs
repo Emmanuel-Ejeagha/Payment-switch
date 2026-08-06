@@ -122,7 +122,7 @@ public class PublicPaymentsController : ControllerBase
             return Unauthorized();
 
         var result = await handler.Handle(new GetPaymentIntentByIdQuery(id));
-        if (result.IsSuccess && result.Value.MerchantId != merchantId)
+        if (result.IsSuccess && result.Value!.MerchantId != merchantId)
             return NotFound();
 
         return result.ToActionResult();

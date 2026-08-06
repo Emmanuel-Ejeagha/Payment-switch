@@ -6,9 +6,9 @@ namespace Identity.Domain.Entities;
 
 public class User : AggregateRoot
 {
-    public Email Email { get; private set; }
-    public PasswordHash PasswordHash { get; private set; }
-    public FullName FullName { get; private set; }
+    public Email Email { get; private set; } = null!;
+    public PasswordHash PasswordHash { get; private set; } = null!;
+    public FullName FullName { get; private set; } = null!;
     public bool IsActive { get; private set; }
     private readonly List<string> _roles = new();
     private readonly List<TokenValue> _refreshTokens = new();

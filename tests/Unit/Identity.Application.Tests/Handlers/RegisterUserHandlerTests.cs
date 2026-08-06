@@ -50,7 +50,7 @@ public class RegisterUserHandlerTests
 
         // Assert
         Assert.True(result.IsSuccess);
-        Assert.NotEqual(Guid.Empty, result.Value.UserId);
+        Assert.NotEqual(Guid.Empty, result.Value!.UserId);
         _userRepositoryMock.Verify(r => r.AddAsync(It.Is<User>(u => u.Email.Value == command.Email), It.IsAny<CancellationToken>()), Times.Once);
         _unitOfWorkMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
         _dispatcherMock.Verify(d => d.DispatchAsync(It.IsAny<IReadOnlyList<DomainEvent>>(), It.IsAny<CancellationToken>()), Times.Once);

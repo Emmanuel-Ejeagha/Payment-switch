@@ -42,9 +42,9 @@ public class CreatePaymentIntentHandlerTests
         var result = await _handler.Handle(command);
 
         Assert.True(result.IsSuccess);
-        Assert.NotEqual(Guid.Empty, result.Value.IntentId);
-        Assert.Equal("Captured", result.Value.Status);
-        Assert.NotNull(result.Value.ClientSecret);
+        Assert.NotEqual(Guid.Empty, result.Value!.IntentId);
+        Assert.Equal("Captured", result.Value!.Status);
+        Assert.NotNull(result.Value!.ClientSecret);
         _repoMock.Verify(r => r.AddAsync(It.Is<PaymentIntent>(i => i.IdempotencyKey.Value == command.IdempotencyKey), It.IsAny<CancellationToken>()), Times.Once);
         _uowMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
         _dispatcherMock.Verify(d => d.DispatchAsync(It.IsAny<IReadOnlyList<DomainEvent>>(), It.IsAny<CancellationToken>()), Times.Once);
@@ -64,8 +64,8 @@ public class CreatePaymentIntentHandlerTests
         var result = await _handler.Handle(command);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal("Authorized", result.Value.Status);
-        Assert.Null(result.Value.ClientSecret);
+        Assert.Equal("Authorized", result.Value!.Status);
+        Assert.Null(result.Value!.ClientSecret);
     }
 
     [Fact]
@@ -81,7 +81,7 @@ public class CreatePaymentIntentHandlerTests
         var result = await _handler.Handle(command);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal("Failed", result.Value.Status);
+        Assert.Equal("Failed", result.Value!.Status);
         _repoMock.Verify(r => r.AddAsync(It.Is<PaymentIntent>(i => i.Status.Value == "Failed"), It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -96,7 +96,7 @@ public class CreatePaymentIntentHandlerTests
         var result = await _handler.Handle(command);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(existing.Id, result.Value.IntentId);
+        Assert.Equal(existing.Id, result.Value!.IntentId);
         _repoMock.Verify(r => r.AddAsync(It.IsAny<PaymentIntent>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 

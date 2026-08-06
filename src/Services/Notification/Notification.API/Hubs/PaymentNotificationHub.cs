@@ -31,7 +31,7 @@ public class PaymentNotificationHub : Hub
             {
                 var merchantId = await _merchantGroupResolver.ResolveMerchantIdAsync(
                     email,
-                    accessToken.ToString(),
+                    accessToken.ToString()!,
                     Context.ConnectionAborted);
 
                 if (merchantId.HasValue)

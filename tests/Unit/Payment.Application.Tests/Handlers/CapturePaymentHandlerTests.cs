@@ -40,7 +40,7 @@ public class CapturePaymentHandlerTests
         var result = await _handler.Handle(command);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal("Captured", result.Value.Status);
+        Assert.Equal("Captured", result.Value!.Status);
     }
 
     [Fact]
@@ -103,7 +103,7 @@ public class CapturePaymentHandlerTests
         var result = await _handler.Handle(command);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal("Captured", result.Value.Status);
+        Assert.Equal("Captured", result.Value!.Status);
         _gatewayMock.Verify(g => g.CaptureAsync(It.IsAny<Guid>(), It.IsAny<GatewayReference>(), It.IsAny<Money>(), It.IsAny<CancellationToken>()), Times.Never);
         _uowMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }

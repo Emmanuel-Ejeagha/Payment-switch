@@ -51,9 +51,9 @@ public class AuthorizePaymentHandlerTests
         var result = await _handler.Handle(command);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal("AUTH123", result.Value.AuthorizationCode);
-        Assert.Equal("GW-1", result.Value.GatewayReference);
-        Assert.Equal("Authorized", result.Value.Status);
+        Assert.Equal("AUTH123", result.Value!.AuthorizationCode);
+        Assert.Equal("GW-1", result.Value!.GatewayReference);
+        Assert.Equal("Authorized", result.Value!.Status);
     }
 
     [Fact]
@@ -122,8 +122,8 @@ public class AuthorizePaymentHandlerTests
         var result = await _handler.Handle(command);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal("AUTH123", result.Value.AuthorizationCode);
-        Assert.Equal("GW-1", result.Value.GatewayReference);
+        Assert.Equal("AUTH123", result.Value!.AuthorizationCode);
+        Assert.Equal("GW-1", result.Value!.GatewayReference);
         _gatewayMock.Verify(g => g.AuthorizeAsync(It.IsAny<Guid>(), It.IsAny<Money>(), It.IsAny<CardDetails>(), It.IsAny<CardSecurityCode?>(), It.IsAny<CancellationToken>()), Times.Never);
         _uowMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }

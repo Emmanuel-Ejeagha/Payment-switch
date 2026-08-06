@@ -51,8 +51,8 @@ public class ConfirmPaymentIntentHandlerTests
         var result = await _handler.Handle(command);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal("Authorized", result.Value.Status);
-        Assert.Equal(intent.Id, result.Value.IntentId);
+        Assert.Equal("Authorized", result.Value!.Status);
+        Assert.Equal(intent.Id, result.Value!.IntentId);
         _dispatcherMock.Verify(d => d.DispatchAsync(intent.DomainEvents, It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -71,8 +71,8 @@ public class ConfirmPaymentIntentHandlerTests
         var result = await _handler.Handle(command);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal("Captured", result.Value.Status);
-        Assert.NotNull(result.Value.ClientSecret);
+        Assert.Equal("Captured", result.Value!.Status);
+        Assert.NotNull(result.Value!.ClientSecret);
     }
 
     [Fact]
