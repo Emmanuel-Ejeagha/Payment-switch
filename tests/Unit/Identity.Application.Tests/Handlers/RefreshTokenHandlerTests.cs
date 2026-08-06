@@ -54,8 +54,8 @@ public class RefreshTokenHandlerTests
 
         // Assert
         Assert.True(result.IsSuccess);
-        Assert.Equal("new_access_token", result.Value.AccessToken);
-        Assert.Equal("new_refresh_token", result.Value.RefreshToken);
+        Assert.Equal("new_access_token", result.Value!.AccessToken);
+        Assert.Equal("new_refresh_token", result.Value!.RefreshToken);
         Assert.True(user.RefreshTokens.First(t => t.Value == "hash-valid_refresh_token").IsRevoked);
         Assert.Contains(user.RefreshTokens, t => t.Value == "hash-new_refresh_token");
     }

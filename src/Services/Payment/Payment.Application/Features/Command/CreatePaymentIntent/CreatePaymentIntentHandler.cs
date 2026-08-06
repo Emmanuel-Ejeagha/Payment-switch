@@ -120,7 +120,7 @@ public class CreatePaymentIntentHandler
             var authCode = new AuthorizationCode(gwResponse.AuthorizationCode!);
             intent.Authorize(authCode, gatewayRef);
 
-            if (configResult.Value.AutoCapture)
+            if (configResult.Value!.AutoCapture)
                 intent.Capture();
         }
 

@@ -57,9 +57,9 @@ public class LoginHandlerTests
 
         // Assert
         Assert.True(result.IsSuccess);
-        Assert.Equal("access_token", result.Value.AccessToken);
-        Assert.Equal("refresh_token", result.Value.RefreshToken);
-        Assert.Equal(3600, result.Value.ExpiresIn);
+        Assert.Equal("access_token", result.Value!.AccessToken);
+        Assert.Equal("refresh_token", result.Value!.RefreshToken);
+        Assert.Equal(3600, result.Value!.ExpiresIn);
         Assert.Single(user.RefreshTokens);
     }
 

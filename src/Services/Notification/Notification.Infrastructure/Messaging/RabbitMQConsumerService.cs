@@ -189,7 +189,13 @@ public class RabbitMQConsumerService : BackgroundService
 
     private async Task HandleFailureAsync(BasicDeliverEventArgs ea, string messageId, CancellationToken cancellationToken)
     {
-        var retryCount = MessageRetryPolicy.GetRetryCount(ea.BasicProperties.Headers);
+        // A delivered message always carries BasicProperties; the client types it
+        // as nullable so we assert it rather than branch on a value that cannot be null.
+        var basicProperties = ea.BasicProperties!;
+        // The consumer is running on a channel created in ExecuteAsync, so it is
+        // always initialized by the time a failure can be handled.
+        var channel = _channel ?? throw new InvalidOperationException("Channel is not initialized.");
+        var retryCount = MessageRetryPolicy.GetRetryCount(basicProperties.Headers);
 
         if (MessageRetryPolicy.ShouldRetry(retryCount))
         {
@@ -197,22 +203,22 @@ public class RabbitMQConsumerService : BackgroundService
             {
                 Persistent = true,
                 ContentType = "application/json",
-                MessageId = ea.BasicProperties.MessageId,
-                CorrelationId = ea.BasicProperties.CorrelationId,
+                MessageId = basicProperties.MessageId,
+                CorrelationId = basicProperties.CorrelationId,
                 Headers = new Dictionary<string, object?>
                 {
                     [MessageRetryPolicy.RetryCountHeader] = retryCount + 1
                 }
             };
 
-            await _channel.BasicPublishAsync(
+            await channel.BasicPublishAsync(
                 exchange: _retryExchange,
                 routingKey: ea.RoutingKey,
                 mandatory: false,
                 basicProperties: properties,
                 body: ea.Body,
                 cancellationToken: cancellationToken);
-            await _channel.BasicAckAsync(ea.DeliveryTag, false, cancellationToken);
+            await channel.BasicAckAsync(ea.DeliveryTag, false, cancellationToken);
 
             _logger.LogWarning("Message {MessageId} failed; scheduled retry {RetryCount}/{MaxRetries}",
                 messageId, retryCount + 1, MessageRetryPolicy.MaxRetries);
@@ -223,19 +229,19 @@ public class RabbitMQConsumerService : BackgroundService
             {
                 Persistent = true,
                 ContentType = "application/json",
-                MessageId = ea.BasicProperties.MessageId,
-                CorrelationId = ea.BasicProperties.CorrelationId,
-                Headers = ea.BasicProperties.Headers
+                MessageId = basicProperties.MessageId,
+                CorrelationId = basicProperties.CorrelationId,
+                Headers = basicProperties.Headers
             };
 
-            await _channel.BasicPublishAsync(
+            await channel.BasicPublishAsync(
                 exchange: _dlxExchange,
                 routingKey: ea.RoutingKey,
                 mandatory: false,
                 basicProperties: properties,
                 body: ea.Body,
                 cancellationToken: cancellationToken);
-            await _channel.BasicAckAsync(ea.DeliveryTag, false, cancellationToken);
+            await channel.BasicAckAsync(ea.DeliveryTag, false, cancellationToken);
 
             _logger.LogError("Message {MessageId} failed after {MaxRetries} retries; moved to DLQ",
                 messageId, MessageRetryPolicy.MaxRetries);

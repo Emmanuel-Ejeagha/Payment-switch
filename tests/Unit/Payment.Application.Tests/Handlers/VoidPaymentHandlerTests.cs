@@ -40,7 +40,7 @@ public class VoidPaymentHandlerTests
         var result = await _handler.Handle(command);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal("Voided", result.Value.Status);
+        Assert.Equal("Voided", result.Value!.Status);
     }
 
     [Fact]
@@ -87,7 +87,7 @@ public class VoidPaymentHandlerTests
         var result = await _handler.Handle(command);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal("Voided", result.Value.Status);
+        Assert.Equal("Voided", result.Value!.Status);
         _gatewayMock.Verify(g => g.VoidAsync(It.IsAny<Guid>(), It.IsAny<GatewayReference>(), It.IsAny<CancellationToken>()), Times.Never);
         _uowMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }

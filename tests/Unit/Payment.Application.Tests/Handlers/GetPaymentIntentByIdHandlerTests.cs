@@ -20,8 +20,8 @@ public class GetPaymentIntentByIdHandlerTests
         var result = await handler.Handle(new GetPaymentIntentByIdQuery(intent.Id));
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(50, result.Value.Amount);
-        Assert.Equal("Pending", result.Value.Status);
+        Assert.Equal(50, result.Value!.Amount);
+        Assert.Equal("Pending", result.Value!.Status);
     }
 
     [Fact]

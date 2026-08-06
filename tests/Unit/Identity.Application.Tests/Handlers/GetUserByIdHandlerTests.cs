@@ -25,9 +25,9 @@ public class GetUserByIdHandlerTests
 
         // Assert
         Assert.True(result.IsSuccess);
-        Assert.Equal(user.Id, result.Value.Id);
-        Assert.Equal("test@example.com", result.Value.Email);
-        Assert.Contains("Admin", result.Value.Roles);
+        Assert.Equal(user.Id, result.Value!.Id);
+        Assert.Equal("test@example.com", result.Value!.Email);
+        Assert.Contains("Admin", result.Value!.Roles);
     }
 
     [Fact]

@@ -3,9 +3,9 @@
 public class InboxMessage
 {
     public Guid Id { get; private set; }
-    public string MessageId { get; private set; }
-    public string EventType { get; private set; }
-    public string Payload { get; private set; }
+    public string MessageId { get; private set; } = null!;
+    public string EventType { get; private set; } = null!;
+    public string Payload { get; private set; } = null!;
     public DateTime OccurredOn { get; private set; }
     public DateTime? ProcessedAt { get; private set; }
 

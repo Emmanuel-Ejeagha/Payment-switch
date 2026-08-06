@@ -20,7 +20,7 @@ public class GetNotificationByIdHandlerTests
         var result = await handler.Handle(new GetNotificationByIdQuery(notification.Id));
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(notification.Recipient, result.Value.Recipient);
+        Assert.Equal(notification.Recipient, result.Value!.Recipient);
     }
 
     [Fact]

@@ -32,6 +32,9 @@ Thumbs.db
 appsettings.Development.json
 /.env.example
 
+# Local environment overrides for the Next.js apps
+.env*.local
+
 # Kubernetes secrets - never commit real credentials
 k8s/secret.yaml
 helm/**/secrets.yaml

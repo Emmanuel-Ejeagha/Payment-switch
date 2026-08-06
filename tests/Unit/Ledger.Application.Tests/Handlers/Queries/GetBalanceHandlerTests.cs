@@ -23,8 +23,8 @@ public class GetBalanceHandlerTests
         var result = await handler.Handle(new GetBalanceQuery(account.MerchantId));
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(500L, result.Value.Available);
-        Assert.Equal(200L, result.Value.Pending);
+        Assert.Equal(500L, result.Value!.Available);
+        Assert.Equal(200L, result.Value!.Pending);
     }
 
     [Fact]

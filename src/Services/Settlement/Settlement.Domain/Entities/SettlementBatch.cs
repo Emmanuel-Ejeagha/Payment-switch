@@ -10,7 +10,7 @@ namespace Settlement.Domain.Entities;
 public class SettlementBatch : AggregateRoot
 {
     public DateTime BatchDate { get; private set; }
-    public SettlementStatus Status { get; internal set; }
+    public SettlementStatus Status { get; internal set; } = null!;
     public long TotalAmount { get; internal set; }
     public IReadOnlyList<Payout> Payouts => _payouts.AsReadOnly();
     private readonly List<Payout> _payouts = new();

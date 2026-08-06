@@ -40,7 +40,7 @@ public class RefundPaymentHandlerTests
         var result = await _handler.Handle(command);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal("FullyRefunded", result.Value.Status);
+        Assert.Equal("FullyRefunded", result.Value!.Status);
     }
 
     [Fact]
@@ -103,7 +103,7 @@ public class RefundPaymentHandlerTests
         var result = await _handler.Handle(command);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal("FullyRefunded", result.Value.Status);
+        Assert.Equal("FullyRefunded", result.Value!.Status);
         _gatewayMock.Verify(g => g.RefundAsync(It.IsAny<Guid>(), It.IsAny<GatewayReference>(), It.IsAny<Money>(), It.IsAny<CancellationToken>()), Times.Never);
         _uowMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
