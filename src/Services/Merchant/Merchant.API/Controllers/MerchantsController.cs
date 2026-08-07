@@ -1,4 +1,5 @@
-﻿using Merchant.API.Extensions;
+﻿using Merchant.API.Contracts;
+using Merchant.API.Extensions;
 using Merchant.Application.DTOs;
 using Merchant.Application.Features.Commands.ActivateMerchant;
 using Merchant.Application.Features.Commands.OnboardMerchant;
@@ -127,10 +128,10 @@ public class MerchantsController : BaseApiController
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateConfiguration(
         Guid id,
-        [FromBody] UpdateMerchantConfigurationCommand command,
+        [FromBody] UpdateMerchantConfigurationRequest request,
         [FromServices] UpdateMerchantConfigurationHandler handler)
     {
-        command = new UpdateMerchantConfigurationCommand(id, command.WebhookUrl, command.PaymentMethods, command.AutoCapture, User.ToCallerContext());
+        var command = new UpdateMerchantConfigurationCommand(id, request.WebhookUrl, request.PaymentMethods, request.AutoCapture, User.ToCallerContext());
         var result = await handler.Handle(command);
         return result.ToActionResult();
     }

@@ -3,6 +3,7 @@ using BuildingBlocks.Shared.Exceptions;
 using BuildingBlocks.Shared.Results;
 using FluentValidation;
 using Microsoft.Extensions.Logging;
+using Settlement.Application.DTOs;
 using Settlement.Application.Interfaces;
 using Settlement.Domain.DomainErrors;
 using Settlement.Domain.Entities;
@@ -35,7 +36,7 @@ public class TriggerSettlementHandler
         _logger = logger;
     }
 
-    public async Task<Result<Guid>> Handle(TriggerSettlementCommand command, CancellationToken cancellationToken = default)
+    public async Task<Result<TriggerSettlementResponse>> Handle(TriggerSettlementCommand command, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Handling {CommandName}", nameof(TriggerSettlementCommand));
 
@@ -43,17 +44,21 @@ public class TriggerSettlementHandler
         if (!validation.IsValid)
             return validation.Errors.Select(e => new Error(e.PropertyName, e.ErrorMessage)).ToList();
 
-        var existing = await _repository.GetByBatchDateAsync(command.BatchDate, cancellationToken);
-        if (existing is not null)
-            return existing.Id;
+        var batchDate = command.BatchDate.Kind == DateTimeKind.Unspecified
+            ? DateTime.SpecifyKind(command.BatchDate, DateTimeKind.Utc)
+            : command.BatchDate;
 
-        var ledgerResult = await _ledgerService.GetDailyPayoutDataAsync(command.BatchDate, cancellationToken);
+        var existing = await _repository.GetByBatchDateAsync(batchDate, cancellationToken);
+        if (existing is not null)
+            return new TriggerSettlementResponse(existing.Id);
+
+        var ledgerResult = await _ledgerService.GetDailyPayoutDataAsync(batchDate, cancellationToken);
         if (!ledgerResult.IsSuccess)
-            return Result<Guid>.Failure(ledgerResult.Errors);
+            return Result<TriggerSettlementResponse>.Failure(ledgerResult.Errors);
 
         var payoutDataList = ledgerResult.Value!;
 
-        var batch = new SettlementBatch(Guid.NewGuid(), command.BatchDate);
+        var batch = new SettlementBatch(Guid.NewGuid(), batchDate);
 
         foreach (var data in payoutDataList)
         {
@@ -78,6 +83,6 @@ public class TriggerSettlementHandler
         }
         await _dispatcher.DispatchAsync(batch.DomainEvents, cancellationToken);
 
-        return batch.Id;
+        return new TriggerSettlementResponse(batch.Id);
     }
 }

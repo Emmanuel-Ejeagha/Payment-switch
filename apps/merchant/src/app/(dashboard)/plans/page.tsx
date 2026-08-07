@@ -2,17 +2,19 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { Plus, X, Archive, Package } from "lucide-react"
+import { useMerchant } from "@/hooks/use-merchant"
 import type { PlanDto } from "@paymentswitch/shared"
 
 const SUPPORTED_CURRENCIES = ["USD", "EUR", "GBP", "NGN"]
 const INTERVAL_UNITS = ["Day", "Week", "Month", "Year"]
 
 export default function PlansPage() {
-  const [merchantId, setMerchantId] = useState<string | null>(null)
+  const { merchantId, loading: merchantLoading, error: merchantError } = useMerchant()
   const [plans, setPlans] = useState<PlanDto[]>([])
-  const [loading, setLoading] = useState(true)
+  const [dataReady, setDataReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [working, setWorking] = useState(false)
+  const loading = merchantLoading || (merchantId !== null && !dataReady)
 
   const [showForm, setShowForm] = useState(false)
   const [name, setName] = useState("")
@@ -28,24 +30,20 @@ export default function PlansPage() {
   }, [])
 
   useEffect(() => {
+    if (merchantLoading) return
+    if (!merchantId) return
+    const mid = merchantId
     async function load() {
       try {
-        const userRes = await fetch("/api/proxy/identity/api/v1/users/me")
-        if (!userRes.ok) { setError("Failed to load user"); setLoading(false); return }
-        const user = await userRes.json()
-        const merchantRes = await fetch(`/api/proxy/merchant/api/v1/merchants/by-email/${encodeURIComponent(user.email)}`)
-        if (!merchantRes.ok) { setError("Failed to load merchant"); setLoading(false); return }
-        const merchant = await merchantRes.json()
-        setMerchantId(merchant.id)
-        await loadPlans(merchant.id)
+        await loadPlans(mid)
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load plans")
       } finally {
-        setLoading(false)
+        setDataReady(true)
       }
     }
     load()
-  }, [loadPlans])
+  }, [merchantLoading, merchantId, loadPlans])
 
   const createPlan = async () => {
     if (!merchantId || !name || !amount) return
@@ -118,7 +116,7 @@ export default function PlansPage() {
         </button>
       </div>
 
-      {error && <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
+      {(error || merchantError) && <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error || merchantError}</div>}
 
       {showForm && (
         <div className="rounded-xl border bg-card p-6">

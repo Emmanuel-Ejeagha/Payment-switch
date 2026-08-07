@@ -38,3 +38,8 @@ appsettings.Development.json
 # Kubernetes secrets - never commit real credentials
 k8s/secret.yaml
 helm/**/secrets.yaml
+
+# Local tooling / scratch files - never commit
+.claude/
+claude.txt
+apps/*/logs/

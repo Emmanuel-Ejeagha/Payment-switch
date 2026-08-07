@@ -2,47 +2,28 @@
 
 import { useEffect, useState } from "react"
 import { Store, Globe, CreditCard, Check, AlertCircle } from "lucide-react"
-import type { MerchantDto, UserDto } from "@paymentswitch/shared"
+import { useMerchant } from "@/hooks/use-merchant"
 import { StatusBadge } from "@paymentswitch/ui"
 
 const paymentMethods = ["card", "bank_transfer", "wallet", "ussd"]
 
 export default function SettingsPage() {
-  const [user, setUser] = useState<UserDto | null>(null)
-  const [merchant, setMerchant] = useState<MerchantDto | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { user, merchant, loading, error } = useMerchant()
 
   const [webhookUrl, setWebhookUrl] = useState("")
   const [enabledMethods, setEnabledMethods] = useState<string[]>([])
   const [autoCapture, setAutoCapture] = useState(true)
+  const [loadedMerchantId, setLoadedMerchantId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
   const [saveError, setSaveError] = useState(false)
 
-  useEffect(() => {
-    async function load() {
-      try {
-        const userRes = await fetch("/api/proxy/identity/api/v1/users/me")
-        if (!userRes.ok) { setError("Failed to load user"); setLoading(false); return }
-        const userData: UserDto = await userRes.json()
-        setUser(userData)
-
-        const merchantRes = await fetch(`/api/proxy/merchant/api/v1/merchants/by-email/${encodeURIComponent(userData.email)}`)
-        if (!merchantRes.ok) { setError("Failed to load merchant profile"); setLoading(false); return }
-        const merchantData: MerchantDto = await merchantRes.json()
-        setMerchant(merchantData)
-        setWebhookUrl(merchantData.webhookUrl || "")
-        setEnabledMethods(merchantData.enabledPaymentMethods || [])
-        setAutoCapture(merchantData.autoCapture ?? true)
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed to load settings")
-      } finally {
-        setLoading(false)
-      }
-    }
-    load()
-  }, [])
+  if (merchant && merchant.id !== loadedMerchantId) {
+    setLoadedMerchantId(merchant.id)
+    setWebhookUrl(merchant.webhookUrl || "")
+    setEnabledMethods(merchant.enabledPaymentMethods || [])
+    setAutoCapture(merchant.autoCapture ?? true)
+  }
 
   const toggleMethod = (method: string) => {
     setEnabledMethods((prev) =>

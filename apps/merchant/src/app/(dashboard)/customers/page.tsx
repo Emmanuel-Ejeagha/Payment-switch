@@ -2,14 +2,16 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { Plus, X, Edit, Trash2, Users } from "lucide-react"
+import { useMerchant } from "@/hooks/use-merchant"
 import type { CustomerDto } from "@paymentswitch/shared"
 
 export default function CustomersPage() {
-  const [merchantId, setMerchantId] = useState<string | null>(null)
+  const { merchantId, loading: merchantLoading, error: merchantError } = useMerchant()
   const [customers, setCustomers] = useState<CustomerDto[]>([])
-  const [loading, setLoading] = useState(true)
+  const [dataReady, setDataReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [working, setWorking] = useState(false)
+  const loading = merchantLoading || (merchantId !== null && !dataReady)
 
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -24,24 +26,20 @@ export default function CustomersPage() {
   }, [])
 
   useEffect(() => {
+    if (merchantLoading) return
+    if (!merchantId) return
+    const mid = merchantId
     async function load() {
       try {
-        const userRes = await fetch("/api/proxy/identity/api/v1/users/me")
-        if (!userRes.ok) { setError("Failed to load user"); setLoading(false); return }
-        const user = await userRes.json()
-        const merchantRes = await fetch(`/api/proxy/merchant/api/v1/merchants/by-email/${encodeURIComponent(user.email)}`)
-        if (!merchantRes.ok) { setError("Failed to load merchant"); setLoading(false); return }
-        const merchant = await merchantRes.json()
-        setMerchantId(merchant.id)
-        await loadCustomers(merchant.id)
+        await loadCustomers(mid)
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load customers")
       } finally {
-        setLoading(false)
+        setDataReady(true)
       }
     }
     load()
-  }, [loadCustomers])
+  }, [merchantLoading, merchantId, loadCustomers])
 
   const openForm = (customer?: CustomerDto) => {
     if (customer) {
@@ -142,7 +140,7 @@ export default function CustomersPage() {
         </button>
       </div>
 
-      {error && <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
+      {(error || merchantError) && <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error || merchantError}</div>}
 
       {showForm && (
         <div className="rounded-xl border bg-card p-6">

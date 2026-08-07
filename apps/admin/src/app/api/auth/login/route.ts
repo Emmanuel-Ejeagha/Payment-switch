@@ -19,6 +19,19 @@ export async function POST(request: Request) {
     if (!res.ok) {
       return NextResponse.json(data, { status: res.status })
     }
+
+    const meRes = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/identity/api/v1/users/me`,
+      { headers: { authorization: `Bearer ${data.accessToken}` } }
+    )
+    const me = await meRes.json()
+    const roles: string[] = Array.isArray(me.roles) ? me.roles : []
+    if (!roles.includes("Admin")) {
+      return NextResponse.json(
+        { message: "Admin access required. Sign in with an admin account." },
+        { status: 403 }
+      )
+    }
   } catch {
     return NextResponse.json(
       { message: "Backend unreachable or returned an invalid response" },

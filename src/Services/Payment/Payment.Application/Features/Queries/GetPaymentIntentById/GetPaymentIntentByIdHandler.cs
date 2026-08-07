@@ -36,5 +36,6 @@ public class GetPaymentIntentByIdHandler
             intent.Status.Value,
             intent.CardDetails?.LastFour,
             intent.CardDetails?.Brand,
+            intent.CreatedAt,
             intent.Transactions.Select(t => new TransactionDto(t.Id, t.Type.ToString(), t.Amount.Amount, t.Amount.Currency, t.Timestamp)).ToList());
 }

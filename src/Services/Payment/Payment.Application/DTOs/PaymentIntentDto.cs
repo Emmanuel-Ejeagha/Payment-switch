@@ -8,5 +8,6 @@ public record PaymentIntentDto(
     string Status,
     string? CardLastFour,
     string? CardBrand,
+    DateTime CreatedAt,
     List<TransactionDto> Transactions
 );

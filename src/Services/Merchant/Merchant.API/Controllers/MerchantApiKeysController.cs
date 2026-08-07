@@ -1,4 +1,5 @@
 using Asp.Versioning;
+using Merchant.API.Contracts;
 using Merchant.API.Extensions;
 using Merchant.Application.DTOs;
 using Merchant.Application.Features.Commands.GenerateMerchantApiKey;
@@ -30,10 +31,10 @@ public class MerchantApiKeysController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Generate(
         Guid merchantId,
-        [FromBody] GenerateMerchantApiKeyCommand command,
+        [FromBody] GenerateMerchantApiKeyRequest request,
         [FromServices] GenerateMerchantApiKeyHandler handler)
     {
-        var result = await handler.Handle(new GenerateMerchantApiKeyCommand(merchantId, command.Environment, User.ToCallerContext()));
+        var result = await handler.Handle(new GenerateMerchantApiKeyCommand(merchantId, request.Environment, User.ToCallerContext()));
         return result.ToActionResult();
     }
 

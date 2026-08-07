@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, Fragment } from "react"
 import { Webhook, RotateCcw, Send, ChevronDown, ChevronRight } from "lucide-react"
+import { useMerchant } from "@/hooks/use-merchant"
 import type { WebhookEventDto } from "@paymentswitch/shared"
 
 const STATUS_STYLES: Record<string, string> = {
@@ -11,13 +12,14 @@ const STATUS_STYLES: Record<string, string> = {
 }
 
 export default function WebhooksPage() {
-  const [merchantId, setMerchantId] = useState<string | null>(null)
+  const { merchantId, loading: merchantLoading, error: merchantError } = useMerchant()
   const [events, setEvents] = useState<WebhookEventDto[]>([])
-  const [loading, setLoading] = useState(true)
+  const [dataReady, setDataReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [working, setWorking] = useState(false)
   const [expanded, setExpanded] = useState<string | null>(null)
+  const loading = merchantLoading || (merchantId !== null && !dataReady)
 
   const loadEvents = useCallback(async (merchantId: string) => {
     const res = await fetch(`/api/proxy/payment/api/v1/webhookevents?merchantId=${merchantId}&skip=0&take=100`)
@@ -25,24 +27,20 @@ export default function WebhooksPage() {
   }, [])
 
   useEffect(() => {
+    if (merchantLoading) return
+    if (!merchantId) return
+    const mid = merchantId
     async function load() {
       try {
-        const userRes = await fetch("/api/proxy/identity/api/v1/users/me")
-        if (!userRes.ok) { setError("Failed to load user"); setLoading(false); return }
-        const user = await userRes.json()
-        const merchantRes = await fetch(`/api/proxy/merchant/api/v1/merchants/by-email/${encodeURIComponent(user.email)}`)
-        if (!merchantRes.ok) { setError("Failed to load merchant"); setLoading(false); return }
-        const merchant = await merchantRes.json()
-        setMerchantId(merchant.id)
-        await loadEvents(merchant.id)
+        await loadEvents(mid)
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load webhook events")
       } finally {
-        setLoading(false)
+        setDataReady(true)
       }
     }
     load()
-  }, [loadEvents])
+  }, [merchantLoading, merchantId, loadEvents])
 
   const replay = async (id: string) => {
     if (!merchantId) return
@@ -111,7 +109,7 @@ export default function WebhooksPage() {
         </button>
       </div>
 
-      {error && <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
+      {(error || merchantError) && <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error || merchantError}</div>}
       {notice && <div className="rounded-lg bg-primary/10 p-3 text-sm text-primary">{notice}</div>}
 
       <div className="rounded-xl border bg-card">

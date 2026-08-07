@@ -24,6 +24,7 @@ export default function LedgerPage() {
   const [balance, setBalance] = useState<BalanceDto | null>(null)
   const [transactions, setTransactions] = useState<LedgerTransactionDto[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [skip, setSkip] = useState(0)
   const take = 10
 
@@ -46,13 +47,18 @@ export default function LedgerPage() {
 
     async function loadLedger() {
       setLoading(true)
+      setLoadError(null)
       try {
         const [balRes, txRes] = await Promise.all([
-          fetch(`/api/proxy/ledger/api/v1/ledger/balance?merchantId=${selectedMerchantId}`),
+          fetch(`/api/proxy/ledger/api/v1/ledger/balances?merchantId=${selectedMerchantId}`),
           fetch(`/api/proxy/ledger/api/v1/ledger/transactions?merchantId=${selectedMerchantId}&skip=${skip}&take=${take}`),
         ])
-        if (balRes.ok) setBalance(await balRes.json())
+        if (balRes.ok) {
+          const balances = await balRes.json()
+          setBalance(Array.isArray(balances) ? (balances[0] ?? null) : balances)
+        }
         if (txRes.ok) setTransactions(await txRes.json())
+        if (!balRes.ok || !txRes.ok) setLoadError("Could not load ledger data")
       } finally {
         setLoading(false)
       }
@@ -193,9 +199,17 @@ export default function LedgerPage() {
             )}
           </div>
         </>
-      ) : (
+      ) : loadError ? (
         <div className="rounded-xl border border-destructive/50 bg-destructive/10 p-6 text-destructive">
           <p className="font-medium">Could not load ledger data</p>
+        </div>
+      ) : (
+        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-16 text-center">
+          <Wallet className="mb-3 h-8 w-8 text-muted-foreground" />
+          <p className="font-medium">No ledger activity yet</p>
+          <p className="text-sm text-muted-foreground">
+            This merchant has no captured payments or ledger entries.
+          </p>
         </div>
       )}
     </div>

@@ -2,16 +2,33 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { RefreshCw, X, Ban, Repeat } from "lucide-react"
+import { useMerchant } from "@/hooks/use-merchant"
 import type { SubscriptionDto, CustomerDto, PlanDto } from "@paymentswitch/shared"
 
+function extractError(body: unknown): string {
+  if (!body || typeof body !== "object") return "Request failed"
+  const b = body as Record<string, unknown>
+  if (typeof b.message === "string") return b.message
+  if (typeof b.detail === "string") return b.detail
+  if (b.errors && typeof b.errors === "object") {
+    const parts = Object.values(b.errors as Record<string, unknown>).flatMap((v) =>
+      Array.isArray(v) ? v.map(String) : [String(v)]
+    )
+    if (parts.length) return parts.join(" ")
+  }
+  if (typeof b.title === "string") return b.title
+  return "Request failed"
+}
+
 export default function SubscriptionsPage() {
-  const [merchantId, setMerchantId] = useState<string | null>(null)
+  const { merchantId, loading: merchantLoading, error: merchantError } = useMerchant()
   const [subscriptions, setSubscriptions] = useState<SubscriptionDto[]>([])
   const [customers, setCustomers] = useState<CustomerDto[]>([])
   const [plans, setPlans] = useState<PlanDto[]>([])
-  const [loading, setLoading] = useState(true)
+  const [dataReady, setDataReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [working, setWorking] = useState(false)
+  const loading = merchantLoading || (merchantId !== null && !dataReady)
 
   const [showForm, setShowForm] = useState(false)
   const [customerId, setCustomerId] = useState("")
@@ -24,32 +41,31 @@ export default function SubscriptionsPage() {
   }, [])
 
   useEffect(() => {
+    if (merchantLoading) return
+    if (!merchantId) return
+    let cancelled = false
     async function load() {
       try {
-        const userRes = await fetch("/api/proxy/identity/api/v1/users/me")
-        if (!userRes.ok) { setError("Failed to load user"); setLoading(false); return }
-        const user = await userRes.json()
-        const merchantRes = await fetch(`/api/proxy/merchant/api/v1/merchants/by-email/${encodeURIComponent(user.email)}`)
-        if (!merchantRes.ok) { setError("Failed to load merchant"); setLoading(false); return }
-        const merchant = await merchantRes.json()
-        setMerchantId(merchant.id)
-
         const [subsRes, custRes, plansRes] = await Promise.all([
-          fetch(`/api/proxy/payment/api/v1/subscriptions?merchantId=${merchant.id}&skip=0&take=100`),
-          fetch(`/api/proxy/payment/api/v1/customers?merchantId=${merchant.id}&skip=0&take=100`),
-          fetch(`/api/proxy/payment/api/v1/plans?merchantId=${merchant.id}&skip=0&take=100`),
+          fetch(`/api/proxy/payment/api/v1/subscriptions?merchantId=${merchantId}&skip=0&take=100`),
+          fetch(`/api/proxy/payment/api/v1/customers?merchantId=${merchantId}&skip=0&take=100`),
+          fetch(`/api/proxy/payment/api/v1/plans?merchantId=${merchantId}&skip=0&take=100`),
         ])
+        if (cancelled) return
         if (subsRes.ok) setSubscriptions(await subsRes.json())
         if (custRes.ok) setCustomers(await custRes.json())
-        if (plansRes.ok) setPlans(await plansRes.json().then(p => p.filter((x: PlanDto) => x.active)))
+        if (plansRes.ok) setPlans(await plansRes.json().then((p) => p.filter((x: PlanDto) => x.active)))
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed to load subscriptions")
+        if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load subscriptions")
       } finally {
-        setLoading(false)
+        if (!cancelled) setDataReady(true)
       }
     }
     load()
-  }, [])
+    return () => {
+      cancelled = true
+    }
+  }, [merchantLoading, merchantId])
 
   const createSubscription = async () => {
     if (!merchantId || !customerId || !planId || !cardToken) return
@@ -62,8 +78,8 @@ export default function SubscriptionsPage() {
         body: JSON.stringify({ merchantId, customerId, planId, cardToken }),
       })
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        setError(body.message ?? body.detail ?? "Failed to create subscription")
+        const body = await res.json().catch(() => undefined)
+        setError(extractError(body))
         return
       }
       await loadSubscriptions(merchantId)
@@ -83,8 +99,8 @@ export default function SubscriptionsPage() {
     try {
       const res = await fetch(`/api/proxy/payment/api/v1/subscriptions/${id}/cancel?atPeriodEnd=${atPeriodEnd}`, { method: "POST" })
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        setError(body.message ?? body.detail ?? "Cancel failed")
+        const body = await res.json().catch(() => undefined)
+        setError(extractError(body))
         return
       }
       await loadSubscriptions(merchantId)
@@ -100,8 +116,8 @@ export default function SubscriptionsPage() {
     try {
       const res = await fetch(`/api/proxy/payment/api/v1/subscriptions/${id}/collect`, { method: "POST" })
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        setError(body.message ?? body.detail ?? "Collect failed")
+        const body = await res.json().catch(() => undefined)
+        setError(extractError(body))
         return
       }
       await loadSubscriptions(merchantId)
@@ -123,43 +139,58 @@ export default function SubscriptionsPage() {
         </div>
         <button
           onClick={() => setShowForm((v) => !v)}
-          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
+          disabled={!merchantId}
+          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
         >
           {showForm ? <X className="h-4 w-4" /> : <RefreshCw className="h-4 w-4" />}
           {showForm ? "Cancel" : "New subscription"}
         </button>
       </div>
 
-      {error && <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
+      {(error || merchantError) && <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error || merchantError}</div>}
 
       {showForm && (
         <div className="rounded-xl border bg-card p-6">
           <div className="grid gap-4 md:grid-cols-3">
             <div>
               <label className="mb-1 block text-sm font-medium">Customer <span className="text-destructive">*</span></label>
-              <select
-                value={customerId}
-                onChange={(e) => setCustomerId(e.target.value)}
-                className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
-              >
-                <option value="">Select customer</option>
-                {customers.map((c) => (
-                  <option key={c.id} value={c.id}>{c.email} ({c.code})</option>
-                ))}
-              </select>
+              {customers.length === 0 ? (
+                <div className="rounded-lg border border-dashed bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+                  No customers yet.{" "}
+                  <a href="/customers" className="font-medium text-primary underline">Create one</a> before adding a subscription.
+                </div>
+              ) : (
+                <select
+                  value={customerId}
+                  onChange={(e) => setCustomerId(e.target.value)}
+                  className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="">Select customer</option>
+                  {customers.map((c) => (
+                    <option key={c.id} value={c.id}>{c.email} ({c.code})</option>
+                  ))}
+                </select>
+              )}
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium">Plan <span className="text-destructive">*</span></label>
-              <select
-                value={planId}
-                onChange={(e) => setPlanId(e.target.value)}
-                className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
-              >
-                <option value="">Select plan</option>
-                {plans.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name} — {(p.amount / 100).toFixed(2)} {p.currency}</option>
-                ))}
-              </select>
+              {plans.length === 0 ? (
+                <div className="rounded-lg border border-dashed bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+                  No active plans yet.{" "}
+                  <a href="/plans" className="font-medium text-primary underline">Create one</a> before adding a subscription.
+                </div>
+              ) : (
+                <select
+                  value={planId}
+                  onChange={(e) => setPlanId(e.target.value)}
+                  className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="">Select plan</option>
+                  {plans.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name} — {(p.amount / 100).toFixed(2)} {p.currency}</option>
+                  ))}
+                </select>
+              )}
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium">Card token <span className="text-destructive">*</span></label>
