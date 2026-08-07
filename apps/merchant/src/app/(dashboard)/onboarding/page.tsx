@@ -31,7 +31,7 @@ export default function OnboardingPage() {
           `/api/proxy/merchant/api/v1/merchants/by-email/${encodeURIComponent(userData.email)}`
         )
         if (merchantRes.ok) {
-          router.replace("/")
+          router.replace("/dashboard")
           return
         }
       } catch (e) {
@@ -65,7 +65,7 @@ export default function OnboardingPage() {
       setDone(true)
       // The merchant lands in Pending until an admin activates it; the dashboard
       // renders that state, so there is no reason to hold the user here.
-      setTimeout(() => router.replace("/"), 1200)
+      setTimeout(() => router.replace("/dashboard"), 1200)
     } catch {
       setError("Backend unreachable. Please try again later.")
     } finally {
