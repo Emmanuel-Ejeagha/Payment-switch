@@ -26,12 +26,12 @@ export function LandingFooter() {
       <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
         <div className="grid gap-8 md:grid-cols-4">
           <div className="md:col-span-2">
-            <div className="flex items-center gap-2">
+            <Link href="/" className="flex items-center gap-2">
               <span className="rounded-lg bg-primary/10 p-1.5">
                 <Store className="h-5 w-5 text-primary" />
               </span>
               <span className="text-lg font-semibold">PaymentSwitch</span>
-            </div>
+            </Link>
             <p className="mt-3 max-w-sm text-sm text-muted-foreground">
               The payment switch that powers modern commerce — real-time payments,
               subscriptions, hosted checkout, and settlements on a distributed,

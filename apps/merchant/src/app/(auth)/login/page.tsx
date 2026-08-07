@@ -48,12 +48,12 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen">
       <div className="relative hidden w-1/2 flex-col justify-between bg-gradient-to-br from-indigo-900 via-indigo-800 to-indigo-900 p-12 text-white lg:flex">
-        <div className="flex items-center gap-3">
+        <Link href="/" className="flex items-center gap-3">
           <div className="rounded-lg bg-white/10 p-2">
             <Store className="h-6 w-6" />
           </div>
           <span className="text-lg font-semibold">PaymentSwitch</span>
-        </div>
+        </Link>
         <div className="space-y-6">
           <h2 className="text-4xl font-bold leading-tight tracking-tight">
             Your merchant dashboard
