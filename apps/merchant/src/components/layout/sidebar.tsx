@@ -26,7 +26,7 @@ import { useNotifications } from "@/components/use-notifications"
 import { useState } from "react"
 
 const navItems = [
-  { label: "Dashboard", href: "/", icon: Home },
+  { label: "Dashboard", href: "/dashboard", icon: Home },
   { label: "Payments", href: "/payments", icon: CreditCard },
   { label: "Payment Links", href: "/payment-links", icon: Link2 },
   { label: "Customers", href: "/customers", icon: Users },
