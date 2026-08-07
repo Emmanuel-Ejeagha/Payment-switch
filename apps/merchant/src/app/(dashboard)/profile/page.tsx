@@ -1,35 +1,11 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import { User, Store, Mail, Shield, Check } from "lucide-react"
-import type { UserDto, MerchantDto } from "@paymentswitch/shared"
+import { useMerchant } from "@/hooks/use-merchant"
 import { StatusBadge } from "@paymentswitch/ui"
 
 export default function ProfilePage() {
-  const [user, setUser] = useState<UserDto | null>(null)
-  const [merchant, setMerchant] = useState<MerchantDto | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    async function load() {
-      try {
-        const userRes = await fetch("/api/proxy/identity/api/v1/users/me")
-        if (!userRes.ok) { setError("Failed to load user"); setLoading(false); return }
-        const userData: UserDto = await userRes.json()
-        setUser(userData)
-
-        const merchantRes = await fetch(`/api/proxy/merchant/api/v1/merchants/by-email/${encodeURIComponent(userData.email)}`)
-        if (!merchantRes.ok) { setError("Failed to load merchant profile"); setLoading(false); return }
-        setMerchant(await merchantRes.json())
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed to load profile")
-      } finally {
-        setLoading(false)
-      }
-    }
-    load()
-  }, [])
+  const { user, merchant, loading, error } = useMerchant()
 
   if (loading) {
     return (

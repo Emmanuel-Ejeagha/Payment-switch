@@ -43,8 +43,9 @@ public class ResilientPaymentGatewayService : IPaymentGatewayService
                     return Result<GatewayResponse>.Success(response);
                 }
 
-                entry.CircuitBreaker.RecordFailure();
+                entry.CircuitBreaker.RecordSuccess();
                 _logger.LogWarning("Gateway {Gateway} declined authorize: {Error}", entry.Provider.Name, response.ErrorMessage);
+                return new Error("Payment.GatewayDeclined", response.ErrorMessage ?? "Payment declined by gateway.");
             }
             catch (Exception ex)
             {
@@ -77,8 +78,9 @@ public class ResilientPaymentGatewayService : IPaymentGatewayService
                     return Result<GatewayResponse>.Success(response);
                 }
 
-                entry.CircuitBreaker.RecordFailure();
+                entry.CircuitBreaker.RecordSuccess();
                 _logger.LogWarning("Gateway {Gateway} declined challenge confirm: {Error}", entry.Provider.Name, response.ErrorMessage);
+                return new Error("Payment.GatewayDeclined", response.ErrorMessage ?? "Payment declined by gateway.");
             }
             catch (Exception ex)
             {
@@ -111,8 +113,9 @@ public class ResilientPaymentGatewayService : IPaymentGatewayService
                     return Result<GatewayResponse>.Success(response);
                 }
 
-                entry.CircuitBreaker.RecordFailure();
+                entry.CircuitBreaker.RecordSuccess();
                 _logger.LogWarning("Gateway {Gateway} declined capture: {Error}", entry.Provider.Name, response.ErrorMessage);
+                return new Error("Payment.GatewayDeclined", response.ErrorMessage ?? "Payment declined by gateway.");
             }
             catch (Exception ex)
             {
@@ -145,8 +148,9 @@ public class ResilientPaymentGatewayService : IPaymentGatewayService
                     return Result<GatewayResponse>.Success(response);
                 }
 
-                entry.CircuitBreaker.RecordFailure();
+                entry.CircuitBreaker.RecordSuccess();
                 _logger.LogWarning("Gateway {Gateway} declined void: {Error}", entry.Provider.Name, response.ErrorMessage);
+                return new Error("Payment.GatewayDeclined", response.ErrorMessage ?? "Payment declined by gateway.");
             }
             catch (Exception ex)
             {
@@ -179,8 +183,9 @@ public class ResilientPaymentGatewayService : IPaymentGatewayService
                     return Result<GatewayResponse>.Success(response);
                 }
 
-                entry.CircuitBreaker.RecordFailure();
+                entry.CircuitBreaker.RecordSuccess();
                 _logger.LogWarning("Gateway {Gateway} declined refund: {Error}", entry.Provider.Name, response.ErrorMessage);
+                return new Error("Payment.GatewayDeclined", response.ErrorMessage ?? "Payment declined by gateway.");
             }
             catch (Exception ex)
             {

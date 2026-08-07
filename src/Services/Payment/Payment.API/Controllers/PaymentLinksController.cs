@@ -7,6 +7,7 @@ using Payment.Application.Features.Queries.ListPaymentLinksByMerchant;
 namespace Payment.API.Controllers;
 
 [Authorize]
+[Route("api/v{version:apiVersion}/payment-links")]
 public class PaymentLinksController : BaseApiController
 {
     /// <summary>

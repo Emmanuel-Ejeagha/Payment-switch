@@ -2,39 +2,38 @@
 
 import { useEffect, useState } from "react"
 import { Plus, CreditCard } from "lucide-react"
-import type { PaymentIntentDto, MerchantDto, UserDto } from "@paymentswitch/shared"
+import { useMerchant } from "@/hooks/use-merchant"
+import type { PaymentIntentDto } from "@paymentswitch/shared"
 import { useToast } from "@/components/toast"
 
 export default function PaymentsPage() {
   const { showToast } = useToast()
-  const [merchant, setMerchant] = useState<MerchantDto | null>(null)
+  const { merchant, loading: merchantLoading } = useMerchant()
   const [payments, setPayments] = useState<PaymentIntentDto[]>([])
-  const [loading, setLoading] = useState(true)
+  const [dataReady, setDataReady] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
+  const loading = merchantLoading || (merchant !== null && !dataReady)
 
   useEffect(() => {
+    if (merchantLoading) return
+    if (!merchant) return
+    const m = merchant
+    let cancelled = false
     async function load() {
       try {
-        const userRes = await fetch("/api/proxy/identity/api/v1/users/me")
-        if (!userRes.ok) return
-        const userData: UserDto = await userRes.json()
-
-        const merchantRes = await fetch(`/api/proxy/merchant/api/v1/merchants/by-email/${encodeURIComponent(userData.email)}`)
-        if (!merchantRes.ok) return
-        const merchantData: MerchantDto = await merchantRes.json()
-        setMerchant(merchantData)
-
-        const paymentsRes = await fetch(`/api/proxy/payment/api/v1/payments?merchantId=${merchantData.id}&skip=0&take=10`)
-        if (paymentsRes.ok) setPayments(await paymentsRes.json())
+        const paymentsRes = await fetch(`/api/proxy/payment/api/v1/payments?merchantId=${m.id}&skip=0&take=10`)
+        if (!cancelled && paymentsRes.ok) setPayments(await paymentsRes.json())
       } catch {
         /* ignore */
       } finally {
-        setLoading(false)
+        if (!cancelled) setDataReady(true)
       }
     }
-
     load()
-  }, [])
+    return () => {
+      cancelled = true
+    }
+  }, [merchantLoading, merchant])
 
   return (
     <div className="space-y-6">

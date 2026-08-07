@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react"
 import { BookOpen, ChevronLeft, ChevronRight, Wallet, Clock, Lock } from "lucide-react"
-import type { UserDto, MerchantDto, BalanceDto, LedgerTransactionDto } from "@paymentswitch/shared"
+import { useMerchant } from "@/hooks/use-merchant"
+import type { BalanceDto, LedgerTransactionDto } from "@paymentswitch/shared"
 
 const txTypeColors: Record<string, string> = {
   Credit: "bg-emerald-500/10 text-emerald-600",
@@ -12,55 +13,40 @@ const txTypeColors: Record<string, string> = {
 }
 
 export default function MerchantLedgerPage() {
-  const [user, setUser] = useState<UserDto | null>(null)
-  const [merchant, setMerchant] = useState<MerchantDto | null>(null)
+  const { merchant, loading: merchantLoading, error: merchantError } = useMerchant()
   const [balances, setBalances] = useState<BalanceDto[]>([])
   const [transactions, setTransactions] = useState<LedgerTransactionDto[]>([])
-  const [loading, setLoading] = useState(true)
+  const [dataReady, setDataReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [skip, setSkip] = useState(0)
   const take = 10
+  const loading = merchantLoading || (merchant !== null && !dataReady)
 
   useEffect(() => {
+    if (merchantLoading) return
+    if (!merchant) return
+    const m = merchant
+    let cancelled = false
     async function load() {
       try {
-        const userRes = await fetch("/api/proxy/identity/api/v1/users/me")
-        if (!userRes.ok) { setError("Failed to load user"); setLoading(false); return }
-        const userData: UserDto = await userRes.json()
-        setUser(userData)
-
-        const merchantRes = await fetch(`/api/proxy/merchant/api/v1/merchants/by-email/${encodeURIComponent(userData.email)}`)
-        if (!merchantRes.ok) { setError("Failed to load merchant profile"); setLoading(false); return }
-        const merchantData: MerchantDto = await merchantRes.json()
-        setMerchant(merchantData)
-
         const [balRes, txRes] = await Promise.all([
-          fetch(`/api/proxy/ledger/api/v1/ledger/balances?merchantId=${merchantData.id}`),
-          fetch(`/api/proxy/ledger/api/v1/ledger/transactions?merchantId=${merchantData.id}&skip=0&take=${take}`),
+          fetch(`/api/proxy/ledger/api/v1/ledger/balances?merchantId=${m.id}`),
+          fetch(`/api/proxy/ledger/api/v1/ledger/transactions?merchantId=${m.id}&skip=${skip}&take=${take}`),
         ])
+        if (cancelled) return
         if (balRes.ok) setBalances(await balRes.json())
         if (txRes.ok) setTransactions(await txRes.json())
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed to load ledger")
+        if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load ledger")
       } finally {
-        setLoading(false)
+        if (!cancelled) setDataReady(true)
       }
     }
-
     load()
-  }, [])
-
-  useEffect(() => {
-    if (!merchant) return
-    const mId = merchant.id
-    async function loadTx() {
-      const txRes = await fetch(
-        `/api/proxy/ledger/api/v1/ledger/transactions?merchantId=${mId}&skip=${skip}&take=${take}`
-      )
-      if (txRes.ok) setTransactions(await txRes.json())
+    return () => {
+      cancelled = true
     }
-    loadTx()
-  }, [skip])
+  }, [merchantLoading, merchant, skip])
 
   if (loading) {
     return (
@@ -76,13 +62,13 @@ export default function MerchantLedgerPage() {
     )
   }
 
-  if (error) {
+  if (error || merchantError) {
     return (
       <div className="space-y-6">
         <h1 className="text-3xl font-semibold">Ledger</h1>
         <div className="rounded-xl border border-destructive/50 bg-destructive/10 p-6 text-destructive">
           <p className="font-medium">Failed to load ledger</p>
-          <p className="mt-1 text-sm">{error}</p>
+          <p className="mt-1 text-sm">{error || merchantError}</p>
         </div>
       </div>
     )

@@ -46,9 +46,9 @@ public class MerchantRepository : IMerchantRepository
     public async Task<List<MerchantDto>> ListAsync(int skip, int take, CancellationToken cancellationToken = default)
     {
         return await _context.Merchants
-            .OrderBy(m => m.CreatedAt)
+            .OrderByDescending(m => m.CreatedAt)
             .Skip(skip).Take(take)
-            .Select(m => new MerchantDto(m.Id, m.BusinessName.Value, m.Email.Value, m.Status.Value, m.WebhookUrl == null ? null : m.WebhookUrl.Value, m.WebhookSecret == null ? null : m.WebhookSecret.Value, m.EnabledPaymentMethods.ToList(), m.AutoCapture))
+            .Select(m => new MerchantDto(m.Id, m.BusinessName.Value, m.Email.Value, m.Status.Value, m.WebhookUrl == null ? null : m.WebhookUrl.Value, m.WebhookSecret == null ? null : m.WebhookSecret.Value, m.EnabledPaymentMethods.ToList(), m.CreatedAt, m.AutoCapture))
             .ToListAsync(cancellationToken);
     }
 

@@ -54,7 +54,7 @@ public class MerchantGrpcService : MerchantService.MerchantServiceBase
                                 join m in _db.Merchants on k.MerchantId equals m.Id
                                 where k.KeyPrefix == request.KeyPrefix
                                       && k.RevokedAt == null
-                                select new { m.Id, m.Status, k.Environment, k.KeyHash })
+                                select new { m.Id, Status = m.Status.Value, k.Environment, k.KeyHash })
             .ToListAsync(context.CancellationToken);
 
         var match = candidates.FirstOrDefault(c => ApiKeyHasher.Verify(request.KeyValue, c.KeyHash));
@@ -63,7 +63,7 @@ public class MerchantGrpcService : MerchantService.MerchantServiceBase
         if (match != null)
         {
             response.MerchantId = match.Id.ToString();
-            response.Status = match.Status.Value;
+            response.Status = match.Status;
             response.Environment = match.Environment;
         }
         return response;

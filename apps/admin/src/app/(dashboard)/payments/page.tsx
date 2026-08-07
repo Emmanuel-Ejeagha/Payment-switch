@@ -207,7 +207,7 @@ export default function PaymentsPage() {
               </thead>
               <tbody className="divide-y">
                   {filtered.map((p) => {
-                    const created = p.transactions?.find((t) => t.type === "Created")?.timestamp
+                    const created = p.createdAt
                     return (
                       <tr key={p.intentId} className="text-sm transition-colors hover:bg-muted/30">
                         <td className="px-6 py-4 font-medium">

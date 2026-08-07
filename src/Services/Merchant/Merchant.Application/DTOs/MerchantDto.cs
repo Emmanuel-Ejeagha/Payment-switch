@@ -8,5 +8,6 @@ public record MerchantDto(
     string? WebhookUrl,
     string? WebhookSecret,
     List<string> EnabledPaymentMethods,
+    DateTime CreatedAt,
     bool AutoCapture = true
 );

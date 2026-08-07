@@ -2,41 +2,37 @@
 
 import { useEffect, useState } from "react"
 import { Key, Plus, Copy, Trash2, Check, AlertCircle } from "lucide-react"
-import type { ApiKeyDto, MerchantDto, UserDto } from "@paymentswitch/shared"
+import { useMerchant } from "@/hooks/use-merchant"
+import type { ApiKeyDto } from "@paymentswitch/shared"
 
 export default function ApiKeysPage() {
+  const { merchantId, loading: merchantLoading, error: merchantError } = useMerchant()
   const [apiKeys, setApiKeys] = useState<ApiKeyDto[]>([])
-  const [loading, setLoading] = useState(true)
+  const [dataReady, setDataReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [environment, setEnvironment] = useState("test")
   const [generating, setGenerating] = useState(false)
   const [newKey, setNewKey] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
-  const [merchantId, setMerchantId] = useState<string | null>(null)
+  const loading = merchantLoading || (merchantId !== null && !dataReady)
 
   useEffect(() => {
+    if (merchantLoading) return
+    if (!merchantId) return
+    const mid = merchantId
     async function loadKeys() {
       try {
-        const userRes = await fetch("/api/proxy/identity/api/v1/users/me")
-        if (!userRes.ok) { setError("Failed to load user"); setLoading(false); return }
-        const userData: UserDto = await userRes.json()
-
-        const merchantRes = await fetch(`/api/proxy/merchant/api/v1/merchants/by-email/${encodeURIComponent(userData.email)}`)
-        if (!merchantRes.ok) { setError("Failed to load merchant"); setLoading(false); return }
-        const merchantData: MerchantDto = await merchantRes.json()
-        setMerchantId(merchantData.id)
-
-        const res = await fetch(`/api/proxy/merchant/api/v1/merchants/${merchantData.id}/apikeys`)
+        const res = await fetch(`/api/proxy/merchant/api/v1/merchants/${mid}/apikeys`)
         if (!res.ok) { setError("Failed to load API keys"); return }
         setApiKeys(await res.json())
       } catch {
         setError("Failed to load API keys")
       } finally {
-        setLoading(false)
+        setDataReady(true)
       }
     }
     loadKeys()
-  }, [])
+  }, [merchantLoading, merchantId])
 
   const handleGenerateKey = async () => {
     if (!merchantId) return
@@ -152,10 +148,10 @@ export default function ApiKeysPage() {
           </div>
         )}
 
-        {error && (
+        {(error || merchantError) && (
           <div className="mt-4 flex items-center gap-2 rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
             <AlertCircle className="h-4 w-4 shrink-0" />
-            {error}
+            {error || merchantError}
           </div>
         )}
       </div>

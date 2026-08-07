@@ -47,19 +47,20 @@ public class NotificationRepository : INotificationRepository
 
         if (!string.IsNullOrEmpty(recipient))
             query = query.Where(n => n.Recipient.Contains(recipient));
-        if (!string.IsNullOrEmpty(channel))
-            query = query.Where(n => n.Channel.Value == channel);
-        if (!string.IsNullOrEmpty(status))
-            query = query.Where(n => n.Status.Value == status);
+        if (!string.IsNullOrEmpty(channel) && channel.ToLowerInvariant() is "email" or "sms" or "webhook")
+            query = query.Where(n => n.Channel == NotificationChannel.FromString(channel));
+        if (!string.IsNullOrEmpty(status) && status.ToLowerInvariant() is "pending" or "sent" or "failed")
+            query = query.Where(n => n.Status == NotificationStatus.FromString(status));
 
-        return await query
+        var notifications = await query
             .OrderByDescending(n => n.CreatedAt)
             .Skip(skip)
             .Take(take)
-            .Select(n => new NotificationDto(
-                n.Id, n.Recipient, n.Channel.Value, n.Subject, n.Body,
-                n.WebhookUrl, n.Status.Value, n.RetryCount,
-                n.NextRetryAt, n.CreatedAt, n.ProcessedAt))
             .ToListAsync(cancellationToken);
+
+        return notifications.Select(n => new NotificationDto(
+            n.Id, n.Recipient, n.Channel.Value, n.Subject, n.Body,
+            n.WebhookUrl, n.Status.Value, n.RetryCount,
+            n.NextRetryAt, n.CreatedAt, n.ProcessedAt)).ToList();
     }
 }

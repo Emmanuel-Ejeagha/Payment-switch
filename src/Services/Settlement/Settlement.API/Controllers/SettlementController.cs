@@ -15,7 +15,7 @@ public class SettlementController : BaseApiController
     /// Manually trigger a settlement batch for a given date.
     /// </summary>
     [HttpPost("trigger")]
-    [ProducesResponseType(typeof(Guid), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(TriggerSettlementResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Trigger(
         [FromBody] TriggerSettlementCommand command,

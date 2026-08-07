@@ -47,7 +47,7 @@ interface SidebarProps {
 export function Sidebar({ open, onClose }: SidebarProps) {
   const router = useRouter()
   const pathname = usePathname()
-  const { theme, toggle } = useTheme()
+  const { toggle } = useTheme()
   const [showNotifications, setShowNotifications] = useState(false)
 
   const { connected, events } = useNotifications()
@@ -102,7 +102,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" title="Connected" />
             )}
           </button>
-          {showNotifications && events.length > 0 && (
+          {showNotifications && (
             <div className="fixed bottom-20 left-16 z-50 max-h-64 w-72 overflow-y-auto rounded-lg border bg-card shadow-lg">
               <div className="flex items-center justify-between border-b px-3 py-2">
                 <span className="text-xs font-semibold">Notifications</span>
@@ -113,12 +113,18 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                   <X className="h-3 w-3" />
                 </button>
               </div>
-              {events.slice(0, 10).map((ev, i) => (
-                <div key={i} className="border-b px-3 py-2 text-xs last:border-0">
-                  <p className="font-medium">{ev.eventType}</p>
-                  <p className="text-muted-foreground">{ev.message}</p>
+              {events.length === 0 ? (
+                <div className="px-3 py-6 text-center text-xs text-muted-foreground">
+                  {connected ? "No notifications yet." : "Connecting to live notifications..."}
                 </div>
-              ))}
+              ) : (
+                events.slice(0, 10).map((ev, i) => (
+                  <div key={i} className="border-b px-3 py-2 text-xs last:border-0">
+                    <p className="font-medium">{ev.eventType}</p>
+                    <p className="text-muted-foreground">{ev.message}</p>
+                  </div>
+                ))
+              )}
             </div>
           )}
         </div>
@@ -126,8 +132,10 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           onClick={toggle}
           className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
         >
-          {theme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
-          {theme === "light" ? "Dark mode" : "Light mode"}
+          <Moon className="h-4 w-4 dark:hidden" />
+          <Sun className="hidden h-4 w-4 dark:block" />
+          <span className="dark:hidden">Dark mode</span>
+          <span className="hidden dark:inline">Light mode</span>
         </button>
         <button
           onClick={handleLogout}

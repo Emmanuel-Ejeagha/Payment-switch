@@ -52,14 +52,13 @@ public class CaptureFundsHandler
         try
         {
             var amount = new Money(command.Amount, command.Currency);
-            var correlationId = new CorrelationId(command.CorrelationId);
-            account.CaptureFunds(amount, correlationId);
+            account.CaptureFunds(amount, new CorrelationId(command.CorrelationId));
 
             var fee = FeeCalculator.Calculate(command.Amount, _options.FeeBasisPoints);
             if (fee > 0)
             {
                 _logger.LogInformation("Charging {Fee} processing fee for Merchant {MerchantId}", fee, command.MerchantId);
-                account.ChargeFees(new Money(fee, command.Currency), correlationId);
+                account.ChargeFees(new Money(fee, command.Currency), new CorrelationId(command.CorrelationId));
             }
         }
         catch (InvalidOperationException ex)

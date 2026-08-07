@@ -2,6 +2,7 @@
 using Payment.Application.DTOs;
 using Payment.Application.Interfaces;
 using Payment.Domain.Entities;
+using Payment.Domain.ValueObjects;
 
 namespace Payment.Infrastructure.Persistence.Repositories;
 
@@ -24,7 +25,7 @@ public class PaymentIntentRepository : IPaymentIntentRepository
     public async Task<PaymentIntent?> GetByIdempotencyKeyAsync(Guid merchantId, string idempotencyKey, CancellationToken cancellationToken = default)
     {
         return await _context.PaymentIntents
-            .FirstOrDefaultAsync(p => p.MerchantId == merchantId && p.IdempotencyKey.Value == idempotencyKey, cancellationToken);
+            .FirstOrDefaultAsync(p => p.MerchantId == merchantId && p.IdempotencyKey == new IdempotencyKey(idempotencyKey), cancellationToken);
     }
 
     public async Task AddAsync(PaymentIntent intent, CancellationToken cancellationToken = default)
@@ -40,26 +41,29 @@ public class PaymentIntentRepository : IPaymentIntentRepository
 
     public async Task<List<PaymentIntentDto>> ListByMerchantAsync(Guid merchantId, int skip, int take, CancellationToken cancellationToken = default)
     {
-        return await _context.PaymentIntents
+        var intents = await _context.PaymentIntents
             .Where(p => p.MerchantId == merchantId)
             .OrderByDescending(p => p.CreatedAt)
             .Skip(skip).Take(take)
-            .Select(p => new PaymentIntentDto(
-                p.Id,
-                p.MerchantId,
-                p.Amount.Amount,
-                p.Amount.Currency,
-                p.Status.Value,
-                p.CardDetails != null ? p.CardDetails.LastFour : null,
-                p.CardDetails != null ? p.CardDetails.Brand : null,
-                p.Transactions.Select(t => new TransactionDto(
-                    t.Id,
-                    t.Type.ToString(),
-                    t.Amount.Amount,
-                    t.Amount.Currency,
-                    t.Timestamp
-                )).ToList()
-            ))
+            .Include(p => p.Transactions)
             .ToListAsync(cancellationToken);
+
+        return intents.Select(p => new PaymentIntentDto(
+            p.Id,
+            p.MerchantId,
+            p.Amount.Amount,
+            p.Amount.Currency,
+            p.Status.Value,
+            p.CardDetails != null ? p.CardDetails.LastFour : null,
+            p.CardDetails != null ? p.CardDetails.Brand : null,
+            p.CreatedAt,
+            p.Transactions.Select(t => new TransactionDto(
+                t.Id,
+                t.Type.ToString(),
+                t.Amount.Amount,
+                t.Amount.Currency,
+                t.Timestamp
+            )).ToList()
+        )).ToList();
     }
 }

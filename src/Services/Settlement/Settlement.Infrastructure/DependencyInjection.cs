@@ -23,10 +23,7 @@ public static class DependencyInjection
         services.AddDbContext<AppDbContext>((sp, options) =>
         {
             var interceptor = sp.GetRequiredService<OutboxInterceptor>();
-            options.UseNpgsql(configuration.GetConnectionString("SettlementDb"), npgsqlOptions =>
-            {
-                npgsqlOptions.EnableRetryOnFailure(3, TimeSpan.FromSeconds(10), null);
-            })
+            options.UseNpgsql(configuration.GetConnectionString("SettlementDb"))
                    .AddInterceptors(interceptor);
         });
 
@@ -44,7 +41,7 @@ public static class DependencyInjection
 
         services.AddGrpcClient<LedgerService.LedgerServiceClient>(o =>
         {
-            o.Address = new Uri(configuration["Grpc:Ledger:Address"] ?? "http://ledger-api:8080");
+            o.Address = new Uri(configuration["Grpc:Ledger:Address"] ?? "http://ledger-api:5001");
             o.ChannelOptionsActions.Add(channel =>
                 channel.UnsafeUseInsecureChannelCallCredentials = true);
         })

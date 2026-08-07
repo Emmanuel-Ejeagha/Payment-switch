@@ -21,10 +21,7 @@ public static class DependencyInjection
         services.AddDbContext<AppDbContext>((sp, options) =>
         {
             var interceptor = sp.GetRequiredService<OutboxInterceptor>();
-            options.UseNpgsql(configuration.GetConnectionString("LedgerDb"), npgsqlOptions =>
-            {
-                npgsqlOptions.EnableRetryOnFailure(3, TimeSpan.FromSeconds(10), null);
-            })
+            options.UseNpgsql(configuration.GetConnectionString("LedgerDb"))
                    .AddInterceptors(interceptor);
         });
 
