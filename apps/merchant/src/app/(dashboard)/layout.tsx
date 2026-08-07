@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { Menu } from "lucide-react"
+import Link from "next/link"
 import { Sidebar } from "@/components/layout/sidebar"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { ToastProvider } from "@/components/toast"
@@ -21,7 +22,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             >
               <Menu className="h-5 w-5" />
             </button>
-            <span className="font-semibold">PaymentSwitch</span>
+            <Link href="/dashboard" className="font-semibold">PaymentSwitch</Link>
           </div>
           <div className="flex-1 overflow-y-auto p-4 md:p-8">
             <ErrorBoundary>{children}</ErrorBoundary>

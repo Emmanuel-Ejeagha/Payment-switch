@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
+import Link from "next/link"
 import { Store, CreditCard, CheckCircle, XCircle } from "lucide-react"
 
 export default function HostedCheckoutPage() {
@@ -115,12 +116,12 @@ export default function HostedCheckoutPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
       <div className="w-full max-w-md space-y-4">
-        <div className="flex items-center justify-center gap-2 pt-4 text-muted-foreground">
+        <Link href="/" className="flex items-center justify-center gap-2 pt-4 text-muted-foreground">
           <div className="rounded-lg bg-primary p-2 text-primary-foreground">
             <Store className="h-5 w-5" />
           </div>
           <span className="font-semibold text-foreground">PaymentSwitch</span>
-        </div>
+        </Link>
 
         {result ? (
           <div className="rounded-2xl border bg-card p-8 text-center shadow-sm">

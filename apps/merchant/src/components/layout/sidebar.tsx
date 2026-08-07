@@ -60,10 +60,10 @@ export function Sidebar({ open, onClose }: SidebarProps) {
   const nav = (
     <>
       <div className="flex h-14 items-center justify-between border-b px-6">
-        <div className="flex items-center gap-3">
+        <Link href="/dashboard" className="flex items-center gap-3">
           <Store className="h-5 w-5" />
           <span className="font-semibold">PaymentSwitch</span>
-        </div>
+        </Link>
         <button onClick={onClose} className="rounded-lg p-1 hover:bg-accent md:hidden">
           <X className="h-5 w-5" />
         </button>
