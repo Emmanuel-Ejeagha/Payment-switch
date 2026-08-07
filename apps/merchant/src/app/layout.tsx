@@ -3,8 +3,12 @@ import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 
 export const metadata: Metadata = {
-  title: "PaymentSwitch Merchant",
-  description: "Merchant portal for PaymentSwitch",
+  title: {
+    default: "PaymentSwitch — Accept payments anywhere",
+    template: "%s | PaymentSwitch",
+  },
+  description:
+    "PaymentSwitch is a real-time payment switch with hosted checkout, subscriptions, webhooks, and daily settlement.",
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
