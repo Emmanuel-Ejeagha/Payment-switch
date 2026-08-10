@@ -117,7 +117,8 @@ builder.Services.AddPaymentSwitchHealthChecks()
         try
         {
             using var tcp = new System.Net.Sockets.TcpClient();
-            tcp.Connect(builder.Configuration["RabbitMQ:HostName"] ?? "localhost", 5672);
+            var port = int.TryParse(builder.Configuration["RabbitMQ:Port"], out var p) ? p : 5672;
+            tcp.Connect(builder.Configuration["RabbitMQ:HostName"] ?? "localhost", port);
             return HealthCheckResult.Healthy();
         }
         catch (Exception ex)

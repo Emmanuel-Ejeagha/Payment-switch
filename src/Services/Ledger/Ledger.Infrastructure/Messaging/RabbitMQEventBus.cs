@@ -9,22 +9,25 @@ public class RabbitMQEventBus : IEventBus, IDisposable
 {
     private readonly IConnection _connection;
     private readonly IChannel _channel;
+    private readonly RabbitMQSettings _settings;
     private bool _disposed;
 
     public RabbitMQEventBus(IOptions<RabbitMQSettings> settings)
     {
+        _settings = settings.Value;
         var factory = new ConnectionFactory
         {
-            HostName = settings.Value.HostName,
-            UserName = settings.Value.UserName,
-            Password = settings.Value.Password
+            HostName = _settings.HostName,
+            Port = _settings.Port,
+            UserName = _settings.UserName,
+            Password = _settings.Password
         };
 
         _connection = factory.CreateConnectionAsync().GetAwaiter().GetResult();
         _channel = _connection.CreateChannelAsync().GetAwaiter().GetResult();
 
         _channel.ExchangeDeclareAsync(
-            exchange: settings.Value.ExchangeName,
+            exchange: _settings.ExchangeName,
             type: ExchangeType.Topic,
             durable: true).GetAwaiter().GetResult();
     }
@@ -41,7 +44,7 @@ public class RabbitMQEventBus : IEventBus, IDisposable
         };
 
         await _channel.BasicPublishAsync(
-            exchange: "ledger.events",
+            exchange: _settings.ExchangeName,
             routingKey: eventType,
             mandatory: false,
             basicProperties: properties,
