@@ -45,7 +45,7 @@ public class TriggerSettlementHandlerTests
         var result = await _handler.Handle(command);
 
         Assert.True(result.IsSuccess);
-        Assert.NotEqual(Guid.Empty, result.Value);
+        Assert.NotEqual(Guid.Empty, result.Value!.Id);
         _repoMock.Verify(r => r.AddAsync(It.Is<SettlementBatch>(b => b.BatchDate == command.BatchDate && b.Payouts.Count == 2), It.IsAny<CancellationToken>()), Times.Once);
         _uowMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
         _dispatcherMock.Verify(d => d.DispatchAsync(It.IsAny<IReadOnlyList<DomainEvent>>(), It.IsAny<CancellationToken>()), Times.Once);
@@ -62,7 +62,7 @@ public class TriggerSettlementHandlerTests
         var result = await _handler.Handle(command);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(existingBatch.Id, result.Value);
+        Assert.Equal(existingBatch.Id, result.Value!.Id);
         _ledgerMock.Verify(l => l.GetDailyPayoutDataAsync(It.IsAny<DateTime>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
