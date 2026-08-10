@@ -2134,7 +2134,7 @@ P3 - Low
 
 | Phase | Title | Status |
 |---|---|---|
-| 0 | Baseline & Enablement | [ ] Not started |
+| 0 | Baseline & Enablement | [x] In progress |
 | 1 | Financial Integrity Foundation (P0) | [ ] Not started |
 | 2 | Security Baseline (P0/P1) | [ ] Not started |
 | 3 | Identity Account Lifecycle | [ ] Not started |
@@ -2154,8 +2154,8 @@ P3 - Low
 **Tasks:** TASK-022 (harness only), TASK-030 (README claims)
 
 **Steps:**
-1. [ ] Run the full build and test suite locally (`dotnet build PaymentSwitch.slnx && dotnet test PaymentSwitch.slnx`) and confirm unit + integration baseline is green.
-2. [ ] Add Testcontainers **RabbitMQ** to the integration shared fixture (`tests/Integration/Shared/TestSecrets.cs` currently uses `rabbitmq.invalid`); prove outbox → exchange → consumer → inbox → DB flow in one throwaway test.
+1. [x] Run the full build and test suite locally (`dotnet build PaymentSwitch.slnx && dotnet test PaymentSwitch.slnx`) and confirm unit + integration baseline is green.
+2. [x] Add Testcontainers **RabbitMQ** to the integration shared fixture (`tests/Integration/Shared/TestSecrets.cs` currently uses `rabbitmq.invalid`); prove outbox → exchange → consumer → inbox → DB flow in one throwaway test.
 3. [ ] Adopt the convention "every fix ships with a test" (unit for logic, integration for broker/DB paths).
 4. [ ] Correct the README's false claims (Event Sourcing, Saga, OAuth2) so later work is measured against an accurate description.
 

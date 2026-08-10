@@ -67,6 +67,18 @@ public static class TestSecrets
     }
 
     /// <summary>
+    /// Points <c>RabbitMQ:HostName</c>/<c>RabbitMQ:Port</c> at a Testcontainers
+    /// RabbitMQ instance. Must run before the host is first built (see the remarks
+    /// on <see cref="ApplyEnvironment"/>), which is why factories start the broker
+    /// and call this before touching <c>Services</c>.
+    /// </summary>
+    public static void ApplyRabbitMqHost(string host, int port)
+    {
+        Environment.SetEnvironmentVariable("RabbitMQ__HostName", host);
+        Environment.SetEnvironmentVariable("RabbitMQ__Port", port.ToString());
+    }
+
+    /// <summary>
     /// Publishes the test container connection string once its port is known.
     /// The container only gets a host port after it starts, so this runs after
     /// <c>StartAsync</c> but before the host is first resolved.
