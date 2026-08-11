@@ -6,6 +6,7 @@ using Ledger.Infrastructure.Messaging;
 using Ledger.Infrastructure.Outbox;
 using Ledger.Infrastructure.Persistence;
 using Ledger.Infrastructure.Persistence.Repositories;
+using Ledger.Infrastructure.Queries;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -27,6 +28,7 @@ public static class DependencyInjection
 
         services.AddScoped<ILedgerAccountRepository, LedgerAccountRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+        services.AddScoped<IDailyPayoutQuery, DailyPayoutQuery>();
 
         services.AddValidatedOptions<RabbitMQSettings>(configuration, "RabbitMQ",
             s => !string.IsNullOrEmpty(s.HostName),
