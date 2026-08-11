@@ -67,6 +67,21 @@ public class TriggerSettlementHandler
             batch.AddPayout(data.MerchantId, gross, fees);
         }
 
+        // Tie-out: re-query the ledger and refuse to complete a batch whose totals
+        // drift from the ledger's daily figures (e.g. activity landing mid-batch).
+        var tieOutResult = await _ledgerService.GetDailyPayoutDataAsync(batchDate, cancellationToken);
+        if (!tieOutResult.IsSuccess)
+            return Result<TriggerSettlementResponse>.Failure(tieOutResult.Errors);
+
+        var tieOutList = tieOutResult.Value!;
+        var ledgerGross = tieOutList.Sum(d => d.GrossVolume);
+        var ledgerFees = tieOutList.Sum(d => d.Fees);
+        var batchGross = batch.Payouts.Sum(p => p.GrossVolume.Amount);
+        var batchFees = batch.Payouts.Sum(p => p.Fees.Amount);
+
+        if (ledgerGross != batchGross || ledgerFees != batchFees)
+            return Result<TriggerSettlementResponse>.Failure(SettlementErrors.LedgerTieOutMismatch);
+
         batch.Complete();
 
         await _unitOfWork.BeginTransactionAsync(cancellationToken);

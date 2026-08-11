@@ -113,6 +113,29 @@ public class TriggerSettlementHandlerTests
         Assert.Equal("Settlement.ConcurrencyConflict", result.Errors[0].Code);
     }
 
+    [Fact]
+    public async Task Handle_TieOutMismatch_ShouldFailWithoutCompleting()
+    {
+        var command = new TriggerSettlementCommand(new DateTime(2026, 7, 3));
+        SetupValidatorSuccess(command);
+        _repoMock.Setup(r => r.GetByBatchDateAsync(command.BatchDate, It.IsAny<CancellationToken>())).ReturnsAsync((SettlementBatch?)null);
+        _ledgerMock.SetupSequence(l => l.GetDailyPayoutDataAsync(command.BatchDate, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<List<MerchantPayoutData>>.Success(new List<MerchantPayoutData>
+            {
+                new(Guid.NewGuid(), 1000L, 20L, "USD")
+            }))
+            .ReturnsAsync(Result<List<MerchantPayoutData>>.Success(new List<MerchantPayoutData>
+            {
+                new(Guid.NewGuid(), 2000L, 40L, "USD")
+            }));
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Settlement.LedgerTieOutMismatch", result.Errors[0].Code);
+        _repoMock.Verify(r => r.AddAsync(It.IsAny<SettlementBatch>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     private void SetupValidatorSuccess(TriggerSettlementCommand command) =>
         _validatorMock.Setup(v => v.ValidateAsync(command, It.IsAny<CancellationToken>())).ReturnsAsync(new ValidationResult());
 
