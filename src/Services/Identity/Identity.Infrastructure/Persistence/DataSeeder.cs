@@ -35,6 +35,7 @@ public static class DataSeeder
         var hash = BCrypt.Net.BCrypt.HashPassword(adminPassword);
         var user = new User(Guid.NewGuid(), new Email(adminEmail), new PasswordHash(hash), new FullName("Admin User"));
         user.AddRole("Admin");
+        user.MarkEmailConfirmed();
 
         dbContext.Users.Add(user);
         await dbContext.SaveChangesAsync();

@@ -1,4 +1,6 @@
 ﻿using BuildingBlocks.Shared.Configuration;
+using BuildingBlocks.Shared.Email;
+using Identity.Application.Configuration;
 using Identity.Application.Interfaces;
 using Identity.Infrastructure.Messaging;
 using Identity.Infrastructure.Outbox;
@@ -34,6 +36,11 @@ public static class DependencyInjection
         services.AddValidatedOptions<JwtSettings>(configuration, "Jwt",
             s => !string.IsNullOrEmpty(s.Secret) && !string.IsNullOrEmpty(s.Issuer),
             "JWT Secret and Issuer are required");
+
+        services.AddScoped<IEmailVerificationTokenFactory, EmailVerificationTokenFactory>();
+        services.AddScoped<IEmailSender, EmailSender>();
+        services.Configure<SmtpSettings>(configuration.GetSection("Smtp"));
+        services.Configure<EmailVerificationOptions>(configuration.GetSection("EmailVerification"));
 
         services.AddValidatedOptions<RabbitMQSettings>(configuration, "RabbitMQ",
             s => !string.IsNullOrEmpty(s.HostName),

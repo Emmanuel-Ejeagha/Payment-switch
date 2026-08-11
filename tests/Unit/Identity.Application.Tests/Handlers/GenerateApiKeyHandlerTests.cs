@@ -105,8 +105,32 @@ public class GenerateApiKeyHandlerTests
         Assert.Contains(result.Errors, e => e.Code == "Environment");
     }
 
+    [Fact]
+    public async Task Handle_UnverifiedUser_ShouldReturnFailure()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var command = new GenerateApiKeyCommand(userId, "test");
+        var user = new User(userId, new Email("user@example.com"), new PasswordHash("hashed"), new FullName("User"));
+        SetupValidatorSuccess(command);
+        _userRepositoryMock.Setup(r => r.GetByIdAsync(userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+
+        // Act
+        var result = await _handler.Handle(command);
+
+        // Assert
+        Assert.True(result.IsFailure);
+        Assert.Equal("Identity.EmailNotVerified", result.Errors[0].Code);
+        Assert.Empty(user.ApiKeys);
+    }
+
     private static User CreateUser(Guid userId)
-        => new(userId, new Email("user@example.com"), new PasswordHash("hashed"), new FullName("User"));
+    {
+        var user = new User(userId, new Email("user@example.com"), new PasswordHash("hashed"), new FullName("User"));
+        user.MarkEmailConfirmed();
+        return user;
+    }
 
     private void SetupValidatorSuccess(GenerateApiKeyCommand command)
     {

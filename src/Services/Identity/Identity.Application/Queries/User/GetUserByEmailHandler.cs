@@ -25,6 +25,6 @@ public class GetUserByEmailHandler
         if (user == null)
             return IdentityErrors.InvalidCredentials;
 
-        return new UserDto(user.Id, user.Email.Value, user.FullName.Value, user.IsActive, user.Roles.ToList());
+        return new UserDto(user.Id, user.Email.Value, user.FullName.Value, user.IsActive, user.EmailConfirmed, user.Roles.ToList());
     }
 }

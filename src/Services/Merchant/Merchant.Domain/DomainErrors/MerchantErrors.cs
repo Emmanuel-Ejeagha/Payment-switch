@@ -24,4 +24,7 @@ public static class MerchantErrors
 
     public static Error MerchantNotActive() =>
         new("Merchant.NotActive", "Only active merchants can generate API keys.");
+
+    public static Error EmailNotVerified() =>
+        new("Merchant.EmailNotVerified", "Please verify your email address before generating API keys.");
 }

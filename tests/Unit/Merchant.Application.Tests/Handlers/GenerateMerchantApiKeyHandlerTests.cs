@@ -91,6 +91,21 @@ public class GenerateMerchantApiKeyHandlerTests
     }
 
     [Fact]
+    public async Task Handle_UnverifiedEmailCaller_ShouldFail()
+    {
+        var merchant = CreateActiveMerchant();
+        var command = new GenerateMerchantApiKeyCommand(merchant.Id, "test", new CallerContext(merchant.OwnerId, null, false, false));
+        SetupValidatorSuccess(command);
+        _repoMock.Setup(r => r.GetByIdWithApiKeysAsync(merchant.Id, It.IsAny<CancellationToken>())).ReturnsAsync(merchant);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Merchant.EmailNotVerified", result.Errors[0].Code);
+        Assert.Empty(merchant.ApiKeys);
+    }
+
+    [Fact]
     public async Task Handle_InvalidEnvironment_ShouldReturnValidationErrors()
     {
         var command = new GenerateMerchantApiKeyCommand(Guid.NewGuid(), "prod", new CallerContext(Guid.NewGuid(), null, false));
@@ -102,7 +117,7 @@ public class GenerateMerchantApiKeyHandlerTests
         Assert.Equal("Environment", result.Errors[0].Code);
     }
 
-    private CallerContext OwnerCaller(MerchantEntity merchant) => new(merchant.OwnerId, null, false);
+    private CallerContext OwnerCaller(MerchantEntity merchant) => new(merchant.OwnerId, null, false, true);
 
     private MerchantEntity CreateActiveMerchant()
     {

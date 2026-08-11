@@ -1,4 +1,5 @@
-﻿using Identity.Application.Interfaces;
+﻿using BuildingBlocks.Shared.Auth;
+using Identity.Application.Interfaces;
 using Identity.Domain.Entities;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -23,7 +24,8 @@ public class TokenService : ITokenService
         {
             new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new Claim(ClaimTypes.Email, user.Email.Value),
-            new Claim(ClaimTypes.Name, user.FullName.Value)            
+            new Claim(ClaimTypes.Name, user.FullName.Value),
+            new Claim(CustomClaimTypes.EmailVerified, user.EmailConfirmed ? "true" : "false")
         };
         claims.AddRange(user.Roles.Select(role => new Claim(ClaimTypes.Role, role)));
 

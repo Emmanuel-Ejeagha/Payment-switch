@@ -89,6 +89,13 @@ services:
       - RabbitMQ__Password=${RABBITMQ_DEFAULT_PASS:?Set RABBITMQ_DEFAULT_PASS in .env}
       - Seed__AdminEmail=${SEED_ADMIN_EMAIL:-admin@paymentswitch.com}
       - Seed__AdminPassword=${SEED_ADMIN_PASSWORD:?Set SEED_ADMIN_PASSWORD in .env}
+      - EmailVerification__FrontendBaseUrl=${FRONTEND_BASE_URL:-http://localhost:3000}
+      - Smtp__Host=${SMTP_HOST:-}
+      - Smtp__Port=${SMTP_PORT:-587}
+      - Smtp__Username=${SMTP_USERNAME:-}
+      - Smtp__Password=${SMTP_PASSWORD:-}
+      - Smtp__FromAddress=${SMTP_FROM_ADDRESS:-noreply@paymentswitch.com}
+      - Smtp__FromName=${SMTP_FROM_NAME:-PaymentSwitch}
     depends_on:
       postgres:
         condition: service_healthy

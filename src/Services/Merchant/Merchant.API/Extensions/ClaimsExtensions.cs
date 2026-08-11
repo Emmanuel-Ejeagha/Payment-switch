@@ -1,3 +1,4 @@
+using BuildingBlocks.Shared.Auth;
 using Merchant.Application.Auth;
 using System.Security.Claims;
 
@@ -11,7 +12,8 @@ public static class ClaimsExtensions
         Guid? userId = Guid.TryParse(userIdClaim, out var id) ? id : null;
         var email = user.FindFirstValue(ClaimTypes.Email);
         var isAdmin = user.IsInRole("Admin");
+        var emailVerified = string.Equals(user.FindFirstValue(CustomClaimTypes.EmailVerified), "true", StringComparison.OrdinalIgnoreCase);
 
-        return new CallerContext(userId, email, isAdmin);
+        return new CallerContext(userId, email, isAdmin, emailVerified);
     }
 }
