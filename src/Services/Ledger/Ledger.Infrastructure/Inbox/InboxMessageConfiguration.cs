@@ -13,6 +13,7 @@ public class InboxMessageConfiguration : IEntityTypeConfiguration<InboxMessage>
         builder.Property(m => m.EventType).IsRequired().HasMaxLength(200);
         builder.Property(m => m.Payload).IsRequired().HasColumnType("jsonb");
         builder.Property(m => m.OccurredOn).IsRequired();
+        builder.Property(m => m.State).IsRequired();
         builder.Property(m => m.ProcessedAt);
     }
 }

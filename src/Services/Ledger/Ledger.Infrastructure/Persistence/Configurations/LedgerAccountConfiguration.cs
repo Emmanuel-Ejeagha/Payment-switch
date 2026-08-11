@@ -38,6 +38,7 @@ public class LedgerAccountConfiguration : IEntityTypeConfiguration<LedgerAccount
             j.OwnsOne(e => e.CorrelationId, c =>
             {
                 c.Property(cid => cid.Value).HasColumnName("CorrelationId").IsRequired().HasMaxLength(200);
+                c.HasIndex(cid => cid.Value).IsUnique();
             });
             j.Property(e => e.Timestamp).IsRequired();
             j.ToTable("JournalEntries");
