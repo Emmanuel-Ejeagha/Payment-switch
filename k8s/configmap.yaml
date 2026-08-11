@@ -8,6 +8,8 @@ data:
   Jwt__Audience: "PaymentSwitch"
   RabbitMQ__HostName: "rabbitmq"
   EmailVerification__FrontendBaseUrl: "http://localhost:3000"
+  PasswordReset__FrontendBaseUrl: "http://localhost:3000"
+  PasswordReset__TokenLifetimeHours: "1"
   Smtp__Host: ""
   Smtp__Port: "587"
   Smtp__Username: ""

@@ -14,6 +14,8 @@ public class User : AggregateRoot
     public DateTime? EmailVerifiedAt { get; private set; }
     public string? EmailVerificationTokenHash { get; private set; }
     public DateTime? EmailVerificationTokenExpiresAt { get; private set; }
+    public string? PasswordResetTokenHash { get; private set; }
+    public DateTime? PasswordResetTokenExpiresAt { get; private set; }
     private readonly List<string> _roles = new();
     private readonly List<TokenValue> _refreshTokens = new();
     private readonly List<ApiKey> _apiKeys = new();
@@ -33,9 +35,46 @@ public class User : AggregateRoot
         AddDomainEvent(new UserRegisteredDomainEvent(Id, email.Value, fullName.Value));
     }
 
+    /// <summary>
+    /// Sets a new password and revokes every existing refresh token, forcing
+    /// all current sessions to re-authenticate.
+    /// </summary>
     public void ChangePassword(PasswordHash newPasswordHash)
     {
         PasswordHash = newPasswordHash ?? throw new ArgumentNullException(nameof(newPasswordHash));
+        RevokeAllRefreshTokens();
+    }
+
+    /// <summary>
+    /// Registers a new password-reset token, replacing any outstanding one
+    /// (so requesting another reset invalidates the previous link).
+    /// </summary>
+    public void InitiatePasswordReset(string tokenHash, DateTime expiresAtUtc)
+    {
+        PasswordResetTokenHash = tokenHash ?? throw new ArgumentNullException(nameof(tokenHash));
+        PasswordResetTokenExpiresAt = expiresAtUtc;
+    }
+
+    /// <summary>
+    /// Attempts to reset the password with the supplied hashed token. The token
+    /// is single-use: a successful reset clears it and revokes all sessions.
+    /// </summary>
+    public PasswordResetResult ResetPassword(string tokenHash, PasswordHash newPasswordHash)
+    {
+        if (string.IsNullOrEmpty(PasswordResetTokenHash))
+            return PasswordResetResult.NoToken;
+
+        if (!string.Equals(PasswordResetTokenHash, tokenHash, StringComparison.Ordinal))
+            return PasswordResetResult.InvalidToken;
+
+        if (PasswordResetTokenExpiresAt is null || PasswordResetTokenExpiresAt < DateTime.UtcNow)
+            return PasswordResetResult.TokenExpired;
+
+        PasswordHash = newPasswordHash ?? throw new ArgumentNullException(nameof(newPasswordHash));
+        PasswordResetTokenHash = null;
+        PasswordResetTokenExpiresAt = null;
+        RevokeAllRefreshTokens();
+        return PasswordResetResult.Success;
     }
 
     /// <summary>

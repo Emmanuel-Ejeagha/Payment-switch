@@ -8,6 +8,8 @@ data:
   Jwt__Audience: {{ .Values.config.jwt.audience | quote }}
   RabbitMQ__HostName: {{ .Values.config.rabbitmq.hostName | quote }}
   EmailVerification__FrontendBaseUrl: {{ .Values.config.emailVerification.frontendBaseUrl | quote }}
+  PasswordReset__FrontendBaseUrl: {{ .Values.config.passwordReset.frontendBaseUrl | quote }}
+  PasswordReset__TokenLifetimeHours: {{ .Values.config.passwordReset.tokenLifetimeHours | quote }}
   Smtp__Host: {{ .Values.config.smtp.host | quote }}
   Smtp__Port: {{ .Values.config.smtp.port | quote }}
   Smtp__Username: {{ .Values.config.smtp.username | quote }}
