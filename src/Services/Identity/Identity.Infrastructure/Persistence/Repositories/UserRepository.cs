@@ -86,4 +86,14 @@ public class UserRepository : IUserRepository
     {
         return await _context.Users.AnyAsync(u => u.Email.Value == email, cancellationToken);
     }
+
+    public Task<int> PruneRefreshTokensAsync(CancellationToken cancellationToken = default)
+    {
+        // Physically delete tokens that are revoked or already expired so the
+        // RefreshTokens table cannot grow without bound. Best-effort cleanup —
+        // executed on its own command, independent of the current unit of work.
+        return _context.Database.ExecuteSqlRawAsync(
+            "DELETE FROM \"RefreshTokens\" WHERE \"IsRevoked\" = true OR \"ExpiresAt\" < NOW()",
+            Array.Empty<object>(), cancellationToken);
+    }
 }

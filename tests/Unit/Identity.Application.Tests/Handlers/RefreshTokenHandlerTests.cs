@@ -61,6 +61,52 @@ public class RefreshTokenHandlerTests
     }
 
     [Fact]
+    public async Task Handle_ValidToken_ShouldPruneStaleRefreshTokens()
+    {
+        var command = new RefreshTokenCommand("valid_refresh_token");
+        var user = CreateUserWithRefreshToken("valid_refresh_token");
+        SetupValidatorSuccess(command);
+        _userRepositoryMock.Setup(r => r.FindByRefreshTokenAsync("hash-valid_refresh_token", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+        _tokenServiceMock.Setup(t => t.GenerateAccessToken(user)).Returns("new_access_token");
+        _tokenServiceMock.Setup(t => t.GenerateRefreshToken()).Returns("new_refresh_token");
+        _userRepositoryMock.Setup(r => r.PruneRefreshTokensAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(2);
+        _unitOfWorkMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsSuccess);
+        _userRepositoryMock.Verify(r => r.PruneRefreshTokensAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_ValidToken_ShouldEnforceRefreshTokenCap()
+    {
+        var command = new RefreshTokenCommand("valid_refresh_token");
+        var user = CreateUserWithRefreshToken("valid_refresh_token");
+        for (var i = 0; i < User.MaxActiveRefreshTokens + 2; i++)
+            user.AddRefreshToken($"hash-old-{i}", DateTime.UtcNow.AddDays(i + 1));
+        SetupValidatorSuccess(command);
+        _userRepositoryMock.Setup(r => r.FindByRefreshTokenAsync("hash-valid_refresh_token", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+        _tokenServiceMock.Setup(t => t.GenerateAccessToken(user)).Returns("new_access_token");
+        _tokenServiceMock.Setup(t => t.GenerateRefreshToken()).Returns("new_refresh_token");
+        _userRepositoryMock.Setup(r => r.PruneRefreshTokensAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(0);
+        _unitOfWorkMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsSuccess);
+        // The current token is revoked by rotation; exactly 3 others must be
+        // evicted by the cap so the account stays within MaxActiveRefreshTokens.
+        Assert.Equal(4, user.RefreshTokens.Count(t => t.IsRevoked));
+    }
+
+    [Fact]
     public async Task Handle_ExpiredToken_ShouldReturnFailure()
     {
         // Arrange

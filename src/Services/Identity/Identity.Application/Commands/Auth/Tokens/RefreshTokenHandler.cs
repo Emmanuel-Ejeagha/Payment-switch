@@ -56,6 +56,8 @@ public class RefreshTokenHandler
         var newAccessToken = _tokenService.GenerateAccessToken(user);
         var newRefreshToken = _tokenService.GenerateRefreshToken();
         user.AddRefreshToken(_tokenService.HashRefreshToken(newRefreshToken), DateTime.UtcNow.AddDays(7));
+        user.EnforceRefreshTokenCap();
+        await _userRepository.PruneRefreshTokensAsync(cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         await _dispatcher.DispatchAsync(user.DomainEvents, cancellationToken);
 

@@ -65,6 +65,7 @@ public class LoginHandler
         var expiresIn = 3600; // 1 hour, should come from config but hardcoded for now
 
         user.AddRefreshToken(_tokenService.HashRefreshToken(refreshToken), DateTime.UtcNow.AddDays(7));
+        user.EnforceRefreshTokenCap();
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         await _dispatcher.DispatchAsync(user.DomainEvents, cancellationToken);
 
