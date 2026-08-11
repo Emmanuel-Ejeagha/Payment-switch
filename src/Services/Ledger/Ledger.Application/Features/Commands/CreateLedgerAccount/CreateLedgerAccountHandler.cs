@@ -34,7 +34,7 @@ public class CreateLedgerAccountHandler
         if (!validation.IsValid)
             return validation.Errors.Select(e => new Error(e.PropertyName, e.ErrorMessage)).ToList();
 
-        var existing = await _repository.GetByMerchantIdAsync(command.MerchantId, cancellationToken);
+        var existing = await _repository.GetByMerchantIdAndCurrencyAsync(command.MerchantId, command.Currency, cancellationToken);
         if (existing is not null)
             return Result.Success(); 
 
