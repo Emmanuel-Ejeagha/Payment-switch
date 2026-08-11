@@ -43,6 +43,10 @@ public class MerchantGrpcService : MerchantService.MerchantServiceBase
             resp.EnabledPaymentMethods.AddRange(merchant.EnabledPaymentMethods);
             resp.AutoCapture = merchant.AutoCapture;
             resp.WebhookSecret = merchant.WebhookSecret?.Value ?? string.Empty;
+            resp.PreviousWebhookSecret = merchant.PreviousWebhookSecret?.Value ?? string.Empty;
+            resp.WebhookSecretRotatedAt = merchant.WebhookSecretRotatedAtUtc is { } rotatedAt
+                ? new DateTimeOffset(rotatedAt).ToUnixTimeSeconds()
+                : 0;
         }
         return resp;
     }

@@ -242,11 +242,11 @@ A payment switch handling card tokenization, authentication, and money movement 
 - DNS/domain for cert issuance (currently raw IP).
 
 **Acceptance Criteria:**
-- [ ] All public traffic is HTTPS; HTTP redirects to HTTPS.
-- [ ] HSTS and secure headers present.
-- [ ] Checkout and portals operate over HTTPS in production.
-- [ ] Committed production envs no longer contain a plaintext HTTP IP.
-- [ ] Documentation covers cert provisioning and renewal.
+- [x] All public traffic is HTTPS; HTTP redirects to HTTPS.
+- [x] HSTS and secure headers present.
+- [x] Checkout and portals operate over HTTPS in production.
+- [x] Committed production envs no longer contain a plaintext HTTP IP.
+- [x] Documentation covers cert provisioning and renewal.
 
 **Evidence:**
 - `infra/nginx/nginx.conf`
@@ -332,10 +332,10 @@ The merchant webhook signing secret is stored **plaintext**, returned in merchan
 - TASK-004 (TLS for gRPC secret delivery).
 
 **Acceptance Criteria:**
-- [ ] `WebhookSecret` never appears in any HTTP response.
-- [ ] Secret encrypted at rest; decrypt only inside webhook signing path.
-- [ ] Rotation supports a grace window for the previous secret.
-- [ ] Tests assert the secret is not returned and old secret still verifies during grace.
+- [x] `WebhookSecret` never appears in any HTTP response.
+- [x] Secret encrypted at rest; decrypt only inside webhook signing path.
+- [x] Rotation supports a grace window for the previous secret.
+- [x] Tests assert the secret is not returned and old secret still verifies during grace.
 
 **Evidence:**
 - `src/Services/Merchant/Merchant.Domain/Entities/Merchant.cs:13-14`
@@ -1937,7 +1937,7 @@ P3 - Low
 - [ ] Approved/Rejected lifecycle + rejection (P1, TASK-016)
 - [ ] Reactivation from suspended + deactivation (P1, TASK-016)
 - [ ] Settlement/bank info (P1, TASK-016)
-- [ ] Webhook secret encrypted + not exposed (P0, TASK-006)
+- [x] Webhook secret encrypted + not exposed (P0, TASK-006)
 - [ ] Notification preferences (P1, TASK-012)
 - [ ] API-key scopes (P2)
 
@@ -1993,7 +1993,7 @@ P3 - Low
 
 **Security**
 - [x] No committed secrets; startup validation; BCrypt; HMAC signing
-- [ ] TLS (P0, TASK-004)
+- [x] TLS (P0, TASK-004)
 - [ ] Hangfire auth + default-creds removal (P1, TASK-013)
 - [ ] jti + key rotation (P2, TASK-031)
 - [ ] CORS tightening + forwarded proto (P2, TASK-032)
@@ -2061,7 +2061,7 @@ P3 - Low
 
 **API integration**
 - [x] All screens call real endpoints via proxy; zero mocks
-- [ ] Committed `.env.production` HTTP IPs removed (P0, TASK-004)
+- [x] Committed `.env.production` HTTP IPs removed (P0, TASK-004)
 - [ ] Deploy config (P1, TASK-021)
 
 ---
@@ -2195,15 +2195,15 @@ P3 - Low
 **Tasks:** TASK-004 (TLS), TASK-006 (webhook secret), TASK-013 (Hangfire + default creds)
 
 **Steps:**
-1. [ ] **TASK-004** — Add 443/TLS to `infra/nginx/nginx.conf` (Let's Encrypt/AWS ALB/ACM), HTTP→HTTPS redirect, HSTS, and `X-Forwarded-Proto` forwarding.
-2. [ ] **TASK-004** — Provision TLS on the k8s Ingress (cert-manager/issuer or ALB); update `k8s/ingress.yaml`.
-3. [ ] **TASK-004** — Remove committed `apps/*/.env.production` (plaintext HTTP IP) and move the base URL to HTTPS build/run-time secrets.
-4. [ ] **TASK-006** — Encrypt `WebhookSecret` at rest (AES-GCM); strip it from `MerchantDto`/all responses; keep gRPC secret delivery behind `ServiceOnly` + TLS; add a dual-secret grace window to rotation.
+1. [x] **TASK-004** — Add 443/TLS to `infra/nginx/nginx.conf` (Let's Encrypt/AWS ALB/ACM), HTTP→HTTPS redirect, HSTS, and `X-Forwarded-Proto` forwarding.
+2. [x] **TASK-004** — Provision TLS on the k8s Ingress (cert-manager/issuer or ALB); update `k8s/ingress.yaml`.
+3. [x] **TASK-004** — Remove committed `apps/*/.env.production` (plaintext HTTP IP) and move the base URL to HTTPS build/run-time secrets.
+4. [x] **TASK-006** — Encrypt `WebhookSecret` at rest (AES-GCM); strip it from `MerchantDto`/all responses; keep gRPC secret delivery behind `ServiceOnly` + TLS; add a dual-secret grace window to rotation.
 5. [ ] **TASK-013** — Restrict the Hangfire dashboard (`Settlement.API`) to the Admin role; move Grafana/RabbitMQ credentials out of k8s/Helm defaults into secrets.
 
 **Exit criteria:**
-- [ ] No plaintext HTTP traffic in production; HSTS + secure headers verified.
-- [ ] `WebhookSecret` never appears in an API response; encrypted at rest.
+- [x] No plaintext HTTP traffic in production; HSTS + secure headers verified.
+- [x] `WebhookSecret` never appears in an API response; encrypted at rest.
 - [ ] `/hangfire` and dashboards require auth; no default credentials in manifests.
 
 ---

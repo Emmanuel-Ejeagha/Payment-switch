@@ -52,6 +52,11 @@ spec:
                 secretKeyRef:
                   name: payment-switch-secret
                   key: RabbitMQ__Password
+            - name: WebhookSecretEncryption__Key
+              valueFrom:
+                secretKeyRef:
+                  name: payment-switch-secret
+                  key: WebhookSecretEncryption__Key
           ports:
             - containerPort: 8080
           livenessProbe:

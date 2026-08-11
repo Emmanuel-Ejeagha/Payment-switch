@@ -3,6 +3,7 @@ using Merchant.Infrastructure.Messaging;
 using Merchant.Infrastructure.Outbox;
 using Merchant.Infrastructure.Persistence;
 using Merchant.Infrastructure.Persistence.Repositories;
+using Merchant.Infrastructure.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,7 +14,12 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddMerchantInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
+        var webhookSecretEncryptionKey = configuration["WebhookSecretEncryption:Key"]
+            ?? throw new InvalidOperationException("WebhookSecretEncryption:Key is required (TASK-006).");
+        WebhookSecretEncryptor.Initialize(webhookSecretEncryptionKey);
+
         services.AddScoped<OutboxInterceptor>();
+        services.AddScoped<WebhookSecretEncryptionBackfill>();
 
         services.AddDbContext<AppDbContext>((sp, options) =>
         {

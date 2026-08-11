@@ -12,6 +12,8 @@ public class Merchant : AggregateRoot
     public MerchantStatus Status { get; private set; } = default!;
     public WebhookUrl? WebhookUrl { get; private set; } = default!;
     public WebhookSecret? WebhookSecret { get; private set; } = default!;
+    public WebhookSecret? PreviousWebhookSecret { get; private set; }
+    public DateTime? WebhookSecretRotatedAtUtc { get; private set; }
     public IReadOnlyList<string> EnabledPaymentMethods => _paymentMethods.AsReadOnly();
     private readonly List<string> _paymentMethods = new();
     public IReadOnlyList<MerchantApiKey> ApiKeys => _apiKeys.AsReadOnly();
@@ -80,7 +82,9 @@ public class Merchant : AggregateRoot
 
     public WebhookSecret RotateWebhookSecret()
     {
+        PreviousWebhookSecret = WebhookSecret;
         WebhookSecret = WebhookSecret.Generate();
+        WebhookSecretRotatedAtUtc = DateTime.UtcNow;
         UpdatedAt = DateTime.UtcNow;
         AddDomainEvent(new MerchantConfigurationUpdatedEvent(Id));
         return WebhookSecret;

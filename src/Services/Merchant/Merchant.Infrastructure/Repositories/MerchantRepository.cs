@@ -48,7 +48,7 @@ public class MerchantRepository : IMerchantRepository
         return await _context.Merchants
             .OrderByDescending(m => m.CreatedAt)
             .Skip(skip).Take(take)
-            .Select(m => new MerchantDto(m.Id, m.BusinessName.Value, m.Email.Value, m.Status.Value, m.WebhookUrl == null ? null : m.WebhookUrl.Value, m.WebhookSecret == null ? null : m.WebhookSecret.Value, m.EnabledPaymentMethods.ToList(), m.CreatedAt, m.AutoCapture))
+            .Select(m => new MerchantDto(m.Id, m.BusinessName.Value, m.Email.Value, m.Status.Value, m.WebhookUrl == null ? null : m.WebhookUrl.Value, m.EnabledPaymentMethods.ToList(), m.CreatedAt, m.AutoCapture))
             .ToListAsync(cancellationToken);
     }
 

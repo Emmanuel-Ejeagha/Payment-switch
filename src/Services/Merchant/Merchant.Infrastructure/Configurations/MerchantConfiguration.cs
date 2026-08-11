@@ -1,4 +1,5 @@
 ﻿using Merchant.Domain.Entities;
+using Merchant.Infrastructure.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using System.Text.Json;
@@ -31,8 +32,25 @@ public class MerchantConfiguration : IEntityTypeConfiguration<MerchantEntity>
 
         builder.OwnsOne(m => m.WebhookSecret, ws =>
         {
-            ws.Property(w => w.Value).HasColumnName("WebhookSecret").HasMaxLength(128);
+            ws.Property(w => w.Value)
+              .HasColumnName("WebhookSecret")
+              .HasMaxLength(256)
+              .HasConversion(
+                  v => WebhookSecretEncryptor.Encrypt(v),
+                  v => WebhookSecretEncryptor.Decrypt(v));
         });
+
+        builder.OwnsOne(m => m.PreviousWebhookSecret, ws =>
+        {
+            ws.Property(w => w.Value)
+              .HasColumnName("PreviousWebhookSecret")
+              .HasMaxLength(256)
+              .HasConversion(
+                  v => WebhookSecretEncryptor.Encrypt(v),
+                  v => WebhookSecretEncryptor.Decrypt(v));
+        });
+
+        builder.Property(m => m.WebhookSecretRotatedAtUtc);
 
         builder.OwnsOne(m => m.Status, st =>
         {
