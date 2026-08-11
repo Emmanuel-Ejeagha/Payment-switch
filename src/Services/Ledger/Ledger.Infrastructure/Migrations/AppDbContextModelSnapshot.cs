@@ -169,7 +169,7 @@ namespace Ledger.Infrastructure.Migrations
 
                             b1.HasKey("Id");
 
-                            b1.HasIndex("LedgerAccountId");
+                            b1.HasIndex("LedgerAccountId", "Timestamp");
 
                             b1.ToTable("JournalEntries", (string)null);
 

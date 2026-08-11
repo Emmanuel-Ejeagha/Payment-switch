@@ -1,7 +1,7 @@
 ﻿using BuildingBlocks.Shared.Auth;
 using Grpc.Core;
-using Ledger.Domain.Entities;
 using Ledger.Infrastructure.Persistence;
+using Ledger.Infrastructure.Queries;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using PaymentSwitch.Protos.Ledger;
@@ -12,10 +12,12 @@ namespace Ledger.API.Services;
 public class LedgerGrpcService : LedgerService.LedgerServiceBase
 {
     private readonly AppDbContext _db;
+    private readonly IDailyPayoutQuery _dailyPayoutQuery;
 
-    public LedgerGrpcService(AppDbContext db)
+    public LedgerGrpcService(AppDbContext db, IDailyPayoutQuery dailyPayoutQuery)
     {
         _db = db;
+        _dailyPayoutQuery = dailyPayoutQuery;
     }
 
     public override async Task<GetBalancesResponse> GetBalances(
@@ -37,20 +39,20 @@ public class LedgerGrpcService : LedgerService.LedgerServiceBase
     public override async Task<GetDailyPayoutDataResponse> GetDailyPayoutData(
         GetDailyPayoutDataRequest request, ServerCallContext context)
     {
-        var date = DateTime.Parse(request.Date);
-        var accounts = await _db.LedgerAccounts.ToListAsync();
+        if (!DateTime.TryParse(request.Date, out var parsedDate))
+            return new GetDailyPayoutDataResponse();
+
+        var payouts = await _dailyPayoutQuery.GetAsync(parsedDate, context.CancellationToken);
 
         var resp = new GetDailyPayoutDataResponse();
-        foreach (var account in accounts)
+        foreach (var payout in payouts)
         {
-            var gross = account.AvailableBalance; 
-            var fees = 0L; 
             resp.Payouts.Add(new MerchantPayoutData
             {
-                MerchantId = account.MerchantId.ToString(),
-                GrossVolume = gross,
-                Fees = fees,
-                Currency = account.Currency
+                MerchantId = payout.MerchantId.ToString(),
+                GrossVolume = payout.GrossVolume,
+                Fees = payout.Fees,
+                Currency = payout.Currency
             });
         }
         return resp;

@@ -31,6 +31,7 @@ public class LedgerAccountConfiguration : IEntityTypeConfiguration<LedgerAccount
             j.UsePropertyAccessMode(PropertyAccessMode.PreferField);
             j.WithOwner().HasForeignKey("LedgerAccountId");
             j.HasKey("Id");
+            j.HasIndex("LedgerAccountId", "Timestamp");
             j.Property(e => e.Id).ValueGeneratedNever();
             j.Property(e => e.Type).HasConversion<string>().IsRequired();
             j.Property(e => e.DebitAccount).HasConversion<string>().IsRequired();
