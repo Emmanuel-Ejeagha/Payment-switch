@@ -30,7 +30,7 @@ Roughly **65–70% production-ready** by feature count (most core happy paths wo
 
 - **Identity account lifecycle**: email verification, password reset/change, and account lockout are entirely absent.
 - **Financial integrity under failure**: Ledger inbox is not atomic with posting (crash can double-post); Settlement's gRPC source is a stub producing fabricated figures; no unique constraint on settlement `BatchDate`.
-- **Security**: no TLS anywhere (nginx, ingress, EC2, frontends); plaintext webhook secrets exposed in API/gRPC; unauthenticated Hangfire dashboard; default Grafana/RabbitMQ creds in k8s.
+- **Security**: no TLS anywhere (nginx, ingress, EC2, frontends); plaintext webhook secrets exposed in API/gRPC; admin surfaces (Hangfire, Grafana, RabbitMQ) were previously open with default creds.
 - **Messaging completeness**: 5 of 6 exchanges have zero consumers; 14+ events published into a void.
 - **Observability**: no RabbitMQ trace propagation, no Grafana provisioning, hardcoded OTLP endpoint, no alerts.
 - **Testing depth**: no E2E, no contract tests, no frontend tests, consumers/outbox/inbox/validators untested, 5 of 6 integration suites are health-check-only, no RabbitMQ in integration tests.
@@ -604,13 +604,13 @@ There is no opt-out/opt-in mechanism for notifications. Merchants/customers cann
 
 ---
 
-### [ ] TASK-013 — Secure Admin Surfaces (Hangfire + default creds)
+### [x] TASK-013 — Secure Admin Surfaces (Hangfire + default creds)
 
 **Category:**
 Security
 
 **Status:**
-Partial
+Completed
 
 **Priority:**
 P1 - High
@@ -619,10 +619,10 @@ P1 - High
 The Hangfire dashboard at `/hangfire` is served without authentication on the Settlement service, and k8s/Helm hard-code Grafana `admin/admin` and RabbitMQ `guest/guest`. These are attack surfaces that must be locked down.
 
 **Current State:**
-- `Settlement.API/Program.cs:147` — `UseHangfireDashboard()` with no authorization.
-- `k8s/grafana-deployment.yaml:20-23` — `GF_SECURITY_ADMIN_PASSWORD: "admin"`.
-- `k8s/rabbitmq-deployment.yaml:21-23` — `guest/guest`.
-- `helm/payment-switch/templates/grafana.yaml` — `GF_SECURITY_ADMIN_PASSWORD: "admin"`.
+- `Settlement.API/Program.cs` — `UseHangfireDashboard()` restricted via `AdminDashboardAuthorizationFilter` (Admin role required).
+- `k8s/grafana-deployment.yaml` — `GF_SECURITY_ADMIN_*` from `payment-switch-secret`.
+- `k8s/rabbitmq-deployment.yaml` — `RABBITMQ_DEFAULT_*` from `payment-switch-secret`.
+- `helm/payment-switch/templates/grafana.yaml` / `rabbitmq.yaml` — same, via `payment-switch-secret`; `RabbitMQ__UserName` moved from ConfigMap to Secret.
 
 **Required:**
 1. Restrict Hangfire dashboard via role-based access (e.g., `[Authorize(Roles="Admin")]` via `DashboardAuthorizationFilter`).
@@ -637,13 +637,15 @@ The Hangfire dashboard at `/hangfire` is served without authentication on the Se
 - None.
 
 **Acceptance Criteria:**
-- [ ] `/hangfire` requires an authenticated admin.
-- [ ] No default credentials in any manifest.
-- [ ] Verified via config scan.
+- [x] `/hangfire` requires an authenticated admin.
+- [x] No default credentials in any manifest.
+- [x] Verified via config scan.
 
 **Evidence:**
-- `src/Services/Settlement/Settlement.API/Program.cs:147`
-- `k8s/grafana-deployment.yaml`, `k8s/rabbitmq-deployment.yaml`, `helm/payment-switch/templates/grafana.yaml`
+- `src/Services/Settlement/Settlement.API/Security/HangfireAdminAuthorizationFilter.cs`
+- `src/Services/Settlement/Settlement.API/Program.cs`
+- `tests/Unit/Settlement.API.Tests/HangfireAdminAuthorizationTests.cs`
+- `k8s/grafana-deployment.yaml`, `k8s/rabbitmq-deployment.yaml`, `helm/payment-switch/templates/grafana.yaml`, `helm/payment-switch/templates/rabbitmq.yaml`
 
 ---
 
@@ -1975,7 +1977,7 @@ P3 - Low
 - [ ] Unique BatchDate + concurrent-safe trigger (P0, TASK-005)
 - [ ] Correct ledger tie-out (P0, TASK-003)
 - [ ] Payout disbursement / retry / reports (P1, TASK-016/017)
-- [ ] Hangfire dashboard auth (P1, TASK-013)
+- [x] Hangfire dashboard auth (P1, TASK-013)
 
 **Shared infrastructure**
 - [x] Result, ValueObject, Guard, correlation ID, security headers, rate limiting, request-size, service-token, gRPC resilience
@@ -1994,7 +1996,7 @@ P3 - Low
 **Security**
 - [x] No committed secrets; startup validation; BCrypt; HMAC signing
 - [x] TLS (P0, TASK-004)
-- [ ] Hangfire auth + default-creds removal (P1, TASK-013)
+- [x] Hangfire auth + default-creds removal (P1, TASK-013)
 - [ ] jti + key rotation (P2, TASK-031)
 - [ ] CORS tightening + forwarded proto (P2, TASK-032)
 
@@ -2136,7 +2138,7 @@ P3 - Low
 |---|---|---|
 | 0 | Baseline & Enablement | [x] Complete (CI gate pending PR to main) |
 | 1 | Financial Integrity Foundation (P0) | [x] Complete (unit + integration suites green) |
-| 2 | Security Baseline (P0/P1) | [ ] Not started |
+| 2 | Security Baseline (P0/P1) | [x] Complete (unit + integration suites green) |
 | 3 | Identity Account Lifecycle | [ ] Not started |
 | 4 | Financial Operations: Reconciliation & Lifecycle | [ ] Not started |
 | 5 | Notifications & Real-Time | [ ] Not started |
@@ -2199,12 +2201,12 @@ P3 - Low
 2. [x] **TASK-004** — Provision TLS on the k8s Ingress (cert-manager/issuer or ALB); update `k8s/ingress.yaml`.
 3. [x] **TASK-004** — Remove committed `apps/*/.env.production` (plaintext HTTP IP) and move the base URL to HTTPS build/run-time secrets.
 4. [x] **TASK-006** — Encrypt `WebhookSecret` at rest (AES-GCM); strip it from `MerchantDto`/all responses; keep gRPC secret delivery behind `ServiceOnly` + TLS; add a dual-secret grace window to rotation.
-5. [ ] **TASK-013** — Restrict the Hangfire dashboard (`Settlement.API`) to the Admin role; move Grafana/RabbitMQ credentials out of k8s/Helm defaults into secrets.
+5. [x] **TASK-013** — Restrict the Hangfire dashboard (`Settlement.API`) to the Admin role; move Grafana/RabbitMQ credentials out of k8s/Helm defaults into secrets.
 
 **Exit criteria:**
 - [x] No plaintext HTTP traffic in production; HSTS + secure headers verified.
 - [x] `WebhookSecret` never appears in an API response; encrypted at rest.
-- [ ] `/hangfire` and dashboards require auth; no default credentials in manifests.
+- [x] `/hangfire` and dashboards require auth; no default credentials in manifests.
 
 ---
 

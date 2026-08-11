@@ -44,8 +44,8 @@ spec:
                   key: RabbitMQ__HostName
             - name: RabbitMQ__UserName
               valueFrom:
-                configMapKeyRef:
-                  name: payment-switch-config
+                secretKeyRef:
+                  name: payment-switch-secret
                   key: RabbitMQ__UserName
             - name: RabbitMQ__Password
               valueFrom:

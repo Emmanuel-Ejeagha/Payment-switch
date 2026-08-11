@@ -17,6 +17,7 @@ using Microsoft.OpenApi;
 using OpenTelemetry.Metrics;
 using Serilog;
 using Settlement.API.Middlewares;
+using Settlement.API.Security;
 using Settlement.Application;
 using Settlement.Application.Features.Command.TriggerSettlement;
 using Settlement.Infrastructure;
@@ -144,7 +145,12 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.UsePaymentSwitchOutputCache();
 
-app.UseHangfireDashboard();
+app.UseHangfireDashboard("/hangfire", new Hangfire.DashboardOptions
+{
+    // TASK-013: the dashboard is admin-only. UseAuthentication above has already
+    // populated the user from the JWT bearer attached by the frontend BFF proxy.
+    Authorization = [new AdminDashboardAuthorizationFilter()]
+});
 
 using (var serviceScope = app.Services.CreateScope())
 {

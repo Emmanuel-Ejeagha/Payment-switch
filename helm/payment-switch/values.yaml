@@ -157,7 +157,8 @@ config:
     secret: ""
   rabbitmq:
     hostName: "rabbitmq"
-    userName: "guest"
+    # REQUIRED: provide a strong username/password via --set or a secrets values file
+    userName: "paymentswitch"
     # REQUIRED: provide a strong password via --set config.rabbitmq.password="..."
     password: ""
   postgres:
@@ -168,6 +169,13 @@ config:
   seed:
     adminEmail: "admin@paymentswitch.com"
     # REQUIRED: provide a strong admin password via --set config.seed.adminPassword="..."
+    adminPassword: ""
+  webhookSecretEncryption:
+    # REQUIRED: AES-256 key (base64) used by the Merchant service to encrypt
+    # webhook secrets at rest (TASK-006). See Merchant.API webhook secret config.
+    key: ""
+  grafana:
+    adminUser: "admin"
     adminPassword: ""
 
 infrastructure:
