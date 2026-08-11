@@ -186,6 +186,8 @@ config:
     password: ""
     fromAddress: "noreply@paymentswitch.com"
     fromName: "PaymentSwitch"
+  sms:
+    enabled: false
   grafana:
     adminUser: "admin"
     adminPassword: ""

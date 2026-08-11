@@ -9,4 +9,6 @@ public class SmtpSettings
     public string FromAddress { get; set; } = "noreply@paymentswitch.com";
     public string FromName { get; set; } = "PaymentSwitch";
     public bool UseSsl { get; set; } = false;
+
+    public bool IsConfigured => !string.IsNullOrWhiteSpace(Host);
 }

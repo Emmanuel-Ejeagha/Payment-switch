@@ -203,6 +203,13 @@ services:
       - RabbitMQ__HostName=rabbitmq
       - RabbitMQ__UserName=${RABBITMQ_DEFAULT_USER:?Set RABBITMQ_DEFAULT_USER in .env}
       - RabbitMQ__Password=${RABBITMQ_DEFAULT_PASS:?Set RABBITMQ_DEFAULT_PASS in .env}
+      - Smtp__Host=${SMTP_HOST:-}
+      - Smtp__Port=${SMTP_PORT:-587}
+      - Smtp__Username=${SMTP_USERNAME:-}
+      - Smtp__Password=${SMTP_PASSWORD:-}
+      - Smtp__FromAddress=${SMTP_FROM_ADDRESS:-noreply@paymentswitch.com}
+      - Smtp__FromName=${SMTP_FROM_NAME:-PaymentSwitch}
+      - Sms__Enabled=${SMS_ENABLED:-false}
     depends_on:
       postgres:
         condition: service_healthy

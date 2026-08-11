@@ -65,6 +65,7 @@ public static class DependencyInjection
         .AddServiceTokenAuthentication();
 
         services.Configure<SmtpSettings>(configuration.GetSection("Smtp"));
+        services.Configure<SmsSettings>(configuration.GetSection("Sms"));
 
         return services;
     }
