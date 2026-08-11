@@ -2135,7 +2135,7 @@ P3 - Low
 | Phase | Title | Status |
 |---|---|---|
 | 0 | Baseline & Enablement | [x] Complete (CI gate pending PR to main) |
-| 1 | Financial Integrity Foundation (P0) | [ ] Not started |
+| 1 | Financial Integrity Foundation (P0) | [x] Complete (unit + integration suites green) |
 | 2 | Security Baseline (P0/P1) | [ ] Not started |
 | 3 | Identity Account Lifecycle | [ ] Not started |
 | 4 | Financial Operations: Reconciliation & Lifecycle | [ ] Not started |
@@ -2179,12 +2179,12 @@ P3 - Low
 4. [x] **TASK-003** — Implement real daily payout aggregation in Ledger (Σ captures − Σ refunds per merchant per date, fees from `FeesIncome`) behind a query (index `JournalEntries(LedgerAccountId, Timestamp)`); fix `LedgerGrpcService.GetDailyPayoutData` to honor `date`.
 5. [x] **TASK-003** — Add a Settlement-side tie-out before `Complete()`: assert batch gross/fees match the ledger query; on mismatch, surface an error instead of silently completing.
 6. [x] **TASK-005** — Add unique index on `SettlementBatches.BatchDate`; catch unique-violation in `TriggerSettlementHandler` and return the existing batch.
-7. [ ] Write integration tests proving: redelivered `MessageId` posts once; concurrent settlement triggers produce one batch; settlement totals equal ledger daily sums.
+7. [x] Write integration tests proving: redelivered `MessageId` posts once; concurrent settlement triggers produce one batch; settlement totals equal ledger daily sums.
 
 **Exit criteria:**
-- [ ] Crash/redelivery cannot double-post (test proves it).
-- [ ] Settlement batches are duplicate-proof and computed from real daily ledger activity.
-- [ ] Ledger invariants are DB-enforced.
+- [x] Crash/redelivery cannot double-post (test proves it).
+- [x] Settlement batches are duplicate-proof and computed from real daily ledger activity.
+- [x] Ledger invariants are DB-enforced.
 
 ---
 
