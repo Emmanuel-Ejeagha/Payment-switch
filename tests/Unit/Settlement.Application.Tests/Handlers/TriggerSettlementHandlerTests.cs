@@ -136,6 +136,30 @@ public class TriggerSettlementHandlerTests
         _repoMock.Verify(r => r.AddAsync(It.IsAny<SettlementBatch>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
+    [Fact]
+    public async Task Handle_UniqueViolationOnSave_ShouldReturnExistingBatch()
+    {
+        var existingBatch = new SettlementBatch(Guid.NewGuid(), new DateTime(2026, 7, 3));
+        var command = new TriggerSettlementCommand(new DateTime(2026, 7, 3));
+        SetupValidatorSuccess(command);
+        _repoMock.SetupSequence(r => r.GetByBatchDateAsync(command.BatchDate, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((SettlementBatch?)null)
+            .ReturnsAsync(existingBatch);
+        _ledgerMock.Setup(l => l.GetDailyPayoutDataAsync(command.BatchDate, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<List<MerchantPayoutData>>.Success(new List<MerchantPayoutData>
+            {
+                new(Guid.NewGuid(), 1000L, 20L, "USD")
+            }));
+        _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new UniqueConstraintViolationException());
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(existingBatch.Id, result.Value!.Id);
+        _repoMock.Verify(r => r.AddAsync(It.IsAny<SettlementBatch>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
     private void SetupValidatorSuccess(TriggerSettlementCommand command) =>
         _validatorMock.Setup(v => v.ValidateAsync(command, It.IsAny<CancellationToken>())).ReturnsAsync(new ValidationResult());
 
