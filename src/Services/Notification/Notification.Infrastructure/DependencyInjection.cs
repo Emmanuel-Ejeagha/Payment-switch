@@ -1,4 +1,6 @@
-﻿using BuildingBlocks.Shared.Configuration;
+﻿using BuildingBlocks.Shared.Auth;
+using BuildingBlocks.Shared.Configuration;
+using BuildingBlocks.Shared.Resilience;
 using Notification.Application.Interfaces;
 using Notification.Infrastructure.Inbox;
 using Notification.Infrastructure.Outbox;
@@ -10,6 +12,7 @@ using Notification.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using PaymentSwitch.Protos.Merchant;
 
 namespace Notification.Infrastructure;
 
@@ -28,11 +31,14 @@ public static class DependencyInjection
 
         services.AddScoped<INotificationRepository, NotificationRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+        services.AddScoped<IMerchantContactService, GrpcMerchantContactService>();
 
         services.AddScoped<EmailSender>();
         services.AddScoped<SmsSender>();
         services.AddScoped<WebhookSender>();
         services.AddScoped<INotificationSender, NotificationSenderDispatcher>();
+
+        services.AddServiceTokenProvider(configuration, "Notification");
 
         services.AddHostedService<NotificationSenderBackgroundService>();
         services.AddHostedService<RabbitMQConsumerService>();
@@ -44,6 +50,19 @@ public static class DependencyInjection
             "RabbitMQ HostName is required");
         services.AddScoped<IEventBus, RabbitMQEventBus>();
         services.AddScoped<HttpClient>(_ => new HttpClient());
+
+        // The merchant gRPC channel is a documented in-network exception
+        // (TASK-004): port 5001 is never published and the endpoint is gated by
+        // the ServiceOnly policy. Payment events are enriched with the merchant
+        // contact email at consume time so notifications never use a placeholder.
+        services.AddGrpcClient<MerchantService.MerchantServiceClient>(o =>
+        {
+            o.Address = new Uri(configuration["Grpc:Merchant:Address"] ?? "http://merchant-api:5001");
+            o.ChannelOptionsActions.Add(channel =>
+                channel.UnsafeUseInsecureChannelCallCredentials = true);
+        })
+        .AddGrpcResilienceInterceptor()
+        .AddServiceTokenAuthentication();
 
         services.Configure<SmtpSettings>(configuration.GetSection("Smtp"));
 

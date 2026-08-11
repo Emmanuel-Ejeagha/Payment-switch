@@ -8,6 +8,7 @@ service MerchantService {
   rpc GetMerchantStatus (GetMerchantStatusRequest) returns (GetMerchantStatusResponse);
   rpc GetMerchantConfig (GetMerchantConfigRequest) returns (GetMerchantConfigResponse);
   rpc ResolveApiKey (ResolveApiKeyRequest) returns (ResolveApiKeyResponse);
+  rpc GetMerchantContact (GetMerchantContactRequest) returns (GetMerchantContactResponse);
 }
 
 message GetMerchantStatusRequest {
@@ -42,4 +43,13 @@ message ResolveApiKeyResponse {
   string merchant_id = 1;
   string status = 2;
   string environment = 3;
+}
+
+message GetMerchantContactRequest {
+  string merchant_id = 1;
+}
+
+message GetMerchantContactResponse {
+  string email = 1;
+  string business_name = 2;
 }
