@@ -2156,7 +2156,7 @@ P3 - Low
 **Steps:**
 1. [x] Run the full build and test suite locally (`dotnet build PaymentSwitch.slnx && dotnet test PaymentSwitch.slnx`) and confirm unit + integration baseline is green.
 2. [x] Add Testcontainers **RabbitMQ** to the integration shared fixture (`tests/Integration/Shared/TestSecrets.cs` currently uses `rabbitmq.invalid`); prove outbox → exchange → consumer → inbox → DB flow in one throwaway test.
-3. [ ] Adopt the convention "every fix ships with a test" (unit for logic, integration for broker/DB paths).
+3. [x] Adopt the convention "every fix ships with a test" (unit for logic, integration for broker/DB paths).
 4. [ ] Correct the README's false claims (Event Sourcing, Saga, OAuth2) so later work is measured against an accurate description.
 
 **Exit criteria:**
