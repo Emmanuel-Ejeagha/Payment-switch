@@ -25,7 +25,7 @@ You can explore the live APIs here:
 
 ## Architecture
 
-The system follows **Domain‑Driven Design (DDD)**, **CQRS**, **Event Sourcing**, and **Event‑Driven Architecture** with **Saga** patterns for distributed transactions.
+The system follows **Domain‑Driven Design (DDD)**, **CQRS**, and **Event‑Driven Architecture**.
 ```
 ┌─────────────┐
 │ Clients │
@@ -54,7 +54,7 @@ The system follows **Domain‑Driven Design (DDD)**, **CQRS**, **Event Sourcing*
 ┌──────▼──────┐ ┌─────▼──────┐ ┌────────▼────────┐ ┌──▼──────────┐
 │ Ledger │ │ Notification│ │ Settlement │ │ Redis │
 │ Service │ │ Service │ │ Service │ │ (Cache/ │
-│ (Event Src) │ │ (Retry) │ │ (Hangfire) │ │ Idempotency)│
+│ (Double-entry) │ │ (Retry) │ │ (Hangfire) │ │ Idempotency)│
 └─────────────┘ └────────────┘ └─────────────────┘ └─────────────┘
 
 ```
@@ -68,7 +68,7 @@ The system follows **Domain‑Driven Design (DDD)**, **CQRS**, **Event Sourcing*
 | **Backend**            | .NET 10, ASP.NET Core, PostgreSQL 16, Redis 7, RabbitMQ 3, Hangfire          |
 | **Testing**            | xUnit, Moq, EF Core InMemory                                                 |
 | **Communication**      | REST (OpenAPI), RabbitMQ (AMQP), gRPC (internal sync calls)                 |
-| **Authentication**     | JWT, OAuth2, API Keys                                                        |
+| **Authentication**     | JWT, API Keys, service-to-service tokens (gRPC)                             |
 | **Validation**         | FluentValidation                                                             |
 | **Observability**      | Serilog (structured logging), OpenTelemetry, Jaeger (tracing), Prometheus (metrics), Grafana (dashboards) |
 | **Containerization**   | Docker, Docker Compose (local dev)                                           |
@@ -98,10 +98,10 @@ All services follow **Clean Architecture** with distinct **Domain**, **Applicati
 - **Domain‑Driven Design** – Aggregates, Entities, Value Objects, Domain Events, Bounded Contexts
 - **CQRS** – Commands, Queries, and Handlers with explicit separation
 - **Event‑Driven Architecture** – RabbitMQ for inter‑service communication
-- **Saga Pattern** – Payment lifecycle (authorize → capture → refund) coordinated via process manager
+- **Payment State Machine** – Payment lifecycle (authorize → capture → refund) enforced by a guarded domain state machine, with event‑driven reactions in Ledger
 - **Outbox Pattern** – Reliable message publishing (captured events → database → background worker → RabbitMQ)
 - **Inbox Pattern** – Idempotent message consumption with deduplication
-- **Event Sourcing** – Ledger stores all financial movements as an immutable event stream
+- **Double‑Entry Ledger** – Ledger stores every financial movement as an immutable journal entry (credit/debit pairs)
 - **Result Pattern** – Consistent error propagation across all services
 - **Repository & Unit of Work** – Abstraction over EF Core
 - **Retry with Exponential Backoff** – For failed notifications

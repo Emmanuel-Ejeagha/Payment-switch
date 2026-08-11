@@ -2134,7 +2134,7 @@ P3 - Low
 
 | Phase | Title | Status |
 |---|---|---|
-| 0 | Baseline & Enablement | [x] In progress |
+| 0 | Baseline & Enablement | [x] Complete (CI gate pending PR to main) |
 | 1 | Financial Integrity Foundation (P0) | [ ] Not started |
 | 2 | Security Baseline (P0/P1) | [ ] Not started |
 | 3 | Identity Account Lifecycle | [ ] Not started |
@@ -2157,12 +2157,12 @@ P3 - Low
 1. [x] Run the full build and test suite locally (`dotnet build PaymentSwitch.slnx && dotnet test PaymentSwitch.slnx`) and confirm unit + integration baseline is green.
 2. [x] Add Testcontainers **RabbitMQ** to the integration shared fixture (`tests/Integration/Shared/TestSecrets.cs` currently uses `rabbitmq.invalid`); prove outbox → exchange → consumer → inbox → DB flow in one throwaway test.
 3. [x] Adopt the convention "every fix ships with a test" (unit for logic, integration for broker/DB paths).
-4. [ ] Correct the README's false claims (Event Sourcing, Saga, OAuth2) so later work is measured against an accurate description.
+4. [x] Correct the README's false claims (Event Sourcing, Saga, OAuth2) so later work is measured against an accurate description.
 
 **Exit criteria:**
-- [ ] Local + CI test baseline green and documented.
-- [ ] A broker-backed integration test runs against real RabbitMQ.
-- [ ] README no longer overclaims.
+- [x] Local + CI test baseline green and documented. *(CI gate pending PR to main; local unit + integration green.)*
+- [x] A broker-backed integration test runs against real RabbitMQ.
+- [x] README no longer overclaims.
 
 ---
 
