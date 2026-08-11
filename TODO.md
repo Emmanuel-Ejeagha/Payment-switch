@@ -2177,7 +2177,7 @@ P3 - Low
 2. [x] **TASK-002** — Add a unique index on `JournalEntries.CorrelationId` as the DB backstop; verify no existing duplicates before applying.
 3. [x] **TASK-015** — Add unique `(MerchantId, Currency)` on `LedgerAccounts`, `CHECK (balance >= 0)` constraints, and change the journal FK from `ON DELETE CASCADE` to `RESTRICT`. Fix `CreateLedgerAccountHandler` to create per-currency accounts.
 4. [x] **TASK-003** — Implement real daily payout aggregation in Ledger (Σ captures − Σ refunds per merchant per date, fees from `FeesIncome`) behind a query (index `JournalEntries(LedgerAccountId, Timestamp)`); fix `LedgerGrpcService.GetDailyPayoutData` to honor `date`.
-5. [ ] **TASK-003** — Add a Settlement-side tie-out before `Complete()`: assert batch gross/fees match the ledger query; on mismatch, surface an error instead of silently completing.
+5. [x] **TASK-003** — Add a Settlement-side tie-out before `Complete()`: assert batch gross/fees match the ledger query; on mismatch, surface an error instead of silently completing.
 6. [ ] **TASK-005** — Add unique index on `SettlementBatches.BatchDate`; catch unique-violation in `TriggerSettlementHandler` and return the existing batch.
 7. [ ] Write integration tests proving: redelivered `MessageId` posts once; concurrent settlement triggers produce one batch; settlement totals equal ledger daily sums.
 

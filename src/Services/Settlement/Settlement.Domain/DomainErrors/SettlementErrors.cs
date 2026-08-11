@@ -15,4 +15,7 @@ public static class SettlementErrors
 
     public static Error ConcurrencyConflict =>
         new("Settlement.ConcurrencyConflict", "The settlement batch was modified concurrently. Please retry.");
+
+    public static Error LedgerTieOutMismatch =>
+        new("Settlement.LedgerTieOutMismatch", "Batch totals do not match the ledger's daily payout figures; settlement was not completed.");
 }
