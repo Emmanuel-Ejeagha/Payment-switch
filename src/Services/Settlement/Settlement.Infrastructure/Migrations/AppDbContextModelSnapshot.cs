@@ -52,6 +52,9 @@ namespace Settlement.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("BatchDate")
+                        .IsUnique();
+
                     b.ToTable("SettlementBatches");
                 });
 

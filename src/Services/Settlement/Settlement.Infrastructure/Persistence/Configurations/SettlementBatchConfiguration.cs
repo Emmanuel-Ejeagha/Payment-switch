@@ -11,6 +11,7 @@ public class SettlementBatchConfiguration : IEntityTypeConfiguration<SettlementB
     {
         builder.HasKey(b => b.Id);
         builder.Property(b => b.BatchDate).IsRequired();
+        builder.HasIndex(b => b.BatchDate).IsUnique();
         builder.Property(b => b.Status)
             .HasConversion(s => s.Value, s => SettlementStatus.FromString(s))
             .IsRequired();

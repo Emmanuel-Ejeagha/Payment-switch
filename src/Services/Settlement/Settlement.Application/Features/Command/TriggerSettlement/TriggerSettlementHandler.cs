@@ -96,6 +96,16 @@ public class TriggerSettlementHandler
             await _unitOfWork.RollbackAsync(cancellationToken);
             return SettlementErrors.ConcurrencyConflict;
         }
+        catch (UniqueConstraintViolationException)
+        {
+            // A concurrent trigger already created a batch for this date (unique
+            // BatchDate index). Surface the existing batch instead of failing.
+            await _unitOfWork.RollbackAsync(cancellationToken);
+            var existingBatch = await _repository.GetByBatchDateAsync(batchDate, cancellationToken);
+            if (existingBatch is not null)
+                return new TriggerSettlementResponse(existingBatch.Id);
+            return new Error("Settlement.BatchCreateFailed", "Could not create settlement batch.");
+        }
         await _dispatcher.DispatchAsync(batch.DomainEvents, cancellationToken);
 
         return new TriggerSettlementResponse(batch.Id);

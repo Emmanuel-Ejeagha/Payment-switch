@@ -1,6 +1,7 @@
 ﻿using BuildingBlocks.Shared.Exceptions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
+using Npgsql;
 using Settlement.Application.Interfaces;
 
 namespace Settlement.Infrastructure.Persistence;
@@ -31,6 +32,17 @@ public class UnitOfWork : IUnitOfWork
             throw new ConcurrencyConflictException(
                 $"A concurrency conflict occurred while saving. {ex.Message}");
         }
+        catch (DbUpdateException ex) when (IsUniqueViolation(ex))
+        {
+            throw new UniqueConstraintViolationException(
+                $"A unique constraint was violated while saving. {ex.Message}");
+        }
+    }
+
+    private static bool IsUniqueViolation(DbUpdateException ex)
+    {
+        return ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation }
+            || ex.InnerException?.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation };
     }
 
     public async Task CommitAsync(CancellationToken cancellationToken = default)
