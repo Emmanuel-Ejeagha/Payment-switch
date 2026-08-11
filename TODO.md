@@ -1956,7 +1956,7 @@ P3 - Low
 - [x] Double-entry journal (GL codes), atomic posting
 - [x] Integer minor-unit money, currency guards, fee rounding
 - [x] Optimistic concurrency
-- [ ] Crash-safe inbox idempotency + CorrelationId unique (P0, TASK-002)
+- [x] Crash-safe inbox idempotency + CorrelationId unique (P0, TASK-002)
 - [ ] Negative-balance CHECK + (MerchantId,Currency) unique + journal FK (P1, TASK-015)
 - [ ] Real daily payout aggregation (P0, TASK-003)
 - [ ] Reconciliation (P1, TASK-017)
@@ -1987,7 +1987,7 @@ P3 - Low
 - [x] Transactional outbox (lease-based) in all 6
 - [x] Inbox dedup (Ledger, Notification)
 - [x] Retry queue + DLX (Ledger, Notification)
-- [ ] Crash-safe inbox (P0, TASK-002)
+- [x] Crash-safe inbox (P0, TASK-002)
 - [ ] Consumers for all published events (P2, TASK-027)
 - [ ] DLQ consumers (P2, TASK-025)
 
@@ -2020,7 +2020,7 @@ P3 - Low
 
 **Resilience**
 - [x] Outbox lease, consumer retry + DLQ, gRPC circuit breaker/backoff
-- [ ] Crash-safe idempotency (P0, TASK-002)
+- [x] Crash-safe idempotency (P0, TASK-002)
 - [ ] Graceful startup/shutdown hardening (P2, TASK-034)
 
 ---
@@ -2173,8 +2173,8 @@ P3 - Low
 **Tasks:** TASK-002 (Ledger crash-safe idempotency), TASK-015 (Ledger integrity constraints), TASK-003 (Settlement correctness), TASK-005 (Settlement duplicate prevention)
 
 **Steps:**
-1. [ ] **TASK-002** — Refactor `Ledger.Infrastructure/Messaging/RabbitMQConsumerService.cs` so the inbox row is written **in the same DB transaction** as the posting (insert inbox `Processing` → run handler → commit → mark `Processed`). Add `InboxState` column migration.
-2. [ ] **TASK-002** — Add a unique index on `JournalEntries.CorrelationId` as the DB backstop; verify no existing duplicates before applying.
+1. [x] **TASK-002** — Refactor `Ledger.Infrastructure/Messaging/RabbitMQConsumerService.cs` so the inbox row is written **in the same DB transaction** as the posting (insert inbox `Processing` → run handler → commit → mark `Processed`). Add `InboxState` column migration.
+2. [x] **TASK-002** — Add a unique index on `JournalEntries.CorrelationId` as the DB backstop; verify no existing duplicates before applying.
 3. [ ] **TASK-015** — Add unique `(MerchantId, Currency)` on `LedgerAccounts`, `CHECK (balance >= 0)` constraints, and change the journal FK from `ON DELETE CASCADE` to `RESTRICT`. Fix `CreateLedgerAccountHandler` to create per-currency accounts.
 4. [ ] **TASK-003** — Implement real daily payout aggregation in Ledger (Σ captures − Σ refunds per merchant per date, fees from `FeesIncome`) behind a query (index `JournalEntries(LedgerAccountId, Timestamp)`); fix `LedgerGrpcService.GetDailyPayoutData` to honor `date`.
 5. [ ] **TASK-003** — Add a Settlement-side tie-out before `Complete()`: assert batch gross/fees match the ledger query; on mismatch, surface an error instead of silently completing.

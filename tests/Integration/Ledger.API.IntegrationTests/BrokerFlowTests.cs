@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using Ledger.Infrastructure.Inbox;
 using Ledger.Infrastructure.Messaging;
 using Ledger.Infrastructure.Outbox;
 using Ledger.Infrastructure.Persistence;
@@ -77,6 +78,60 @@ public class BrokerFlowTests : IClassFixture<LedgerApiFactory>
             Assert.Equal(5000, account.ReservedBalance);
             Assert.Equal(0, account.AvailableBalance);
             Assert.Contains(account.Journal, j => j.Description == "Funds reserved" && j.Amount.Amount == 5000);
+        }
+    }
+
+    [Fact]
+    public async Task RedeliveredMessage_AfterCrashBeforeMarkProcessed_DoesNotDoublePost()
+    {
+        // Simulate a crash AFTER the posting is committed but BEFORE the inbox row
+        // is marked processed: the consumer re-claims a Processing row and re-runs
+        // the handler; the unique JournalEntries.CorrelationId index must turn the
+        // re-run into an idempotent no-op instead of a double post.
+        var merchantId = Guid.NewGuid();
+        var messageId = Guid.NewGuid().ToString();
+        var payload = JsonSerializer.Serialize(new PaymentAuthorizedEvent(
+            Guid.NewGuid(), merchantId, new MoneyPayload(5000, "USD"), "auth-code", "gateway-ref"));
+
+        await PublishToPaymentEventsAsync(messageId, payload);
+        await WaitUntilAsync(async () =>
+        {
+            using var scope = _factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            return await db.InboxMessages.AnyAsync(m => m.MessageId == messageId && m.ProcessedAt != null);
+        });
+
+        // Rewind the inbox row to Processing as if mark-processed never ran.
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var inbox = await db.InboxMessages.FirstAsync(m => m.MessageId == messageId);
+            inbox.Reclaim();
+            await db.SaveChangesAsync();
+        }
+
+        // Redeliver the same message (same MessageId → same CorrelationId).
+        await PublishToPaymentEventsAsync(messageId, payload);
+
+        // The consumer must detect the duplicate posting and complete idempotently.
+        await WaitUntilAsync(async () =>
+        {
+            using var scope = _factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            return await db.InboxMessages.AnyAsync(m => m.MessageId == messageId && m.State == InboxState.Processed);
+        });
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var account = await db.LedgerAccounts
+                .Include(a => a.Journal)
+                .FirstAsync(a => a.MerchantId == merchantId);
+
+            Assert.Equal(5000, account.PendingBalance);
+            Assert.Equal(5000, account.ReservedBalance);
+            Assert.Equal(0, account.AvailableBalance);
+            Assert.Single(account.Journal, j => j.Description == "Funds reserved");
         }
     }
 

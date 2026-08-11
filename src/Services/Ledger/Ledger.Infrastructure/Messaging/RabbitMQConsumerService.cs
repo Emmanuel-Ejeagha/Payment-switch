@@ -1,15 +1,18 @@
 ﻿using BuildingBlocks.Shared.Messaging;
 using BuildingBlocks.Shared.Middleware;
+using BuildingBlocks.Shared.Results;
 using Ledger.Application.Features.Commands.CaptureFunds;
 using Ledger.Application.Features.Commands.CreateLedgerAccount;
 using Ledger.Application.Features.Commands.RefundFunds;
 using Ledger.Application.Features.Commands.ReserveFunds;
 using Ledger.Infrastructure.Inbox;
 using Ledger.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Npgsql;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using System.Text;
@@ -111,88 +114,44 @@ public class RabbitMQConsumerService : BackgroundService
                 using (var scope = _scopeFactory.CreateScope())
                 {
                     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                    var existing = db.InboxMessages.FirstOrDefault(m => m.MessageId == messageId);
-                    if (existing is not null && existing.ProcessedAt is not null)
+                    var existing = await db.InboxMessages.FirstOrDefaultAsync(m => m.MessageId == messageId, cancellationToken);
+                    if (existing is { State: InboxState.Processed })
                     {
                         _logger.LogWarning("Duplicate message {MessageId} ignored", messageId);
                         await _channel.BasicAckAsync(ea.DeliveryTag, false);
                         return;
                     }
 
+                    // Claim the message in the SAME transaction the handler commits,
+                    // so the inbox row and the ledger posting are flushed atomically.
                     if (existing is null)
-                    {
                         db.InboxMessages.Add(new InboxMessage(messageId, eventType, body));
-                        await db.SaveChangesAsync(cancellationToken);
+                    else
+                        existing.Reclaim();
+
+                    var result = await ProcessEventAsync(scope, eventType, body, correlationId, cancellationToken);
+                    if (result.IsFailure)
+                    {
+                        _logger.LogWarning("Event {EventType} ({MessageId}) failed: {Errors}",
+                            eventType, messageId, string.Join("; ", result.Errors.Select(e => e.Message)));
+                        await HandleFailureAsync(ea, messageId, cancellationToken);
+                        return;
                     }
                 }
 
-                switch (eventType)
-                {
-                    case "PaymentAuthorizedDomainEvent":
-                        var authEvent = JsonSerializer.Deserialize<PaymentAuthorizedEvent>(body)!;
-                        using (var scope = _scopeFactory.CreateScope())
-                        {
-                            var handler = scope.ServiceProvider.GetRequiredService<CreateLedgerAccountHandler>();
-                            await handler.Handle(new CreateLedgerAccountCommand(authEvent.MerchantId, authEvent.Amount.Currency), cancellationToken);
-                        }
-                        using (var scope = _scopeFactory.CreateScope())
-                        {
-                            var handler = scope.ServiceProvider.GetRequiredService<ReserveFundsHandler>();
-                            var result = await handler.Handle(new ReserveFundsCommand(authEvent.MerchantId, authEvent.Amount.Amount, authEvent.Amount.Currency, correlationId ?? $"PaymentAuth:{authEvent.IntentId}"), cancellationToken);
-                            if (result.IsFailure)
-                            {
-                                _logger.LogWarning("ReserveFunds failed: {Errors}", string.Join("; ", result.Errors.Select(e => e.Message)));
-                                await HandleFailureAsync(ea, messageId, cancellationToken);
-                                return;
-                            }
-                        }
-                        break;
-
-                    case "PaymentCapturedDomainEvent":
-                        var captureEvent = JsonSerializer.Deserialize<PaymentCapturedEvent>(body)!;
-                        using (var scope = _scopeFactory.CreateScope())
-                        {
-                            var handler = scope.ServiceProvider.GetRequiredService<CaptureFundsHandler>();
-                            var result = await handler.Handle(new CaptureFundsCommand(captureEvent.MerchantId, captureEvent.Amount.Amount, captureEvent.Amount.Currency, correlationId ?? $"PaymentCapt:{captureEvent.IntentId}"), cancellationToken);
-                            if (result.IsFailure)
-                            {
-                                _logger.LogWarning("CaptureFunds failed: {Errors}", string.Join("; ", result.Errors.Select(e => e.Message)));
-                                await HandleFailureAsync(ea, messageId, cancellationToken);
-                                return;
-                            }
-                        }
-                        break;
-
-                    case "PaymentRefundedDomainEvent":
-                        var refundEvent = JsonSerializer.Deserialize<PaymentRefundedEvent>(body)!;
-                        using (var scope = _scopeFactory.CreateScope())
-                        {
-                            var handler = scope.ServiceProvider.GetRequiredService<RefundFundsHandler>();
-                            var result = await handler.Handle(new RefundFundsCommand(refundEvent.MerchantId, refundEvent.Amount.Amount, refundEvent.Amount.Currency, correlationId ?? $"PaymentRef:{refundEvent.IntentId}"), cancellationToken);
-                            if (result.IsFailure)
-                            {
-                                _logger.LogWarning("RefundFunds failed: {Errors}", string.Join("; ", result.Errors.Select(e => e.Message)));
-                                await HandleFailureAsync(ea, messageId, cancellationToken);
-                                return;
-                            }
-                        }
-                        break;
-
-                    default:
-                        _logger.LogWarning("Unknown event type: {EventType}", eventType);
-                        break;
-                }
-
-                using (var scope = _scopeFactory.CreateScope())
-                {
-                    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                    var msg = db.InboxMessages.First(m => m.MessageId == messageId);
-                    msg.MarkAsProcessed();
-                    await db.SaveChangesAsync(cancellationToken);
-                }
+                await MarkAsProcessedAsync(messageId, cancellationToken);
 
                 await _channel.BasicAckAsync(ea.DeliveryTag, false);
                 _logger.LogInformation("Processed event {EventType} ({MessageId})", eventType, messageId);
+            }
+            catch (DbUpdateException ex) when (IsUniqueViolation(ex))
+            {
+                // A prior delivery committed the posting but crashed before marking
+                // the inbox row processed. The unique CorrelationId index makes the
+                // re-run a no-op; treat it as an idempotent completion.
+                _logger.LogWarning("Duplicate posting detected for {MessageId}; completing idempotently", messageId);
+                await MarkAsProcessedAsync(messageId, cancellationToken);
+                await _channel.BasicAckAsync(ea.DeliveryTag, false);
             }
             catch (Exception ex)
             {
@@ -208,6 +167,66 @@ public class RabbitMQConsumerService : BackgroundService
         {
             await Task.Delay(1000, cancellationToken);
         }
+    }
+
+    private async Task<Result> ProcessEventAsync(
+        IServiceScope scope,
+        string eventType,
+        string body,
+        string? correlationId,
+        CancellationToken cancellationToken)
+    {
+        switch (eventType)
+        {
+            case "PaymentAuthorizedDomainEvent":
+                var authEvent = JsonSerializer.Deserialize<PaymentAuthorizedEvent>(body)!;
+                var createHandler = scope.ServiceProvider.GetRequiredService<CreateLedgerAccountHandler>();
+                var createResult = await createHandler.Handle(
+                    new CreateLedgerAccountCommand(authEvent.MerchantId, authEvent.Amount.Currency), cancellationToken);
+                if (createResult.IsFailure)
+                    return createResult;
+                var reserveHandler = scope.ServiceProvider.GetRequiredService<ReserveFundsHandler>();
+                return await reserveHandler.Handle(
+                    new ReserveFundsCommand(authEvent.MerchantId, authEvent.Amount.Amount, authEvent.Amount.Currency,
+                        correlationId ?? $"PaymentAuth:{authEvent.IntentId}"), cancellationToken);
+
+            case "PaymentCapturedDomainEvent":
+                var captureEvent = JsonSerializer.Deserialize<PaymentCapturedEvent>(body)!;
+                var captureHandler = scope.ServiceProvider.GetRequiredService<CaptureFundsHandler>();
+                return await captureHandler.Handle(
+                    new CaptureFundsCommand(captureEvent.MerchantId, captureEvent.Amount.Amount, captureEvent.Amount.Currency,
+                        correlationId ?? $"PaymentCapt:{captureEvent.IntentId}"), cancellationToken);
+
+            case "PaymentRefundedDomainEvent":
+                var refundEvent = JsonSerializer.Deserialize<PaymentRefundedEvent>(body)!;
+                var refundHandler = scope.ServiceProvider.GetRequiredService<RefundFundsHandler>();
+                return await refundHandler.Handle(
+                    new RefundFundsCommand(refundEvent.MerchantId, refundEvent.Amount.Amount, refundEvent.Amount.Currency,
+                        correlationId ?? $"PaymentRef:{refundEvent.IntentId}"), cancellationToken);
+
+            default:
+                _logger.LogWarning("Unknown event type: {EventType}", eventType);
+                return Result.Success();
+        }
+    }
+
+    private async Task MarkAsProcessedAsync(string messageId, CancellationToken cancellationToken)
+    {
+        // A fresh scope so a failed handler's dirty tracked entities can never be re-saved.
+        using var scope = _scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var msg = await db.InboxMessages.FirstOrDefaultAsync(m => m.MessageId == messageId, cancellationToken);
+        if (msg is null || msg.State == InboxState.Processed)
+            return;
+
+        msg.MarkAsProcessed();
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private static bool IsUniqueViolation(DbUpdateException ex)
+    {
+        return ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation }
+            || ex.InnerException?.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation };
     }
 
     private async Task HandleFailureAsync(BasicDeliverEventArgs ea, string messageId, CancellationToken cancellationToken)
