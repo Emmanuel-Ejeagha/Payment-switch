@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Notification.Application.Features.Commands.CreateNotification;
 using Notification.Application.Interfaces;
+using Notification.Application.Messaging;
 using Notification.Infrastructure.Inbox;
 using Notification.Infrastructure.Persistence;
 using RabbitMQ.Client;
@@ -98,6 +99,7 @@ public class RabbitMQConsumerService : BackgroundService
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var createHandler = scope.ServiceProvider.GetRequiredService<CreateNotificationHandler>();
             var realTimeNotifier = scope.ServiceProvider.GetRequiredService<IRealTimeNotifier>();
+            var merchantContacts = scope.ServiceProvider.GetRequiredService<IMerchantContactService>();
 
             // Extract merchantId from the event for real-time notification
             Guid? merchantId = null;
@@ -125,20 +127,23 @@ public class RabbitMQConsumerService : BackgroundService
                 {
                     case "PaymentAuthorizedDomainEvent":
                         var authEvent = JsonSerializer.Deserialize<PaymentAuthorizedEvent>(body)!;
-                        command = MapAuthorized(body);
                         merchantId = authEvent.MerchantId;
+                        command = await ResolveCommandAsync(merchantContacts, eventType, authEvent.MerchantId,
+                            recipient => PaymentEventMapper.MapAuthorized(authEvent, recipient, body), cancellationToken);
                         break;
 
                     case "PaymentCapturedDomainEvent":
                         var captEvent = JsonSerializer.Deserialize<PaymentCapturedEvent>(body)!;
-                        command = MapCaptured(body);
                         merchantId = captEvent.MerchantId;
+                        command = await ResolveCommandAsync(merchantContacts, eventType, captEvent.MerchantId,
+                            recipient => PaymentEventMapper.MapCaptured(captEvent, recipient, body), cancellationToken);
                         break;
 
                     case "PaymentRefundedDomainEvent":
                         var refEvent = JsonSerializer.Deserialize<PaymentRefundedEvent>(body)!;
-                        command = MapRefunded(body);
                         merchantId = refEvent.MerchantId;
+                        command = await ResolveCommandAsync(merchantContacts, eventType, refEvent.MerchantId,
+                            recipient => PaymentEventMapper.MapRefunded(refEvent, recipient, body), cancellationToken);
                         break;
                 }
 
@@ -248,25 +253,21 @@ public class RabbitMQConsumerService : BackgroundService
         }
     }
 
-    private CreateNotificationCommand MapAuthorized(string body)
+    private async Task<CreateNotificationCommand?> ResolveCommandAsync(
+        IMerchantContactService merchantContacts,
+        string eventType,
+        Guid merchantId,
+        Func<string, CreateNotificationCommand> mapper,
+        CancellationToken cancellationToken)
     {
-        var e = JsonSerializer.Deserialize<PaymentAuthorizedEvent>(body)!;
-        return new CreateNotificationCommand("customer@example.com", "email", "Payment Authorized",
-            $"Your payment of {e.Amount.Amount} {e.Amount.Currency} has been authorized.", null, body);
-    }
+        var recipient = await merchantContacts.GetMerchantEmailAsync(merchantId, cancellationToken);
+        if (recipient is null)
+        {
+            _logger.LogWarning("Skipping {EventType}: no merchant contact email for {MerchantId}", eventType, merchantId);
+            return null;
+        }
 
-    private CreateNotificationCommand MapCaptured(string body)
-    {
-        var e = JsonSerializer.Deserialize<PaymentCapturedEvent>(body)!;
-        return new CreateNotificationCommand("customer@example.com", "email", "Payment Captured",
-            $"Your payment of {e.Amount.Amount} {e.Amount.Currency} has been captured.", null, body);
-    }
-
-    private CreateNotificationCommand MapRefunded(string body)
-    {
-        var e = JsonSerializer.Deserialize<PaymentRefundedEvent>(body)!;
-        return new CreateNotificationCommand("customer@example.com", "email", "Payment Refunded",
-            $"Your refund of {e.Amount.Amount} {e.Amount.Currency} has been processed.", null, body);
+        return mapper(recipient);
     }
 
     public override void Dispose()
@@ -278,8 +279,3 @@ public class RabbitMQConsumerService : BackgroundService
         base.Dispose();
     }
 }
-
-public record PaymentAuthorizedEvent(Guid IntentId, Guid MerchantId, MoneyPayload Amount, string AuthorizationCode, string GatewayReference);
-public record PaymentCapturedEvent(Guid IntentId, Guid MerchantId, MoneyPayload Amount, Guid TransactionId);
-public record PaymentRefundedEvent(Guid IntentId, Guid MerchantId, MoneyPayload Amount, Guid TransactionId);
-public record MoneyPayload(long Amount, string Currency);

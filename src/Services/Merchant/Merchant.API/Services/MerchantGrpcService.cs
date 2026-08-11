@@ -51,6 +51,21 @@ public class MerchantGrpcService : MerchantService.MerchantServiceBase
         return resp;
     }
 
+    public override async Task<GetMerchantContactResponse> GetMerchantContact(
+        GetMerchantContactRequest request, ServerCallContext context)
+    {
+        var merchantId = Guid.Parse(request.MerchantId);
+        var merchant = await _db.Merchants.FirstOrDefaultAsync(m => m.Id == merchantId);
+
+        var response = new GetMerchantContactResponse();
+        if (merchant != null)
+        {
+            response.Email = merchant.Email.Value;
+            response.BusinessName = merchant.BusinessName.Value;
+        }
+        return response;
+    }
+
     public override async Task<ResolveApiKeyResponse> ResolveApiKey(
         ResolveApiKeyRequest request, ServerCallContext context)
     {
