@@ -35,6 +35,14 @@ appsettings.Development.json
 # Local environment overrides for the Next.js apps
 .env*.local
 
+# Production env files are NOT committed (TASK-004): the HTTPS base URL is
+# injected at build/run time via secrets or a gitignored .env.production.
+apps/*/.env.production
+
+# TLS certificates - never commit private keys
+infra/nginx/tls/certs/*
+!infra/nginx/tls/certs/.gitkeep
+
 # Kubernetes secrets - never commit real credentials
 k8s/secret.yaml
 helm/**/secrets.yaml
