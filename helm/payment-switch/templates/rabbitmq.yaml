@@ -22,9 +22,15 @@ spec:
             - containerPort: {{ .Values.infrastructure.rabbitmq.managementPort }}
           env:
             - name: RABBITMQ_DEFAULT_USER
-              value: {{ .Values.config.rabbitmq.userName | quote }}
+              valueFrom:
+                secretKeyRef:
+                  name: payment-switch-secret
+                  key: RabbitMQ__UserName
             - name: RABBITMQ_DEFAULT_PASS
-              value: {{ .Values.config.rabbitmq.password | quote }}
+              valueFrom:
+                secretKeyRef:
+                  name: payment-switch-secret
+                  key: RabbitMQ__Password
           resources:
             {{- toYaml .Values.infrastructure.rabbitmq.resources | nindent 12 }}
 ---

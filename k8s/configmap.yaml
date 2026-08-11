@@ -7,4 +7,3 @@ data:
   Jwt__Issuer: "IdentityService"
   Jwt__Audience: "PaymentSwitch"
   RabbitMQ__HostName: "rabbitmq"
-  RabbitMQ__UserName: "guest"

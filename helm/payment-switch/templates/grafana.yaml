@@ -20,8 +20,16 @@ spec:
           ports:
             - containerPort: 3000
           env:
+            - name: GF_SECURITY_ADMIN_USER
+              valueFrom:
+                secretKeyRef:
+                  name: payment-switch-secret
+                  key: GrafanaAdminUser
             - name: GF_SECURITY_ADMIN_PASSWORD
-              value: "admin"
+              valueFrom:
+                secretKeyRef:
+                  name: payment-switch-secret
+                  key: GrafanaAdminPassword
 ---
 apiVersion: v1
 kind: Service
