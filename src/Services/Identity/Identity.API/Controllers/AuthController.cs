@@ -1,7 +1,10 @@
 ﻿using Identity.API.Extensions;
+using Identity.Application.Commands.Auth.ChangePassword;
+using Identity.Application.Commands.Auth.ForgotPassword;
 using Identity.Application.Commands.Auth.Login;
 using Identity.Application.Commands.Auth.Register;
 using Identity.Application.Commands.Auth.ResendVerification;
+using Identity.Application.Commands.Auth.ResetPassword;
 using Identity.Application.Commands.Auth.Tokens;
 using Identity.Application.Commands.Auth.VerifyEmail;
 using Microsoft.AspNetCore.Authorization;
@@ -67,6 +70,65 @@ public class AuthController : BaseApiController
         [FromServices] ResendVerificationHandler handler)
     {
         var result = await handler.Handle(command);
+        return result.ToActionResult();
+    }
+
+    /// <summary>
+    /// Request a password-reset link for an account. Always returns 200 OK so the
+    /// endpoint cannot be used to enumerate registered email addresses.
+    /// </summary>
+    /// <param name="command">Email address of the account.</param>
+    /// <param name="handler">Handler injected via DI.</param>
+    /// <returns>200 OK whether or not the account exists.</returns>
+    [HttpPost("forgot-password")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ForgotPassword(
+        [FromBody] ForgotPasswordCommand command,
+        [FromServices] ForgotPasswordHandler handler)
+    {
+        var result = await handler.Handle(command);
+        return result.ToActionResult();
+    }
+
+    /// <summary>
+    /// Set a new password using the single-use token from the reset link.
+    /// On success all existing sessions are revoked.
+    /// </summary>
+    /// <param name="command">Email, reset token, and new password.</param>
+    /// <param name="handler">Handler injected via DI.</param>
+    /// <returns>200 OK when the password was reset, or invalid/expired token errors.</returns>
+    [HttpPost("reset-password")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ResetPassword(
+        [FromBody] ResetPasswordCommand command,
+        [FromServices] ResetPasswordHandler handler)
+    {
+        var result = await handler.Handle(command);
+        return result.ToActionResult();
+    }
+
+    /// <summary>
+    /// Change the authenticated user's password. Requires the current password and
+    /// revokes every existing session afterwards.
+    /// </summary>
+    /// <param name="command">Current and new password.</param>
+    /// <param name="handler">Handler injected via DI.</param>
+    /// <returns>200 OK when the password changed.</returns>
+    [HttpPost("change-password")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> ChangePassword(
+        [FromBody] ChangePasswordCommand command,
+        [FromServices] ChangePasswordHandler handler)
+    {
+        var userId = User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
+        if (userId is null) return Unauthorized();
+
+        var result = await handler.Handle(command, Guid.Parse(userId));
         return result.ToActionResult();
     }
 

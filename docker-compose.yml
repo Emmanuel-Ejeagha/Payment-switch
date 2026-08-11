@@ -90,6 +90,8 @@ services:
       - Seed__AdminEmail=${SEED_ADMIN_EMAIL:-admin@paymentswitch.com}
       - Seed__AdminPassword=${SEED_ADMIN_PASSWORD:?Set SEED_ADMIN_PASSWORD in .env}
       - EmailVerification__FrontendBaseUrl=${FRONTEND_BASE_URL:-http://localhost:3000}
+      - PasswordReset__FrontendBaseUrl=${FRONTEND_BASE_URL:-http://localhost:3000}
+      - PasswordReset__TokenLifetimeHours=${PASSWORD_RESET_TOKEN_LIFETIME_HOURS:-1}
       - Smtp__Host=${SMTP_HOST:-}
       - Smtp__Port=${SMTP_PORT:-587}
       - Smtp__Username=${SMTP_USERNAME:-}

@@ -176,6 +176,9 @@ config:
     key: ""
   emailVerification:
     frontendBaseUrl: "http://localhost:3000"
+  passwordReset:
+    frontendBaseUrl: "http://localhost:3000"
+    tokenLifetimeHours: 1
   smtp:
     host: ""
     port: 587

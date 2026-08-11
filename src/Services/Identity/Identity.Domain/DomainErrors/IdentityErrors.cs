@@ -31,6 +31,15 @@ public static class IdentityErrors
     public static Error VerificationTokenExpired =>
         new("Identity.VerificationTokenExpired", "This verification link has expired. Request a new one.");
 
+    public static Error InvalidCurrentPassword =>
+        new("Identity.InvalidCurrentPassword", "The current password is incorrect.");
+
+    public static Error InvalidPasswordResetToken =>
+        new("Identity.InvalidPasswordResetToken", "This password reset link is invalid or has already been used.");
+
+    public static Error PasswordResetTokenExpired =>
+        new("Identity.PasswordResetTokenExpired", "This password reset link has expired. Request a new one.");
+
     public static Error ApiKeyNotFound(Guid keyId) =>
         new("Identity.ApiKeyNotFound", $"API key with Id '{keyId}' not found.");
 }

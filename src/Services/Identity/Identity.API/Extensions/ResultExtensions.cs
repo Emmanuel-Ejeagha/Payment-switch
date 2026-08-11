@@ -32,6 +32,9 @@ public static class ResultExtensions
             "Identity.EmailAlreadyVerified" => 409,
             "Identity.InvalidVerificationToken" => 400,
             "Identity.VerificationTokenExpired" => 400,
+            "Identity.InvalidCurrentPassword" => 400,
+            "Identity.InvalidPasswordResetToken" => 400,
+            "Identity.PasswordResetTokenExpired" => 400,
             _ => 400
         };
 
