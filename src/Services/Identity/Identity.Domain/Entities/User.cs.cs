@@ -10,6 +10,10 @@ public class User : AggregateRoot
     public PasswordHash PasswordHash { get; private set; } = null!;
     public FullName FullName { get; private set; } = null!;
     public bool IsActive { get; private set; }
+    public bool EmailConfirmed { get; private set; }
+    public DateTime? EmailVerifiedAt { get; private set; }
+    public string? EmailVerificationTokenHash { get; private set; }
+    public DateTime? EmailVerificationTokenExpiresAt { get; private set; }
     private readonly List<string> _roles = new();
     private readonly List<TokenValue> _refreshTokens = new();
     private readonly List<ApiKey> _apiKeys = new();
@@ -32,6 +36,56 @@ public class User : AggregateRoot
     public void ChangePassword(PasswordHash newPasswordHash)
     {
         PasswordHash = newPasswordHash ?? throw new ArgumentNullException(nameof(newPasswordHash));
+    }
+
+    /// <summary>
+    /// Registers a new verification token for an unconfirmed email, replacing any
+    /// outstanding token (so a resend invalidates the previous one).
+    /// </summary>
+    public void InitiateEmailVerification(string tokenHash, DateTime expiresAtUtc)
+    {
+        if (EmailConfirmed)
+            throw new InvalidOperationException("Email is already confirmed.");
+
+        EmailVerificationTokenHash = tokenHash ?? throw new ArgumentNullException(nameof(tokenHash));
+        EmailVerificationTokenExpiresAt = expiresAtUtc;
+    }
+
+    /// <summary>
+    /// Attempts to confirm the email with the supplied hashed token.
+    /// The token is single-use: a successful confirmation clears it.
+    /// </summary>
+    public EmailVerificationResult VerifyEmail(string tokenHash)
+    {
+        if (EmailConfirmed)
+            return EmailVerificationResult.AlreadyConfirmed;
+
+        if (string.IsNullOrEmpty(EmailVerificationTokenHash))
+            return EmailVerificationResult.NoToken;
+
+        if (!string.Equals(EmailVerificationTokenHash, tokenHash, StringComparison.Ordinal))
+            return EmailVerificationResult.InvalidToken;
+
+        if (EmailVerificationTokenExpiresAt is null || EmailVerificationTokenExpiresAt < DateTime.UtcNow)
+            return EmailVerificationResult.TokenExpired;
+
+        EmailConfirmed = true;
+        EmailVerifiedAt = DateTime.UtcNow;
+        EmailVerificationTokenHash = null;
+        EmailVerificationTokenExpiresAt = null;
+        return EmailVerificationResult.Success;
+    }
+
+    /// <summary>
+    /// Marks an account verified without going through the token flow
+    /// (e.g. seeded bootstrap admin).
+    /// </summary>
+    public void MarkEmailConfirmed()
+    {
+        EmailConfirmed = true;
+        EmailVerifiedAt = DateTime.UtcNow;
+        EmailVerificationTokenHash = null;
+        EmailVerificationTokenExpiresAt = null;
     }
 
     public void Activate() => IsActive = true;

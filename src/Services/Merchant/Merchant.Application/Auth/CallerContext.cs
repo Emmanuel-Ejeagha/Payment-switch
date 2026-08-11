@@ -1,6 +1,6 @@
 namespace Merchant.Application.Auth;
 
-public record CallerContext(Guid? UserId, string? Email, bool IsAdmin)
+public record CallerContext(Guid? UserId, string? Email, bool IsAdmin, bool EmailVerified = false)
 {
     public static CallerContext Anonymous => new(null, null, false);
 

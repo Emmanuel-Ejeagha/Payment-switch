@@ -28,6 +28,10 @@ public static class ResultExtensions
             "Identity.ApiKeyNotFound" => 404,
             "Identity.NotAuthorized" => 403,
             "Identity.UserInactive" => 403,
+            "Identity.EmailNotVerified" => 403,
+            "Identity.EmailAlreadyVerified" => 409,
+            "Identity.InvalidVerificationToken" => 400,
+            "Identity.VerificationTokenExpired" => 400,
             _ => 400
         };
 

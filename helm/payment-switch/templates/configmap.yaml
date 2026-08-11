@@ -7,3 +7,9 @@ data:
   Jwt__Issuer: {{ .Values.config.jwt.issuer | quote }}
   Jwt__Audience: {{ .Values.config.jwt.audience | quote }}
   RabbitMQ__HostName: {{ .Values.config.rabbitmq.hostName | quote }}
+  EmailVerification__FrontendBaseUrl: {{ .Values.config.emailVerification.frontendBaseUrl | quote }}
+  Smtp__Host: {{ .Values.config.smtp.host | quote }}
+  Smtp__Port: {{ .Values.config.smtp.port | quote }}
+  Smtp__Username: {{ .Values.config.smtp.username | quote }}
+  Smtp__FromAddress: {{ .Values.config.smtp.fromAddress | quote }}
+  Smtp__FromName: {{ .Values.config.smtp.fromName | quote }}

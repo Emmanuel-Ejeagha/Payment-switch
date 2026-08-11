@@ -55,6 +55,6 @@ public class LoginHandler
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         await _dispatcher.DispatchAsync(user.DomainEvents, cancellationToken);
 
-        return new LoginResponse(accessToken, refreshToken, expiresIn);
+        return new LoginResponse(accessToken, refreshToken, expiresIn, user.EmailConfirmed);
     }
 }

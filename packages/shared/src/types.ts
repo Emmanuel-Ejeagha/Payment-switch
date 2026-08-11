@@ -88,6 +88,7 @@ export interface UserDto {
   email: string
   fullName: string
   isActive: boolean
+  emailConfirmed: boolean
   roles: string[]
 }
 

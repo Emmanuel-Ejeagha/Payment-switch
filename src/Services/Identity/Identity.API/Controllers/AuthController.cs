@@ -1,7 +1,9 @@
 ﻿using Identity.API.Extensions;
 using Identity.Application.Commands.Auth.Login;
 using Identity.Application.Commands.Auth.Register;
+using Identity.Application.Commands.Auth.ResendVerification;
 using Identity.Application.Commands.Auth.Tokens;
+using Identity.Application.Commands.Auth.VerifyEmail;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -26,6 +28,43 @@ public class AuthController : BaseApiController
     public async Task<IActionResult> Register(
         [FromBody] RegisterUserCommand command,
         [FromServices] RegisterUserHandler handler)
+    {
+        var result = await handler.Handle(command);
+        return result.ToActionResult();
+    }
+
+    /// <summary>
+    /// Confirm an email address with the single-use token from the verification link.
+    /// </summary>
+    /// <param name="command">Email address and the verification token.</param>
+    /// <param name="handler">Handler injected via DI.</param>
+    /// <returns>200 OK when verified, or invalid/expired token errors.</returns>
+    [HttpPost("verify-email")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> VerifyEmail(
+        [FromBody] VerifyEmailCommand command,
+        [FromServices] VerifyEmailHandler handler)
+    {
+        var result = await handler.Handle(command);
+        return result.ToActionResult();
+    }
+
+    /// <summary>
+    /// Issue a new verification token and email it to the account (rate-limited).
+    /// The previous token, if any, is invalidated.
+    /// </summary>
+    /// <param name="command">Email address of the unverified account.</param>
+    /// <param name="handler">Handler injected via DI.</param>
+    /// <returns>200 OK when a new verification email was issued.</returns>
+    [HttpPost("resend-verification")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ResendVerification(
+        [FromBody] ResendVerificationCommand command,
+        [FromServices] ResendVerificationHandler handler)
     {
         var result = await handler.Handle(command);
         return result.ToActionResult();

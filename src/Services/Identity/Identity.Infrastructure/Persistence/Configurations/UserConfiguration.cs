@@ -53,6 +53,10 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
        .HasField("_apiKeys");
 
         builder.Property(u => u.IsActive).IsRequired();
+        builder.Property(u => u.EmailConfirmed).IsRequired();
+        builder.Property(u => u.EmailVerifiedAt);
+        builder.Property(u => u.EmailVerificationTokenHash).HasMaxLength(128);
+        builder.Property(u => u.EmailVerificationTokenExpiresAt);
         builder.Ignore(u => u.DomainEvents);
     }
 }

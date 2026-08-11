@@ -1,4 +1,5 @@
-﻿using Identity.Domain.Entities;
+﻿using BuildingBlocks.Shared.Auth;
+using Identity.Domain.Entities;
 using Identity.Domain.ValueObjects;
 using Identity.Infrastructure.Services;
 using Microsoft.Extensions.Options;
@@ -34,6 +35,18 @@ public class TokenServiceTests
         Assert.NotNull(token);
         Assert.Equal("test@test.com", jwt.Claims.First(c => c.Type == ClaimTypes.Email).Value);
         Assert.Contains("Merchant", jwt.Claims.First(c => c.Type == ClaimTypes.Role).Value);
+        Assert.Equal("false", jwt.Claims.First(c => c.Type == CustomClaimTypes.EmailVerified).Value);
+    }
+
+    [Fact]
+    public void GenerateAccessToken_ConfirmedUser_EmitsEmailVerifiedTrue()
+    {
+        var user = new User(Guid.NewGuid(), new Email("test@test.com"), new PasswordHash("hash"), new FullName("Test User"));
+        user.MarkEmailConfirmed();
+
+        var jwt = new JwtSecurityTokenHandler().ReadJwtToken(_tokenService.GenerateAccessToken(user));
+
+        Assert.Equal("true", jwt.Claims.First(c => c.Type == CustomClaimTypes.EmailVerified).Value);
     }
 
     [Fact]

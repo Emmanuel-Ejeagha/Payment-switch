@@ -37,6 +37,9 @@ public class GenerateApiKeyHandler
         if (user == null)
             return IdentityErrors.UserNotFound(query.UserId);
 
+        if (!user.EmailConfirmed)
+            return IdentityErrors.EmailNotVerified;
+
         var plainTextKey = GenerateRandomKey(query.Environment);
         var keyHash = ApiKeyHasher.Hash(plainTextKey);
 

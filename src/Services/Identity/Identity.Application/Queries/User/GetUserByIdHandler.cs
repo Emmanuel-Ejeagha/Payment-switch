@@ -24,6 +24,6 @@ public class GetUserByIdHandler
         if (user == null)
             return IdentityErrors.UserNotFound(query.UserId);
 
-        return new UserDto(user.Id, user.Email.Value, user.FullName.Value, user.IsActive, user.Roles.ToList());
+        return new UserDto(user.Id, user.Email.Value, user.FullName.Value, user.IsActive, user.EmailConfirmed, user.Roles.ToList());
     }
 }
