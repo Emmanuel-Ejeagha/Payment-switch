@@ -5,10 +5,22 @@ metadata:
   namespace: payment-switch
   annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /$2
+    # Force HTTPS: HTTP requests are redirected to https (TASK-004).
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    # Issue/renew the cert into the payment-switch-tls secret automatically
+    # (see k8s/cert-manager-cluster-issuer.yaml). Remove this annotation when
+    # terminating TLS at an AWS ALB/ACM instead.
+    cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
   ingressClassName: nginx
+  tls:
+    # REPLACE the placeholder host with the real domain before applying.
+    - hosts:
+        - paymentswitch.example.com
+      secretName: payment-switch-tls
   rules:
-    - host: localhost
+    - host: paymentswitch.example.com
       http:
         paths:
           - path: /identity(/|$)(.*)
