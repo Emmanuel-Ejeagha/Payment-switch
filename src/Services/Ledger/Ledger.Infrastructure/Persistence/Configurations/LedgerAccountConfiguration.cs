@@ -17,6 +17,12 @@ public class LedgerAccountConfiguration : IEntityTypeConfiguration<LedgerAccount
         builder.Property(a => a.Currency).IsRequired().HasMaxLength(3);
         builder.Property(a => a.RowVersion).IsRowVersion();
 
+        builder.HasIndex(a => new { a.MerchantId, a.Currency }).IsUnique();
+
+        builder.ToTable("LedgerAccounts", t => t.HasCheckConstraint(
+            "CK_LedgerAccounts_NonNegativeBalances",
+            "\"AvailableBalance\" >= 0 AND \"PendingBalance\" >= 0 AND \"ReservedBalance\" >= 0"));
+
         builder.Navigation(a => a.Journal)
             .UsePropertyAccessMode(PropertyAccessMode.PreferField);
 
