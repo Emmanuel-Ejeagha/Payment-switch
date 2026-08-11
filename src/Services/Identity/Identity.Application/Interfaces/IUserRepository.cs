@@ -15,4 +15,5 @@ public interface IUserRepository
     Task<bool> RevokeApiKeyAsync(Guid userId, Guid keyId, CancellationToken cancellationToken = default);
     Task AddApiKeyAsync(User user, ApiKey apiKey, CancellationToken cancellationToken = default);
     Task<List<ApiKeyDto>> GetApiKeysByUserIdAsync(Guid userId, CancellationToken cancellationToken = default);
+    Task<int> PruneRefreshTokensAsync(CancellationToken cancellationToken = default);
 }

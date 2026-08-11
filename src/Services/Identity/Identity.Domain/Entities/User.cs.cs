@@ -201,6 +201,24 @@ public class User : AggregateRoot
         return token;
     }
 
+    /// <summary>Maximum concurrently active refresh tokens kept per account.</summary>
+    public const int MaxActiveRefreshTokens = 10;
+
+    /// <summary>
+    /// Revokes the oldest active refresh tokens beyond the cap so a single account
+    /// cannot accumulate an unbounded number of sessions.
+    /// </summary>
+    public void EnforceRefreshTokenCap(int maxActive = MaxActiveRefreshTokens)
+    {
+        var active = _refreshTokens
+            .Where(t => !t.IsRevoked && t.ExpiresAt > DateTime.UtcNow)
+            .OrderBy(t => t.ExpiresAt)
+            .ToList();
+
+        foreach (var token in active.Take(Math.Max(active.Count - maxActive, 0)))
+            token.Revoke();
+    }
+
     public void RevokeRefreshToken(string tokenHash)
     {
         var token = _refreshTokens.FirstOrDefault(t => t.Value == tokenHash);

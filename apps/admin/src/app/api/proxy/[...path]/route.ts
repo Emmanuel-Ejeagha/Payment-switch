@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server"
+import { POST as refreshTokens } from "../../auth/token/route"
 
 async function handler(request: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const { path } = await params
@@ -19,20 +20,49 @@ async function handler(request: NextRequest, { params }: { params: Promise<{ pat
   const idempotencyKey = request.headers.get("idempotency-key")
   if (idempotencyKey) headers["idempotency-key"] = idempotencyKey
 
-  if (cookie) {
-    const accessToken = cookie.split("; ").find(c => c.startsWith("access_token="))?.split("=")[1]
-    if (accessToken) headers["authorization"] = `Bearer ${accessToken}`
-  }
+  const initialAccessToken = cookie
+    ? cookie.split("; ").find(c => c.startsWith("access_token="))?.split("=")[1]
+    : undefined
 
   const body = request.method === "GET" || request.method === "HEAD" ? undefined : await request.text()
 
-  const res = await fetch(url, { method: request.method, headers, body })
-  const data = await res.text()
+  async function callUpstream(bearer?: string): Promise<Response> {
+    const upstreamHeaders: Record<string, string> = { ...headers }
+    const token = bearer ?? initialAccessToken
+    if (token) upstreamHeaders["authorization"] = `Bearer ${token}`
 
-  return new Response(data, {
-    status: res.status,
-    headers: { "content-type": res.headers.get("content-type") || "application/json" },
-  })
+    const res = await fetch(url, { method: request.method, headers: upstreamHeaders, body })
+    return new Response(await res.text(), {
+      status: res.status,
+      headers: { "content-type": res.headers.get("content-type") || "application/json" },
+    })
+  }
+
+  let response = await callUpstream()
+
+  // The access token may have expired between page renders. Rotate it once and
+  // retry before surfacing a 401 to the browser.
+  if (response.status === 401 && initialAccessToken) {
+    const rotated = await refreshTokens()
+    if (rotated.ok) {
+      const setCookies = rotated.headers.getSetCookie()
+      const newToken = setCookies
+        .find(c => c.startsWith("access_token="))
+        ?.split(";")[0]
+        .split("=")
+        .slice(1)
+        .join("=")
+      if (newToken) {
+        const retried = await callUpstream(newToken)
+        if (retried.status !== 401) {
+          for (const setCookie of setCookies) retried.headers.append("set-cookie", setCookie)
+          return retried
+        }
+      }
+    }
+  }
+
+  return response
 }
 
 export const GET = handler
