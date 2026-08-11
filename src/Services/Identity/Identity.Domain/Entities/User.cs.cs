@@ -16,6 +16,8 @@ public class User : AggregateRoot
     public DateTime? EmailVerificationTokenExpiresAt { get; private set; }
     public string? PasswordResetTokenHash { get; private set; }
     public DateTime? PasswordResetTokenExpiresAt { get; private set; }
+    public int AccessFailedCount { get; private set; }
+    public DateTime? LockoutEnd { get; private set; }
     private readonly List<string> _roles = new();
     private readonly List<TokenValue> _refreshTokens = new();
     private readonly List<ApiKey> _apiKeys = new();
@@ -129,6 +131,40 @@ public class User : AggregateRoot
 
     public void Activate() => IsActive = true;
     public void Deactivate() => IsActive = false;
+
+    /// <summary>Consecutive failed sign-in attempts tolerated before the account is locked.</summary>
+    public const int MaxAccessFailedAttempts = 5;
+
+    /// <summary>How long the account stays locked after too many failed attempts.</summary>
+    public const int LockoutDurationMinutes = 15;
+
+    /// <summary>
+    /// Returns true while the account is locked (within the lockout window).
+    /// </summary>
+    public bool IsLockedOut(DateTime utcNow) => LockoutEnd is not null && LockoutEnd > utcNow;
+
+    /// <summary>
+    /// Records a failed sign-in attempt. Once the configured threshold is reached
+    /// the counter is reset and the account is locked for the lockout window.
+    /// </summary>
+    public void RegisterFailedLogin(DateTime utcNow)
+    {
+        AccessFailedCount++;
+        if (AccessFailedCount < MaxAccessFailedAttempts)
+            return;
+
+        AccessFailedCount = 0;
+        LockoutEnd = utcNow.AddMinutes(LockoutDurationMinutes);
+    }
+
+    /// <summary>
+    /// Clears the failed-attempt counter and any active lockout (e.g. on success).
+    /// </summary>
+    public void ResetAccessFailedCount()
+    {
+        AccessFailedCount = 0;
+        LockoutEnd = null;
+    }
 
     public void AddRole(string role)
     {

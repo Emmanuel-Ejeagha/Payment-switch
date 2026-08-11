@@ -19,6 +19,9 @@ public static class IdentityErrors
     public static Error InvalidCredentials =>
         new("Identity.InvalidCredentials", "Invalid email or password.");
 
+    public static Error AccountLocked =>
+        new("Identity.AccountLocked", "Too many failed sign-in attempts. Please try again later.");
+
     public static Error EmailNotVerified =>
         new("Identity.EmailNotVerified", "Please verify your email address before proceeding.");
 

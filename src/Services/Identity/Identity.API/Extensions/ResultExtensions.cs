@@ -24,6 +24,7 @@ public static class ResultExtensions
         {
             "Identity.EmailAlreadyInUse" => 409,
             "Identity.InvalidCredentials" => 401,
+            "Identity.AccountLocked" => 401,
             "Identity.UserNotFound" => 404,
             "Identity.ApiKeyNotFound" => 404,
             "Identity.NotAuthorized" => 403,
