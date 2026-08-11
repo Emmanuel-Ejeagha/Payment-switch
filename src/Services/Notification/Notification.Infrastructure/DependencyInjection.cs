@@ -30,6 +30,7 @@ public static class DependencyInjection
         });
 
         services.AddScoped<INotificationRepository, NotificationRepository>();
+        services.AddScoped<INotificationPreferenceRepository, NotificationPreferenceRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IMerchantContactService, GrpcMerchantContactService>();
 
