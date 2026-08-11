@@ -28,7 +28,11 @@ public class GrpcMerchantService : IMerchantService
         return Result<MerchantConfig>.Success(new MerchantConfig(
             string.IsNullOrEmpty(response.WebhookUrl) ? null : response.WebhookUrl,
             response.AutoCapture,
-            string.IsNullOrEmpty(response.WebhookSecret) ? null : response.WebhookSecret));
+            string.IsNullOrEmpty(response.WebhookSecret) ? null : response.WebhookSecret,
+            string.IsNullOrEmpty(response.PreviousWebhookSecret) ? null : response.PreviousWebhookSecret,
+            response.WebhookSecretRotatedAt == 0
+                ? null
+                : DateTimeOffset.FromUnixTimeSeconds(response.WebhookSecretRotatedAt).UtcDateTime));
     }
 
     public async Task<Result<MerchantKeyResolution>> ResolveApiKeyAsync(string keyPrefix, string keyValue, CancellationToken cancellationToken = default)

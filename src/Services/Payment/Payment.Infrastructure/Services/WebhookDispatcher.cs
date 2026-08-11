@@ -1,7 +1,9 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Payment.Application.DTOs;
 using Payment.Application.Interfaces;
 using Payment.Domain.Entities;
+using Payment.Infrastructure.Configuration;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
@@ -12,15 +14,18 @@ public class WebhookDispatcher
 {
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IMerchantService _merchantService;
+    private readonly IOptions<WebhookSecretRotationOptions> _rotationOptions;
     private readonly ILogger<WebhookDispatcher> _logger;
 
     public WebhookDispatcher(
         IHttpClientFactory httpClientFactory,
         IMerchantService merchantService,
+        IOptions<WebhookSecretRotationOptions> rotationOptions,
         ILogger<WebhookDispatcher> logger)
     {
         _httpClientFactory = httpClientFactory;
         _merchantService = merchantService;
+        _rotationOptions = rotationOptions;
         _logger = logger;
     }
 
@@ -35,7 +40,13 @@ public class WebhookDispatcher
             return (false, "No webhook endpoint configured.");
 
         var payloadBytes = Encoding.UTF8.GetBytes(webhookEvent.Payload);
-        var signature = WebhookSignature.Compute(config.WebhookSecret, payloadBytes, out var timestamp);
+        var signingSecret = WebhookSecretResolver.SelectSigningSecret(
+            config.WebhookSecret,
+            config.PreviousWebhookSecret,
+            config.WebhookSecretRotatedAtUtc,
+            DateTime.UtcNow,
+            TimeSpan.FromHours(_rotationOptions.Value.GracePeriodHours));
+        var signature = WebhookSignature.Compute(signingSecret, payloadBytes, out var timestamp);
 
         using var client = _httpClientFactory.CreateClient("webhook");
         using var request = new HttpRequestMessage(HttpMethod.Post, config.WebhookUrl);
@@ -76,5 +87,27 @@ public static class WebhookSignature
         using var hmac = new HMACSHA256(keyBytes);
         var hash = hmac.ComputeHash(body);
         return $"sha256={Convert.ToHexString(hash).ToLowerInvariant()}";
+    }
+}
+
+/// <summary>
+/// Selects which webhook secret to sign with. After a rotation the merchant's
+/// verifier still holds the previous secret, so webhooks keep being signed with
+/// it during the grace window and only switch to the new one afterwards
+/// (TASK-006). If the secret was never rotated the current secret is used.
+/// </summary>
+public static class WebhookSecretResolver
+{
+    public static string? SelectSigningSecret(
+        string? current,
+        string? previous,
+        DateTime? rotatedAtUtc,
+        DateTime nowUtc,
+        TimeSpan gracePeriod)
+    {
+        if (string.IsNullOrWhiteSpace(previous) || rotatedAtUtc is null)
+            return current;
+
+        return nowUtc - rotatedAtUtc.Value < gracePeriod ? previous : current;
     }
 }

@@ -27,6 +27,7 @@ public static class TestSecrets
     public const string JwtAudience = "PaymentSwitch";
     public const string RabbitMqUserName = "integration-test";
     public const string RabbitMqPassword = "integration-test-rabbit-password";
+    public const string WebhookSecretEncryptionKey = "integration-test-webhook-secret-encryption-key";
 
     /// <summary>
     /// Host used for the RabbitMQ readiness probe during tests.
@@ -63,6 +64,7 @@ public static class TestSecrets
             Environment.SetEnvironmentVariable("RabbitMQ__HostName", RabbitMqHostName);
             Environment.SetEnvironmentVariable("RabbitMQ__UserName", RabbitMqUserName);
             Environment.SetEnvironmentVariable("RabbitMQ__Password", RabbitMqPassword);
+            Environment.SetEnvironmentVariable("WebhookSecretEncryption__Key", WebhookSecretEncryptionKey);
         }
     }
 

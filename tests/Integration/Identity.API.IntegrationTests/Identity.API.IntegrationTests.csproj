@@ -28,4 +28,8 @@
     <Compile Include="..\Shared\TestSecrets.cs" Link="TestSecrets.cs" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Include="..\Shared\AssemblyInfo.cs" Link="AssemblyInfo.cs" />
+  </ItemGroup>
+
 </Project>

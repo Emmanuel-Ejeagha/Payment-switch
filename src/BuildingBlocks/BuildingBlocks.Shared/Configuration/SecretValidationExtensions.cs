@@ -15,9 +15,7 @@ public static class SecretValidationExtensions
         this IConfiguration configuration,
         string databaseName)
     {
-        ValidateJwtSecret(configuration["Jwt:Secret"]);
-
-        var connectionString = configuration.GetConnectionString(databaseName);
+        ValidateJwtSecret(configuration["Jwt:Secret"]);        var connectionString = configuration.GetConnectionString(databaseName);
         if (string.IsNullOrWhiteSpace(connectionString))
         {
             throw new InvalidOperationException(
@@ -42,6 +40,32 @@ public static class SecretValidationExtensions
         ValidateRabbitMqCredentials(
             configuration["RabbitMQ:UserName"],
             configuration["RabbitMQ:Password"]);
+    }
+
+    /// <summary>
+    /// Validates the AES-GCM key used to encrypt merchant webhook secrets at
+    /// rest (TASK-006). Only the Merchant service calls this.
+    /// </summary>
+    public static void ValidateWebhookSecretEncryptionKey(this IConfiguration configuration)
+    {
+        var key = configuration["WebhookSecretEncryption:Key"];
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            throw new InvalidOperationException(
+                "WebhookSecretEncryption:Key is not configured. Set it via environment or secrets.");
+        }
+
+        if (key.Length < 32)
+        {
+            throw new InvalidOperationException(
+                $"WebhookSecretEncryption:Key must be at least 32 characters (got {key.Length}).");
+        }
+
+        if (KnownInsecureSecrets.Contains(key))
+        {
+            throw new InvalidOperationException(
+                "WebhookSecretEncryption:Key is set to a known insecure placeholder. Set a unique, strong secret.");
+        }
     }
 
     private static void ValidateJwtSecret(string? secret)

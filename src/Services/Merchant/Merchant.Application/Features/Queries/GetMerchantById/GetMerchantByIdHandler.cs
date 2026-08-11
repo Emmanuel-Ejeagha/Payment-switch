@@ -30,7 +30,6 @@ public class GetMerchantByIdHandler
             merchant.Email.Value,
             merchant.Status.Value,
             merchant.WebhookUrl?.Value,
-            merchant.WebhookSecret?.Value,
             merchant.EnabledPaymentMethods.ToList(),
             merchant.CreatedAt,
             merchant.AutoCapture

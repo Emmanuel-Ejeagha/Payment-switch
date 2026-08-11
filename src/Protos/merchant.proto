@@ -27,6 +27,10 @@ message GetMerchantConfigResponse {
   repeated string enabled_payment_methods = 2;
   bool auto_capture = 3;
   string webhook_secret = 4;
+  // Dual-secret rotation (TASK-006): the previous secret stays valid during a
+  // grace window so live webhook consumers are not broken by rotation.
+  string previous_webhook_secret = 5;
+  int64 webhook_secret_rotated_at = 6; // Unix seconds UTC; 0 when never rotated
 }
 
 message ResolveApiKeyRequest {

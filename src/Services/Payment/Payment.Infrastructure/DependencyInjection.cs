@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Payment.Application.Interfaces;
+using Payment.Infrastructure.Configuration;
 using Payment.Infrastructure.Messaging;
 using Payment.Infrastructure.Outbox;
 using Payment.Infrastructure.Persistence;
@@ -45,6 +46,8 @@ public static class DependencyInjection
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IMerchantService, GrpcMerchantService>();
         services.AddScoped<WebhookDispatcher>();
+        services.Configure<WebhookSecretRotationOptions>(
+            configuration.GetSection(WebhookSecretRotationOptions.SectionName));
         services.AddHttpClient("webhook")
             .ConfigureHttpClient(c =>
             {
@@ -61,6 +64,10 @@ public static class DependencyInjection
         services.AddHostedService<WebhookDispatchWorker>();
         services.AddHostedService<SubscriptionBillingWorker>();
 
+        // The merchant gRPC channel is a documented in-network exception
+        // (TASK-004): port 5001 is never published and the endpoint is gated by
+        // the ServiceOnly policy. Secret delivery is additionally constrained by
+        // encrypt-at-rest (TASK-006).
         services.AddGrpcClient<MerchantService.MerchantServiceClient>(o =>
         {
             o.Address = new Uri(configuration["Grpc:Merchant:Address"] ?? "http://merchant-api:5001");

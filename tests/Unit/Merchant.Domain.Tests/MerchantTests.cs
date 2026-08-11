@@ -105,6 +105,40 @@ public class MerchantTests
         Assert.Contains(merchant.DomainEvents, e => e is MerchantConfigurationUpdatedEvent);
     }
 
+    [Fact]
+    public void RotateWebhookSecret_ShouldKeepPreviousSecretAndRecordRotationTime()
+    {
+        var merchant = CreatePendingMerchant();
+        var original = merchant.WebhookSecret!.Value;
+        Assert.Null(merchant.PreviousWebhookSecret);
+        Assert.Null(merchant.WebhookSecretRotatedAtUtc);
+
+        var before = DateTime.UtcNow;
+        merchant.RotateWebhookSecret();
+        var after = DateTime.UtcNow;
+
+        Assert.Equal(original, merchant.PreviousWebhookSecret!.Value);
+        Assert.NotNull(merchant.WebhookSecretRotatedAtUtc);
+        Assert.InRange(merchant.WebhookSecretRotatedAtUtc.Value, before, after);
+    }
+
+    [Fact]
+    public void RotateWebhookSecret_Twice_ShouldKeepMostRecentAsPrevious()
+    {
+        var merchant = CreatePendingMerchant();
+        var first = merchant.WebhookSecret!.Value;
+
+        merchant.RotateWebhookSecret();
+        var second = merchant.WebhookSecret!.Value;
+        merchant.RotateWebhookSecret();
+        var third = merchant.WebhookSecret!.Value;
+
+        Assert.Equal(second, merchant.PreviousWebhookSecret!.Value);
+        Assert.Equal(third, merchant.WebhookSecret!.Value);
+        Assert.NotEqual(first, second);
+        Assert.NotEqual(second, third);
+    }
+
     private MerchantEntity CreatePendingMerchant() =>
         new(Guid.NewGuid(), new BusinessName("Test Co"), new MerchantEmail("test@test.com"));
 }

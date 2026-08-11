@@ -27,6 +27,7 @@ using System.Text;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Configuration.ValidateSecuritySecrets("MerchantDb");
+builder.Configuration.ValidateWebhookSecretEncryptionKey();
 
 builder.Host.UseSerilog((ctx, lc) => lc.ReadFrom.Configuration(ctx.Configuration));
 var otel = builder.AddPaymentSwitchObservability("Merchant");
@@ -38,6 +39,9 @@ builder.WebHost.ConfigureKestrel(options =>
     {
         listenOptions.Protocols = HttpProtocols.Http1AndHttp2;
     });
+    // gRPC (webhook-secret delivery) is ServiceOnly-gated and reachable only on
+    // the internal docker/k8s network (port 5001 is not published). Per
+    // TASK-004, that is the documented in-network exception to end-to-end TLS.
     options.ListenAnyIP(5001, listenOptions =>
     {
         listenOptions.Protocols = HttpProtocols.Http2;
@@ -129,6 +133,12 @@ builder.Services.AddPaymentSwitchHealthChecks()
 var app = builder.Build();
 
 app.MigrateDatabase<AppDbContext>();
+
+using (var scope = app.Services.CreateScope())
+{
+    var backfill = scope.ServiceProvider.GetRequiredService<Merchant.Infrastructure.Security.WebhookSecretEncryptionBackfill>();
+    await backfill.ExecuteAsync();
+}
 
 app.UsePaymentSwitchSecurityHeaders();
 app.UseCorrelationId();
