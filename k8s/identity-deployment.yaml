@@ -52,6 +52,36 @@ spec:
                 secretKeyRef:
                   name: payment-switch-secret
                   key: RabbitMQ__Password
+            - name: Smtp__Host
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-switch-config
+                  key: Smtp__Host
+            - name: Smtp__Port
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-switch-config
+                  key: Smtp__Port
+            - name: Smtp__Username
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-switch-config
+                  key: Smtp__Username
+            - name: Smtp__Password
+              valueFrom:
+                secretKeyRef:
+                  name: payment-switch-secret
+                  key: Smtp__Password
+            - name: Smtp__FromAddress
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-switch-config
+                  key: Smtp__FromAddress
+            - name: Smtp__FromName
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-switch-config
+                  key: Smtp__FromName
             - name: Seed__AdminEmail
               value: "admin@paymentswitch.com"
             - name: Seed__AdminPassword
