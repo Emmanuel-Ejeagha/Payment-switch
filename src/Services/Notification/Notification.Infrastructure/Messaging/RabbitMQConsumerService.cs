@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using Notification.Application.Features.Commands.CreateNotification;
 using Notification.Application.Interfaces;
 using Notification.Application.Messaging;
+using Notification.Application.Services;
 using Notification.Infrastructure.Inbox;
 using Notification.Infrastructure.Persistence;
 using RabbitMQ.Client;
@@ -100,6 +101,7 @@ public class RabbitMQConsumerService : BackgroundService
             var createHandler = scope.ServiceProvider.GetRequiredService<CreateNotificationHandler>();
             var realTimeNotifier = scope.ServiceProvider.GetRequiredService<IRealTimeNotifier>();
             var merchantContacts = scope.ServiceProvider.GetRequiredService<IMerchantContactService>();
+            var preferenceRepo = scope.ServiceProvider.GetRequiredService<INotificationPreferenceRepository>();
 
             // Extract merchantId from the event for real-time notification
             Guid? merchantId = null;
@@ -147,7 +149,11 @@ public class RabbitMQConsumerService : BackgroundService
                         break;
                 }
 
-                if (command != null)
+                if (command != null && await IsSuppressedAsync(preferenceRepo, command, eventType, cancellationToken))
+                {
+                    _logger.LogInformation("Notification suppressed for {Recipient} ({EventType}) by preference", command.Recipient, eventType);
+                }
+                else if (command != null)
                 {
                     var result = await createHandler.Handle(command, cancellationToken);
                     if (result.IsSuccess)
@@ -251,6 +257,16 @@ public class RabbitMQConsumerService : BackgroundService
             _logger.LogError("Message {MessageId} failed after {MaxRetries} retries; moved to DLQ",
                 messageId, MessageRetryPolicy.MaxRetries);
         }
+    }
+
+    private async Task<bool> IsSuppressedAsync(
+        INotificationPreferenceRepository preferenceRepo,
+        CreateNotificationCommand command,
+        string eventType,
+        CancellationToken cancellationToken)
+    {
+        var preference = await preferenceRepo.FindAsync(command.Recipient, command.Channel, eventType, cancellationToken);
+        return NotificationPreferenceRules.IsSuppressed(preference);
     }
 
     private async Task<CreateNotificationCommand?> ResolveCommandAsync(
