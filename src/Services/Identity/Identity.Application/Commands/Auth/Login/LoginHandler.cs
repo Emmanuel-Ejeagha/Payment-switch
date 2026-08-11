@@ -41,11 +41,24 @@ public class LoginHandler
         if (user == null)
             return IdentityErrors.InvalidCredentials;
 
+        if (user.IsLockedOut(DateTime.UtcNow))
+        {
+            _logger.LogWarning("Login rejected for locked user {UserId}", user.Id);
+            return IdentityErrors.AccountLocked;
+        }
+
         if (!_passwordHasher.Verify(command.Password, user.PasswordHash))
+        {
+            user.RegisterFailedLogin(DateTime.UtcNow);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            _logger.LogWarning("Failed login for user {UserId}; failed attempts now {Count}", user.Id, user.AccessFailedCount);
             return IdentityErrors.InvalidCredentials;
+        }
 
         if (!user.IsActive)
             return new Error("Identity.UserInactive", "User account is deactivated.");
+
+        user.ResetAccessFailedCount();
 
         var accessToken = _tokenService.GenerateAccessToken(user);
         var refreshToken = _tokenService.GenerateRefreshToken();

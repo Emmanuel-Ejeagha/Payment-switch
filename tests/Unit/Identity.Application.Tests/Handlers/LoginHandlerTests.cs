@@ -135,6 +135,93 @@ public class LoginHandlerTests
         Assert.Contains(result.Errors, e => e.Code == "Email");
     }
 
+    [Fact]
+    public async Task Handle_LockedAccount_ShouldReturnAccountLocked()
+    {
+        var command = new LoginCommand("user@example.com", "Password123");
+        var user = CreateActiveUser("user@example.com");
+        for (var i = 0; i < User.MaxAccessFailedAttempts; i++)
+            user.RegisterFailedLogin(DateTime.UtcNow);
+        SetupValidatorSuccess(command);
+        _userRepositoryMock.Setup(r => r.GetByEmailAsync(command.Email, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+        _passwordHasherMock.Setup(h => h.Verify(command.Password, user.PasswordHash))
+            .Returns(true);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Identity.AccountLocked", result.Errors[0].Code);
+        _passwordHasherMock.Verify(h => h.Verify(It.IsAny<string>(), It.IsAny<PasswordHash>()), Times.Never);
+        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_WrongPassword_ShouldIncrementFailedCountAndPersist()
+    {
+        var command = new LoginCommand("user@example.com", "WrongPassword");
+        var user = CreateActiveUser("user@example.com");
+        SetupValidatorSuccess(command);
+        _userRepositoryMock.Setup(r => r.GetByEmailAsync(command.Email, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+        _passwordHasherMock.Setup(h => h.Verify(command.Password, user.PasswordHash))
+            .Returns(false);
+        _unitOfWorkMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Identity.InvalidCredentials", result.Errors[0].Code);
+        Assert.Equal(1, user.AccessFailedCount);
+        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_RepeatedWrongPasswords_ShouldLockAccount()
+    {
+        var command = new LoginCommand("user@example.com", "WrongPassword");
+        var user = CreateActiveUser("user@example.com");
+        SetupValidatorSuccess(command);
+        _userRepositoryMock.Setup(r => r.GetByEmailAsync(command.Email, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+        _passwordHasherMock.Setup(h => h.Verify(command.Password, user.PasswordHash))
+            .Returns(false);
+        _unitOfWorkMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        for (var i = 0; i < User.MaxAccessFailedAttempts; i++)
+            await _handler.Handle(command);
+
+        Assert.True(user.IsLockedOut(DateTime.UtcNow));
+        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Exactly(User.MaxAccessFailedAttempts));
+    }
+
+    [Fact]
+    public async Task Handle_ValidCredentials_ShouldResetFailedCount()
+    {
+        var command = new LoginCommand("user@example.com", "Password123");
+        var user = CreateActiveUser("user@example.com");
+        user.RegisterFailedLogin(DateTime.UtcNow);
+        user.RegisterFailedLogin(DateTime.UtcNow);
+        SetupValidatorSuccess(command);
+        _userRepositoryMock.Setup(r => r.GetByEmailAsync(command.Email, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+        _passwordHasherMock.Setup(h => h.Verify(command.Password, user.PasswordHash))
+            .Returns(true);
+        _tokenServiceMock.Setup(t => t.GenerateAccessToken(user)).Returns("access_token");
+        _tokenServiceMock.Setup(t => t.GenerateRefreshToken()).Returns("refresh_token");
+        _tokenServiceMock.Setup(t => t.HashRefreshToken(It.IsAny<string>())).Returns<string>(t => $"hash-{t}");
+        _unitOfWorkMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(0, user.AccessFailedCount);
+        Assert.Null(user.LockoutEnd);
+    }
+
     private static User CreateActiveUser(string email)
     {
         var user = new User(Guid.NewGuid(), new Email(email), new PasswordHash("hashed"), new FullName("Test User"));
