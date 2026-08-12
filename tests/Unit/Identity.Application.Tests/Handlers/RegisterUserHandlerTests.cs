@@ -6,6 +6,7 @@ using FluentValidation;
 using FluentValidation.Results;
 using Identity.Application.Commands.Auth.Register;
 using Identity.Application.Configuration;
+using Identity.Application.Exceptions;
 using Identity.Application.Interfaces;
 using Identity.Domain.Entities;
 using Identity.Domain.ValueObjects;
@@ -117,6 +118,28 @@ public class RegisterUserHandlerTests
         Assert.True(result.IsFailure);
         Assert.Contains(result.Errors, e => e.Code == "Email");
         Assert.Contains(result.Errors, e => e.Code == "Password");
+    }
+
+    [Fact]
+    public async Task Handle_EmailConflictException_ShouldReturnEmailAlreadyInUse()
+    {
+        // Arrange
+        var command = new RegisterUserCommand("caseVariant@example.com", "Password123", "Case Variant");
+        SetupValidatorSuccess(command);
+        _userRepositoryMock.Setup(r => r.ExistsByEmailAsync(command.Email, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+        _passwordHasherMock.Setup(h => h.Hash(command.Password))
+            .Returns(new PasswordHash("hashed_password"));
+        _unitOfWorkMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new EmailConflictException("duplicate", new Exception("unique violation")));
+
+        // Act
+        var result = await _handler.Handle(command);
+
+        // Assert
+        Assert.True(result.IsFailure);
+        Assert.Contains(result.Errors, e => e.Code == "Identity.EmailAlreadyInUse");
+        _emailSenderMock.Verify(s => s.SendAsync(It.IsAny<EmailMessage>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]

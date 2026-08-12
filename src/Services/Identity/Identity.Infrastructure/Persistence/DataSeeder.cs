@@ -9,7 +9,8 @@ public static class DataSeeder
 {
     public static async Task SeedAsync(AppDbContext dbContext, IConfiguration configuration)
     {
-        var adminEmail = configuration["Seed:AdminEmail"] ?? "admin@paymentswitch.com";
+        var adminEmail = (configuration["Seed:AdminEmail"] ?? "admin@paymentswitch.com")
+            .Trim().ToLowerInvariant();
         var adminPassword = configuration["Seed:AdminPassword"];
         if (string.IsNullOrWhiteSpace(adminPassword))
         {
