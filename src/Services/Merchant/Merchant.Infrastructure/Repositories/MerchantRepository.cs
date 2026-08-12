@@ -48,7 +48,24 @@ public class MerchantRepository : IMerchantRepository
         return await _context.Merchants
             .OrderByDescending(m => m.CreatedAt)
             .Skip(skip).Take(take)
-            .Select(m => new MerchantDto(m.Id, m.BusinessName.Value, m.Email.Value, m.Status.Value, m.WebhookUrl == null ? null : m.WebhookUrl.Value, m.EnabledPaymentMethods.ToList(), m.CreatedAt, m.AutoCapture))
+            .Select(m => new MerchantDto(
+                m.Id,
+                m.BusinessName.Value,
+                m.Email.Value,
+                m.Status.Value,
+                m.WebhookUrl == null ? null : m.WebhookUrl.Value,
+                m.EnabledPaymentMethods.ToList(),
+                m.CreatedAt,
+                m.AutoCapture,
+                m.RejectionReason,
+                m.SettlementInfo == null ? null : m.SettlementInfo.BankAccountName,
+                m.SettlementInfo == null ? null : m.SettlementInfo.BankAccountNumber,
+                m.SettlementInfo == null ? null : m.SettlementInfo.BankName,
+                m.SettlementInfo == null ? null : m.SettlementInfo.SettlementCurrency,
+                m.SettlementInfo == null ? null : m.SettlementInfo.SettlementSchedule,
+                m.ContactDetails == null ? null : m.ContactDetails.Phone,
+                m.ContactDetails == null ? null : m.ContactDetails.Address,
+                m.ContactDetails == null ? null : m.ContactDetails.ContactPerson))
             .ToListAsync(cancellationToken);
     }
 

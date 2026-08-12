@@ -78,6 +78,7 @@ public class RevokeMerchantApiKeyHandlerTests
     {
         var ownerId = Guid.NewGuid();
         var m = new MerchantEntity(Guid.NewGuid(), ownerId, new BusinessName("Test"), new MerchantEmail("t@t.com"));
+        m.Approve();
         m.Activate();
         var key = m.GenerateApiKey("hash", "sk_test_", "test");
         keyId = key.Id;

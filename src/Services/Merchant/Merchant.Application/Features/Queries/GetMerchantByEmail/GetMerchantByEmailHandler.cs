@@ -32,7 +32,16 @@ public class GetMerchantByEmailHandler
             merchant.WebhookUrl?.Value,
             merchant.EnabledPaymentMethods.ToList(),
             merchant.CreatedAt,
-            merchant.AutoCapture
+            merchant.AutoCapture,
+            merchant.RejectionReason,
+            merchant.SettlementInfo?.BankAccountName,
+            merchant.SettlementInfo?.BankAccountNumber,
+            merchant.SettlementInfo?.BankName,
+            merchant.SettlementInfo?.SettlementCurrency,
+            merchant.SettlementInfo?.SettlementSchedule,
+            merchant.ContactDetails?.Phone,
+            merchant.ContactDetails?.Address,
+            merchant.ContactDetails?.ContactPerson
         );
     }
 }

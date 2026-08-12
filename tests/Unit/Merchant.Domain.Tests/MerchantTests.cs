@@ -28,9 +28,9 @@ public class MerchantTests
     }
 
     [Fact]
-    public void Activate_WhenPending_ShouldBecomeActive()
+    public void Activate_WhenApproved_ShouldBecomeActive()
     {
-        var merchant = CreatePendingMerchant();
+        var merchant = CreateApprovedMerchant();
 
         merchant.Activate();
 
@@ -39,19 +39,98 @@ public class MerchantTests
     }
 
     [Fact]
-    public void Activate_WhenAlreadyActive_ShouldThrow()
+    public void Activate_WhenPending_ShouldThrow()
     {
         var merchant = CreatePendingMerchant();
+
+        Assert.Throws<InvalidOperationException>(() => merchant.Activate());
+    }
+
+    [Fact]
+    public void Activate_WhenAlreadyActive_ShouldThrow()
+    {
+        var merchant = CreateApprovedMerchant();
         merchant.Activate();
 
         Assert.Throws<InvalidOperationException>(() => merchant.Activate());
     }
 
     [Fact]
-    public void Suspend_WhenActive_ShouldBecomeSuspended()
+    public void Approve_WhenPending_ShouldBecomeApproved()
     {
         var merchant = CreatePendingMerchant();
-        merchant.Activate();
+        merchant.ClearDomainEvents();
+
+        merchant.Approve();
+
+        Assert.Equal(MerchantStatus.Approved, merchant.Status);
+        Assert.Null(merchant.RejectionReason);
+        Assert.Contains(merchant.DomainEvents, e => e is MerchantApprovedEvent);
+    }
+
+    [Fact]
+    public void Approve_WhenNotPending_ShouldThrow()
+    {
+        var merchant = CreateApprovedMerchant();
+
+        Assert.Throws<InvalidOperationException>(() => merchant.Approve());
+    }
+
+    [Fact]
+    public void Reject_WhenPending_ShouldBecomeRejectedWithReason()
+    {
+        var merchant = CreatePendingMerchant();
+        merchant.ClearDomainEvents();
+
+        merchant.Reject("Missing business registration");
+
+        Assert.Equal(MerchantStatus.Rejected, merchant.Status);
+        Assert.Equal("Missing business registration", merchant.RejectionReason);
+        Assert.Contains(merchant.DomainEvents, e => e is MerchantRejectedEvent);
+    }
+
+    [Fact]
+    public void Reject_WithoutReason_ShouldThrow()
+    {
+        var merchant = CreatePendingMerchant();
+
+        Assert.Throws<ArgumentException>(() => merchant.Reject(null!));
+        Assert.Throws<ArgumentException>(() => merchant.Reject("  "));
+    }
+
+    [Fact]
+    public void Reject_WhenNotPending_ShouldThrow()
+    {
+        var merchant = CreateApprovedMerchant();
+
+        Assert.Throws<InvalidOperationException>(() => merchant.Reject("late review"));
+    }
+
+    [Fact]
+    public void Reactivate_WhenSuspended_ShouldBecomeActive()
+    {
+        var merchant = CreateActiveMerchant();
+        merchant.Suspend();
+        merchant.ClearDomainEvents();
+
+        merchant.Reactivate();
+
+        Assert.Equal(MerchantStatus.Active, merchant.Status);
+        Assert.Contains(merchant.DomainEvents, e => e is MerchantActivatedEvent);
+    }
+
+    [Fact]
+    public void Reactivate_WhenNotSuspended_ShouldThrow()
+    {
+        var merchant = CreateActiveMerchant();
+
+        Assert.Throws<InvalidOperationException>(() => merchant.Reactivate());
+    }
+
+    [Fact]
+    public void Suspend_WhenActive_ShouldBecomeSuspended()
+    {
+        var merchant = CreateActiveMerchant();
         merchant.ClearDomainEvents();
 
         merchant.Suspend();
@@ -70,8 +149,7 @@ public class MerchantTests
     [Fact]
     public void UpdateConfiguration_WhenActive_ShouldUpdate()
     {
-        var merchant = CreatePendingMerchant();
-        merchant.Activate();
+        var merchant = CreateActiveMerchant();
         merchant.ClearDomainEvents();
 
         merchant.UpdateConfiguration("https://acme.com/webhook", new List<string> { "card", "bank" });
@@ -84,11 +162,53 @@ public class MerchantTests
     [Fact]
     public void UpdateConfiguration_WhenSuspended_ShouldThrow()
     {
-        var merchant = CreatePendingMerchant();
-        merchant.Activate();
+        var merchant = CreateActiveMerchant();
         merchant.Suspend();
 
         Assert.Throws<InvalidOperationException>(() => merchant.UpdateConfiguration("https://hook.com", null));
+    }
+
+    [Fact]
+    public void UpdateSettlementInfo_ShouldPersistAndRaiseEvent()
+    {
+        var merchant = CreateActiveMerchant();
+        merchant.ClearDomainEvents();
+
+        merchant.UpdateSettlementInfo(new SettlementInfo("Acme Ltd", "0099887766", "Test Bank", "usd", "weekly"));
+
+        Assert.NotNull(merchant.SettlementInfo);
+        Assert.Equal("Acme Ltd", merchant.SettlementInfo!.BankAccountName);
+        Assert.Equal("0099887766", merchant.SettlementInfo.BankAccountNumber);
+        Assert.Equal("USD", merchant.SettlementInfo.SettlementCurrency);
+        Assert.Equal("WEEKLY", merchant.SettlementInfo.SettlementSchedule);
+        Assert.Contains(merchant.DomainEvents, e => e is MerchantConfigurationUpdatedEvent);
+    }
+
+    [Fact]
+    public void UpdateContactDetails_ShouldPersistAndRaiseEvent()
+    {
+        var merchant = CreateActiveMerchant();
+        merchant.ClearDomainEvents();
+
+        merchant.UpdateContactDetails(new ContactDetails("+2348000000000", "1 Test Street", "Ada"));
+
+        Assert.NotNull(merchant.ContactDetails);
+        Assert.Equal("+2348000000000", merchant.ContactDetails!.Phone);
+        Assert.Equal("1 Test Street", merchant.ContactDetails.Address);
+        Assert.Equal("Ada", merchant.ContactDetails.ContactPerson);
+        Assert.Contains(merchant.DomainEvents, e => e is MerchantConfigurationUpdatedEvent);
+    }
+
+    [Fact]
+    public void UpdateContactDetails_WithBlankFields_ShouldStoreNulls()
+    {
+        var merchant = CreateActiveMerchant();
+
+        merchant.UpdateContactDetails(new ContactDetails("  ", null, ""));
+
+        Assert.NotNull(merchant.ContactDetails);
+        Assert.Null(merchant.ContactDetails!.Phone);
+        Assert.Null(merchant.ContactDetails.ContactPerson);
     }
 
     [Fact]
@@ -141,4 +261,18 @@ public class MerchantTests
 
     private MerchantEntity CreatePendingMerchant() =>
         new(Guid.NewGuid(), new BusinessName("Test Co"), new MerchantEmail("test@test.com"));
+
+    private MerchantEntity CreateApprovedMerchant()
+    {
+        var merchant = CreatePendingMerchant();
+        merchant.Approve();
+        return merchant;
+    }
+
+    private MerchantEntity CreateActiveMerchant()
+    {
+        var merchant = CreateApprovedMerchant();
+        merchant.Activate();
+        return merchant;
+    }
 }

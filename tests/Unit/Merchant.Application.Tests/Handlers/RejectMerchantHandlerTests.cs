@@ -1,27 +1,27 @@
-﻿using Merchant.Application.Features.Commands.ActivateMerchant;
+using Merchant.Application.Features.Commands.RejectMerchant;
 
 
 namespace Merchant.Application.Tests.Handlers;
 
-public class ActivateMerchantHandlerTests
+public class RejectMerchantHandlerTests
 {
     private readonly Mock<IMerchantRepository> _repoMock = new();
     private readonly Mock<IUnitOfWork> _uowMock = new();
     private readonly Mock<IDomainEventDispatcher> _dispatcherMock = new();
-    private readonly Mock<IValidator<ActivateMerchantCommand>> _validatorMock = new();
-    private readonly Mock<ILogger<ActivateMerchantHandler>> _loggerMock = new();
-    private readonly ActivateMerchantHandler _handler;
+    private readonly Mock<IValidator<RejectMerchantCommand>> _validatorMock = new();
+    private readonly Mock<ILogger<RejectMerchantHandler>> _loggerMock = new();
+    private readonly RejectMerchantHandler _handler;
 
-    public ActivateMerchantHandlerTests()
+    public RejectMerchantHandlerTests()
     {
-        _handler = new ActivateMerchantHandler(_repoMock.Object, _uowMock.Object, _dispatcherMock.Object, _validatorMock.Object, _loggerMock.Object);
+        _handler = new RejectMerchantHandler(_repoMock.Object, _uowMock.Object, _dispatcherMock.Object, _validatorMock.Object, _loggerMock.Object);
     }
 
     [Fact]
-    public async Task Handle_ApprovedMerchant_ShouldActivate()
+    public async Task Handle_PendingMerchant_ShouldRejectWithReason()
     {
-        var merchant = CreateApprovedMerchant();
-        var command = new ActivateMerchantCommand(merchant.Id);
+        var merchant = CreatePendingMerchant();
+        var command = new RejectMerchantCommand(merchant.Id, "Missing documentation");
         SetupValidatorSuccess(command);
         _repoMock.Setup(r => r.GetByIdAsync(merchant.Id, It.IsAny<CancellationToken>())).ReturnsAsync(merchant);
         _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
@@ -29,14 +29,16 @@ public class ActivateMerchantHandlerTests
         var result = await _handler.Handle(command);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(MerchantStatus.Active, merchant.Status);
+        Assert.Equal(MerchantStatus.Rejected, merchant.Status);
+        Assert.Equal("Missing documentation", merchant.RejectionReason);
     }
 
     [Fact]
-    public async Task Handle_PendingMerchant_ShouldFail()
+    public async Task Handle_ApprovedMerchant_ShouldFail()
     {
         var merchant = CreatePendingMerchant();
-        var command = new ActivateMerchantCommand(merchant.Id);
+        merchant.Approve();
+        var command = new RejectMerchantCommand(merchant.Id, "Too late");
         SetupValidatorSuccess(command);
         _repoMock.Setup(r => r.GetByIdAsync(merchant.Id, It.IsAny<CancellationToken>())).ReturnsAsync(merchant);
 
@@ -47,24 +49,22 @@ public class ActivateMerchantHandlerTests
     }
 
     [Fact]
-    public async Task Handle_AlreadyActive_ShouldFail()
+    public async Task Handle_MissingReason_ShouldReturnValidationFailure()
     {
-        var merchant = CreateApprovedMerchant();
-        merchant.Activate();
-        var command = new ActivateMerchantCommand(merchant.Id);
-        SetupValidatorSuccess(command);
-        _repoMock.Setup(r => r.GetByIdAsync(merchant.Id, It.IsAny<CancellationToken>())).ReturnsAsync(merchant);
+        var command = new RejectMerchantCommand(Guid.NewGuid(), "");
+        _validatorMock.Setup(v => v.ValidateAsync(command, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ValidationResult(new[] { new ValidationFailure("Reason", "A rejection reason is required.") }));
 
         var result = await _handler.Handle(command);
 
         Assert.True(result.IsFailure);
-        Assert.Equal("Merchant.InvalidStatusTransition", result.Errors[0].Code);
+        Assert.Equal("Reason", result.Errors[0].Code);
     }
 
     [Fact]
     public async Task Handle_MerchantNotFound_ShouldFail()
     {
-        var command = new ActivateMerchantCommand(Guid.NewGuid());
+        var command = new RejectMerchantCommand(Guid.NewGuid(), "reason");
         SetupValidatorSuccess(command);
         _repoMock.Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync((MerchantEntity?)null);
 
@@ -77,13 +77,6 @@ public class ActivateMerchantHandlerTests
     private MerchantEntity CreatePendingMerchant() =>
         new(Guid.NewGuid(), new BusinessName("Test"), new MerchantEmail("test@test.com"));
 
-    private MerchantEntity CreateApprovedMerchant()
-    {
-        var merchant = CreatePendingMerchant();
-        merchant.Approve();
-        return merchant;
-    }
-
-    private void SetupValidatorSuccess(ActivateMerchantCommand command) =>
+    private void SetupValidatorSuccess(RejectMerchantCommand command) =>
         _validatorMock.Setup(v => v.ValidateAsync(command, It.IsAny<CancellationToken>())).ReturnsAsync(new ValidationResult());
 }
