@@ -4,6 +4,7 @@ using BuildingBlocks.Shared.Results;
 using BuildingBlocks.Shared.Security;
 using FluentValidation;
 using Identity.Application.Configuration;
+using Identity.Application.Exceptions;
 using Identity.Application.Interfaces;
 using Identity.Application.Services;
 using Identity.Domain.DomainErrors;
@@ -69,7 +70,16 @@ public class RegisterUserHandler
         user.InitiateEmailVerification(token.Hash, token.ExpiresAtUtc);
 
         await _userRepository.AddAsync(user, cancellationToken);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+        catch (EmailConflictException)
+        {
+            // Backstop for a duplicate that raced past the existence check
+            // (TASK-014): map to the same graceful 409 as the primary path.
+            return IdentityErrors.EmailAlreadyInUse(command.Email);
+        }
         await _dispatcher.DispatchAsync(user.DomainEvents, cancellationToken);
 
         var message = VerificationEmailBuilder.Build(user.Email.Value, token.PlainText, _options.Subject, _options.FrontendBaseUrl);

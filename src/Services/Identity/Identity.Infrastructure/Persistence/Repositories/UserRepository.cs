@@ -22,7 +22,9 @@ public class UserRepository : IUserRepository
 
     public async Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default)
     {
-        var normalizedEmail = email.ToLowerInvariant();
+        // Stored emails are normalized to lowercase (Email.cs), so the lookup
+        // must normalize the input too or a case-variant query misses its match.
+        var normalizedEmail = (email ?? string.Empty).Trim().ToLowerInvariant();
         return await _context.Users
             .FirstOrDefaultAsync(u => u.Email.Value == normalizedEmail, cancellationToken);
     }
@@ -84,7 +86,11 @@ public class UserRepository : IUserRepository
 
     public async Task<bool> ExistsByEmailAsync(string email, CancellationToken cancellationToken = default)
     {
-        return await _context.Users.AnyAsync(u => u.Email.Value == email, cancellationToken);
+        // Stored emails are normalized to lowercase (Email.cs), so compare against
+        // the normalized input or a case-variant duplicate slips past this check
+        // and surfaces as a unique-index 500 instead of a graceful 409.
+        var normalizedEmail = (email ?? string.Empty).Trim().ToLowerInvariant();
+        return await _context.Users.AnyAsync(u => u.Email.Value == normalizedEmail, cancellationToken);
     }
 
     public Task<int> PruneRefreshTokensAsync(CancellationToken cancellationToken = default)
