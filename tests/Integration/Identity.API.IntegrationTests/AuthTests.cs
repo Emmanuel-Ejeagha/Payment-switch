@@ -15,7 +15,7 @@ public class AuthTests : IClassFixture<IdentityApiFactory>
     public async Task Register_And_Login_Succeeds()
     {
         var email = $"test-{Guid.NewGuid()}@example.com";
-        var password = "Test123!";
+        var password = "Test123456!";
         var fullName = "Test User";
 
         var registerResponse = await _client.PostAsJsonAsync("/api/v1/auth/register", new
