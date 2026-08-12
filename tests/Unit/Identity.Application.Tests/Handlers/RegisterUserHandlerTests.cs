@@ -108,7 +108,7 @@ public class RegisterUserHandlerTests
         .ReturnsAsync(new ValidationResult(new[]
         {
             new ValidationFailure("Email", "A valid email address is required."),
-            new ValidationFailure("Password", "Password must be at least 8 characters.")
+            new ValidationFailure("Password", "Password must be at least 10 characters.")
         }));
 
         // Act
