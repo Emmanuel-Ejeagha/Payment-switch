@@ -11,6 +11,7 @@ public class GetMerchantByIdHandlerTests
     {
         var repoMock = new Mock<IMerchantRepository>();
         var merchant = new MerchantEntity(Guid.NewGuid(), new BusinessName("Acme"), new MerchantEmail("acme@test.com"));
+        merchant.Approve();
         merchant.Activate();
         repoMock.Setup(r => r.GetByIdAsync(merchant.Id, It.IsAny<CancellationToken>())).ReturnsAsync(merchant);
         var loggerMock = new Mock<ILogger<GetMerchantByIdHandler>>();
@@ -29,6 +30,7 @@ public class GetMerchantByIdHandlerTests
         var repoMock = new Mock<IMerchantRepository>();
         var ownerId = Guid.NewGuid();
         var merchant = new MerchantEntity(Guid.NewGuid(), ownerId, new BusinessName("Acme"), new MerchantEmail("acme@test.com"));
+        merchant.Approve();
         merchant.Activate();
         repoMock.Setup(r => r.GetByIdAsync(merchant.Id, It.IsAny<CancellationToken>())).ReturnsAsync(merchant);
         var loggerMock = new Mock<ILogger<GetMerchantByIdHandler>>();
@@ -46,6 +48,7 @@ public class GetMerchantByIdHandlerTests
     {
         var repoMock = new Mock<IMerchantRepository>();
         var merchant = new MerchantEntity(Guid.NewGuid(), new BusinessName("Acme"), new MerchantEmail("acme@test.com"));
+        merchant.Approve();
         merchant.Activate();
         repoMock.Setup(r => r.GetByIdAsync(merchant.Id, It.IsAny<CancellationToken>())).ReturnsAsync(merchant);
         var loggerMock = new Mock<ILogger<GetMerchantByIdHandler>>();

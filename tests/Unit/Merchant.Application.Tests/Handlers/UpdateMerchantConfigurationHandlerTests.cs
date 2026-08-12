@@ -70,6 +70,7 @@ public class UpdateMerchantConfigurationHandlerTests
     {
         var ownerId = Guid.NewGuid();
         var m = new MerchantEntity(Guid.NewGuid(), ownerId, new BusinessName("Test"), new MerchantEmail("t@t.com"));
+        m.Approve();
         m.Activate();
         m.ClearDomainEvents();
         return m;

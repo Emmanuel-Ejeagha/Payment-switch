@@ -19,6 +19,9 @@ public class Merchant : AggregateRoot
     public IReadOnlyList<MerchantApiKey> ApiKeys => _apiKeys.AsReadOnly();
     private readonly List<MerchantApiKey> _apiKeys = new();
     public bool AutoCapture { get; private set; } = true;
+    public string? RejectionReason { get; private set; }
+    public SettlementInfo? SettlementInfo { get; private set; }
+    public ContactDetails? ContactDetails { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime? UpdatedAt { get; private set; }
 
@@ -39,10 +42,41 @@ public class Merchant : AggregateRoot
     public Merchant(Guid id, BusinessName businessName, MerchantEmail email)
         : this(id, null, businessName, email) { }
 
-    public void Activate()
+    public void Approve()
     {
         if (Status != MerchantStatus.Pending)
-            throw new InvalidOperationException("Only pending merchants can be activated.");
+            throw new InvalidOperationException("Only pending merchants can be approved.");
+        Status = MerchantStatus.Approved;
+        RejectionReason = null;
+        UpdatedAt = DateTime.UtcNow;
+        AddDomainEvent(new MerchantApprovedEvent(Id));
+    }
+
+    public void Reject(string reason)
+    {
+        if (Status != MerchantStatus.Pending)
+            throw new InvalidOperationException("Only pending merchants can be rejected.");
+        if (string.IsNullOrWhiteSpace(reason))
+            throw new ArgumentException("A rejection reason is required.", nameof(reason));
+        Status = MerchantStatus.Rejected;
+        RejectionReason = reason.Trim();
+        UpdatedAt = DateTime.UtcNow;
+        AddDomainEvent(new MerchantRejectedEvent(Id, RejectionReason));
+    }
+
+    public void Activate()
+    {
+        if (Status != MerchantStatus.Approved)
+            throw new InvalidOperationException("Only approved merchants can be activated.");
+        Status = MerchantStatus.Active;
+        UpdatedAt = DateTime.UtcNow;
+        AddDomainEvent(new MerchantActivatedEvent(Id));
+    }
+
+    public void Reactivate()
+    {
+        if (Status != MerchantStatus.Suspended)
+            throw new InvalidOperationException("Only suspended merchants can be reactivated.");
         Status = MerchantStatus.Active;
         UpdatedAt = DateTime.UtcNow;
         AddDomainEvent(new MerchantActivatedEvent(Id));
@@ -88,6 +122,20 @@ public class Merchant : AggregateRoot
         UpdatedAt = DateTime.UtcNow;
         AddDomainEvent(new MerchantConfigurationUpdatedEvent(Id));
         return WebhookSecret;
+    }
+
+    public void UpdateSettlementInfo(SettlementInfo settlementInfo)
+    {
+        SettlementInfo = settlementInfo ?? throw new ArgumentNullException(nameof(settlementInfo));
+        UpdatedAt = DateTime.UtcNow;
+        AddDomainEvent(new MerchantConfigurationUpdatedEvent(Id));
+    }
+
+    public void UpdateContactDetails(ContactDetails contactDetails)
+    {
+        ContactDetails = contactDetails ?? throw new ArgumentNullException(nameof(contactDetails));
+        UpdatedAt = DateTime.UtcNow;
+        AddDomainEvent(new MerchantConfigurationUpdatedEvent(Id));
     }
 
     public MerchantApiKey GenerateApiKey(string keyHash, string keyPrefix, string environment)

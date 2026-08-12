@@ -47,6 +47,7 @@ public class SuspendMerchantHandlerTests
     private MerchantEntity CreateActiveMerchant()
     {
         var m = new MerchantEntity(Guid.NewGuid(), new BusinessName("Test"), new MerchantEmail("test@test.com"));
+        m.Approve();
         m.Activate();
         m.ClearDomainEvents();
         return m;

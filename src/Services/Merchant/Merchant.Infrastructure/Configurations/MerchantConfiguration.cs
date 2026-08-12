@@ -66,6 +66,23 @@ public class MerchantConfiguration : IEntityTypeConfiguration<MerchantEntity>
             .HasColumnType("jsonb");
 
         builder.Property(m => m.AutoCapture).IsRequired();
+        builder.Property(m => m.RejectionReason).HasMaxLength(500);
+
+        builder.OwnsOne(m => m.SettlementInfo, s =>
+        {
+            s.Property(v => v.BankAccountName).HasColumnName("SettlementBankAccountName").HasMaxLength(200);
+            s.Property(v => v.BankAccountNumber).HasColumnName("SettlementBankAccountNumber").HasMaxLength(50);
+            s.Property(v => v.BankName).HasColumnName("SettlementBankName").HasMaxLength(200);
+            s.Property(v => v.SettlementCurrency).HasColumnName("SettlementCurrency").HasMaxLength(3);
+            s.Property(v => v.SettlementSchedule).HasColumnName("SettlementSchedule").HasMaxLength(20);
+        });
+
+        builder.OwnsOne(m => m.ContactDetails, c =>
+        {
+            c.Property(v => v.Phone).HasColumnName("ContactPhone").HasMaxLength(30);
+            c.Property(v => v.Address).HasColumnName("ContactAddress").HasMaxLength(500);
+            c.Property(v => v.ContactPerson).HasColumnName("ContactPerson").HasMaxLength(200);
+        });
 
         builder.Property(m => m.CreatedAt).IsRequired();
         builder.Property(m => m.UpdatedAt);
