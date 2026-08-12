@@ -11,6 +11,7 @@ public class AppDbContext : DbContext
     public DbSet<LedgerAccount> LedgerAccounts { get; set; }
     public DbSet<OutboxMessage> OutboxMessages { get; set; }
     public DbSet<InboxMessage> InboxMessages { get; set; }
+    public DbSet<ReconciliationReport> ReconciliationReports { get; set; }
 
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
