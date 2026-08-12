@@ -59,10 +59,13 @@ public static class DependencyInjection
         services.AddValidatedOptions<RabbitMQSettings>(configuration, "RabbitMQ",
             s => !string.IsNullOrEmpty(s.HostName),
             "RabbitMQ HostName is required");
+        services.AddOptions<PaymentExpiryOptions>()
+            .Bind(configuration.GetSection(PaymentExpiryOptions.SectionName));
         services.AddScoped<IEventBus, RabbitMQEventBus>();
         services.AddHostedService<OutboxPublisherService>();
         services.AddHostedService<WebhookDispatchWorker>();
         services.AddHostedService<SubscriptionBillingWorker>();
+        services.AddHostedService<PaymentExpiryWorker>();
 
         // The merchant gRPC channel is a documented in-network exception
         // (TASK-004): port 5001 is never published and the endpoint is gated by

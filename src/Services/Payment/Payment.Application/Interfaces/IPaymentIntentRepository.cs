@@ -11,4 +11,5 @@ public interface IPaymentIntentRepository
     Task AddAsync(PaymentIntent intent, CancellationToken cancellationToken = default);
     Task UpdateAsync(PaymentIntent intent, CancellationToken cancellationToken = default);
     Task<List<PaymentIntentDto>> ListByMerchantAsync(Guid merchantId, int skip, int take, CancellationToken cancellationToken = default);
+    Task<List<PaymentIntent>> GetExpirableBatchAsync(DateTime olderThanUtc, int batchSize, CancellationToken cancellationToken = default);
 }

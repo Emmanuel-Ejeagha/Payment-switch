@@ -16,6 +16,7 @@ public class PaymentStatus : ValueObject
     public static readonly PaymentStatus PartiallyCaptured = new("PartiallyCaptured");
     public static readonly PaymentStatus Voided = new("Voided");
     public static readonly PaymentStatus Failed = new("Failed");
+    public static readonly PaymentStatus Expired = new("Expired");
     public static readonly PaymentStatus PartiallyRefunded = new("PartiallyRefunded");
     public static readonly PaymentStatus FullyRefunded = new("FullyRefunded");
 

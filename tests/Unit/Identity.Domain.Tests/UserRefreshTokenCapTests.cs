@@ -5,7 +5,7 @@ namespace Identity.Domain.Tests;
 
 public class UserRefreshTokenCapTests
 {
-    private static readonly DateTime Now = new(2026, 8, 11, 12, 0, 0, DateTimeKind.Utc);
+    private static readonly DateTime Now = DateTime.UtcNow;
 
     [Fact]
     public void EnforceRefreshTokenCap_UnderCap_DoesNotRevoke()
