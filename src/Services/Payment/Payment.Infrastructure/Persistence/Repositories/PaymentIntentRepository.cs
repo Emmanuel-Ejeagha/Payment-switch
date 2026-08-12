@@ -66,4 +66,23 @@ public class PaymentIntentRepository : IPaymentIntentRepository
             )).ToList()
         )).ToList();
     }
+
+    /// <summary>
+    /// Returns a bounded batch of in-flight intents (Pending / RequiresAction /
+    /// Processing) untouched since <paramref name="olderThanUtc"/>. Ordering by
+    /// last activity keeps the oldest, most-buried intents first (TASK-018).
+    /// </summary>
+    public async Task<List<PaymentIntent>> GetExpirableBatchAsync(
+        DateTime olderThanUtc, int batchSize, CancellationToken cancellationToken = default)
+    {
+        return await _context.PaymentIntents
+            .AsNoTracking()
+            .Where(p => (p.Status == PaymentStatus.Pending
+                         || p.Status == PaymentStatus.RequiresAction
+                         || p.Status == PaymentStatus.Processing)
+                        && (p.UpdatedAt ?? p.CreatedAt) <= olderThanUtc)
+            .OrderBy(p => p.UpdatedAt ?? p.CreatedAt)
+            .Take(batchSize)
+            .ToListAsync(cancellationToken);
+    }
 }

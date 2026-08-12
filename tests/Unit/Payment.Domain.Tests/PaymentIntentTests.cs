@@ -264,6 +264,142 @@ public class PaymentIntentTests
         Assert.Throws<ArgumentException>(() => new IdempotencyKey(""));
     }
 
+    [Fact]
+    public void Expire_FromPending_ShouldExpireAndRaiseEvent()
+    {
+        var intent = CreatePendingIntent();
+
+        intent.Expire();
+
+        Assert.Equal(PaymentStatus.Expired, intent.Status);
+        Assert.Contains(intent.DomainEvents, e => e is PaymentExpiredDomainEvent);
+    }
+
+    [Fact]
+    public void Expire_FromRequiresAction_ShouldExpire()
+    {
+        var intent = CreateRequiresActionIntent();
+
+        intent.Expire();
+
+        Assert.Equal(PaymentStatus.Expired, intent.Status);
+    }
+
+    [Fact]
+    public void Expire_FromProcessing_ShouldExpire()
+    {
+        var intent = CreateRequiresActionIntent();
+        intent.MarkProcessing();
+        intent.ClearDomainEvents();
+
+        intent.Expire();
+
+        Assert.Equal(PaymentStatus.Expired, intent.Status);
+        Assert.Contains(intent.DomainEvents, e => e is PaymentExpiredDomainEvent);
+    }
+
+    [Fact]
+    public void Expire_FromAuthorized_Throws()
+    {
+        var intent = CreateAuthorizedIntent();
+        Assert.Throws<InvalidOperationException>(() => intent.Expire());
+    }
+
+    [Fact]
+    public void Expire_FromCaptured_Throws()
+    {
+        var intent = CreateCapturedIntent();
+        Assert.Throws<InvalidOperationException>(() => intent.Expire());
+    }
+
+    [Fact]
+    public void Expire_FromVoided_Throws()
+    {
+        var intent = CreateAuthorizedIntent();
+        intent.Void();
+        Assert.Throws<InvalidOperationException>(() => intent.Expire());
+    }
+
+    [Fact]
+    public void Expire_FromFailed_Throws()
+    {
+        var intent = CreatePendingIntent();
+        intent.Fail();
+        Assert.Throws<InvalidOperationException>(() => intent.Expire());
+    }
+
+    [Fact]
+    public void Expire_WhenAlreadyExpired_IsIdempotentNoOp()
+    {
+        var intent = CreatePendingIntent();
+        intent.Expire();
+        intent.ClearDomainEvents();
+
+        intent.Expire();
+
+        Assert.Equal(PaymentStatus.Expired, intent.Status);
+        Assert.Empty(intent.DomainEvents);
+    }
+
+    [Fact]
+    public void ExpiredIntent_CannotBeAuthorized()
+    {
+        var intent = CreatePendingIntent();
+        intent.Expire();
+
+        Assert.Throws<InvalidOperationException>(() =>
+            intent.Authorize(new AuthorizationCode("AUTH-LATE"), new GatewayReference("GTW-LATE")));
+    }
+
+    [Fact]
+    public void ExpiredIntent_CannotBeCaptured()
+    {
+        var intent = CreatePendingIntent();
+        intent.Expire();
+
+        Assert.Throws<InvalidOperationException>(() => intent.Capture(new Money(100L, "USD")));
+    }
+
+    [Fact]
+    public void ExpiredIntent_CannotRequireAction()
+    {
+        var intent = CreatePendingIntent();
+        intent.Expire();
+
+        Assert.Throws<InvalidOperationException>(() => intent.RequireAction(new GatewayReference("G")));
+    }
+
+    [Fact]
+    public void ExpiredIntent_CanBeFailed_OnlyFromPending_IsRejected()
+    {
+        var intent = CreatePendingIntent();
+        intent.Expire();
+
+        Assert.Throws<InvalidOperationException>(() => intent.Fail());
+    }
+
+    [Fact]
+    public void ExpiredIntent_IsStableTerminalState()
+    {
+        var intent = CreatePendingIntent();
+        intent.Expire();
+
+        Assert.Throws<InvalidOperationException>(() => intent.Void());
+        Assert.Throws<InvalidOperationException>(() => intent.Refund(new Money(100L, "USD")));
+        Assert.Throws<InvalidOperationException>(() => intent.ConfirmAction(new AuthorizationCode("A"), new GatewayReference("G")));
+    }
+
+    [Fact]
+    public void Expire_DoesNotAlterAmountOrTransactions()
+    {
+        var intent = CreatePendingIntent();
+
+        intent.Expire();
+
+        Assert.Equal(_amount, intent.Amount);
+        Assert.Empty(intent.Transactions);
+    }
+
     // Helper methods
     private PaymentIntent CreatePendingIntent() =>
         new(Guid.NewGuid(), _merchantId, _amount, _idempotencyKey, PaymentMethod.Card);

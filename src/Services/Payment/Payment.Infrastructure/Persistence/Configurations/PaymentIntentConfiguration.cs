@@ -90,6 +90,7 @@ public class PaymentIntentConfiguration : IEntityTypeConfiguration<PaymentIntent
         "PartiallyCaptured" => PaymentStatus.PartiallyCaptured,
         "Voided" => PaymentStatus.Voided,
         "Failed" => PaymentStatus.Failed,
+        "Expired" => PaymentStatus.Expired,
         "PartiallyRefunded" => PaymentStatus.PartiallyRefunded,
         "FullyRefunded" => PaymentStatus.FullyRefunded,
         _ => throw new ArgumentException($"Unknown status: {value}")

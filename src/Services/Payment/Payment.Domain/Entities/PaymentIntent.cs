@@ -180,6 +180,34 @@ public class PaymentIntent : AggregateRoot
         UpdatedAt = DateTime.UtcNow;
     }
 
+    /// <summary>
+    /// Expires a payment intent that was never finalized. Allowed only from the
+    /// in-flight states (Pending / RequiresAction / Processing) — a merchant may
+    /// not authorize or capture it afterward. Idempotent: expiring an already
+    /// expired intent is a no-op so the worker can run safely alongside replay.
+    /// </summary>
+    /// <remarks>
+    /// Reversal semantics are intentionally NOT a second terminal state: an
+    /// authorized intent is reversed via <c>Void()</c>; a captured intent is
+    /// reversed via <c>Refund()</c>. <c>Expired</c> only terminates intents that
+    /// never left the starting states.
+    /// </remarks>
+    public void Expire()
+    {
+        if (Status == PaymentStatus.Expired)
+            return;
+
+        if (Status != PaymentStatus.Pending
+            && Status != PaymentStatus.RequiresAction
+            && Status != PaymentStatus.Processing)
+            throw new InvalidOperationException($"Cannot expire payment in '{Status}' status.");
+
+        Status = PaymentStatus.Expired;
+        UpdatedAt = DateTime.UtcNow;
+
+        AddDomainEvent(new PaymentExpiredDomainEvent(Id, MerchantId, Amount));
+    }
+
     private long GetTotalCaptured() =>
         _transactions.Where(t => t.Type == TransactionType.Capture).Sum(t => t.Amount.Amount);
 
