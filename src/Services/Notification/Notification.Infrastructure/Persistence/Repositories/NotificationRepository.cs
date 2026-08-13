@@ -10,6 +10,7 @@ namespace Notification.Infrastructure.Persistence.Repositories;
 public class NotificationRepository : INotificationRepository
 {
     private readonly AppDbContext _context;
+    private static readonly TimeSpan LeaseDuration = TimeSpan.FromSeconds(60);
 
     public NotificationRepository(AppDbContext context)
     {
@@ -32,12 +33,35 @@ public class NotificationRepository : INotificationRepository
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Atomically claims up to <paramref name="batchSize"/> due pending
+    /// notifications by stamping a per-worker lease token, so concurrent worker
+    /// instances never pick the same row (no duplicate sends). Rows whose lease
+    /// has expired are re-claimable, which keeps retries moving after a crash.
+    /// </summary>
     public async Task<List<NotificationEntity>> GetPendingForRetryAsync(DateTime now, int batchSize, CancellationToken cancellationToken = default)
     {
-        return await _context.Notifications
-            .Where(n => n.Status == NotificationStatus.Pending && n.NextRetryAt <= now)
+        var leaseToken = Guid.NewGuid();
+        var leaseUntil = now.Add(LeaseDuration);
+
+        var claimable = _context.Notifications
+            .Where(n => n.Status == NotificationStatus.Pending
+                && (n.NextRetryAt == null || n.NextRetryAt <= now)
+                && (n.LeaseExpiresAt == null || n.LeaseExpiresAt < now))
             .OrderBy(n => n.NextRetryAt)
-            .Take(batchSize)
+            .Select(n => n.Id)
+            .Take(batchSize);
+
+        await _context.Notifications
+            .Where(n => claimable.Contains(n.Id))
+            .ExecuteUpdateAsync(
+                s => s.SetProperty(n => n.LeaseToken, leaseToken)
+                      .SetProperty(n => n.LeaseExpiresAt, leaseUntil),
+                cancellationToken);
+
+        return await _context.Notifications
+            .Where(n => n.LeaseToken == leaseToken)
+            .OrderBy(n => n.NextRetryAt)
             .ToListAsync(cancellationToken);
     }
 

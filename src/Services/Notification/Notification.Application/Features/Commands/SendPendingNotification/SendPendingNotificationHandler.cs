@@ -45,6 +45,11 @@ public class SendPendingNotificationHandler
             notification.MarkAsFailed();
         }
 
+        // The worker attempt is over — drop the claim lease. NextRetryAt (set on
+        // failure) or the terminal status gates any future pick-up, so the row
+        // cannot be double-picked while this attempt is still in flight.
+        notification.ReleaseLease();
+
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         await _dispatcher.DispatchAsync(notification.DomainEvents, cancellationToken);
 
