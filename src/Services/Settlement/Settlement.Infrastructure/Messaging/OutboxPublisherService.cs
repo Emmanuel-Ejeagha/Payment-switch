@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using BuildingBlocks.Shared.Messaging;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -67,6 +68,8 @@ public class OutboxPublisherService : BackgroundService
             {
                 try
                 {
+                    using var activity = RabbitMqTracing.StartProducerActivity(
+                        msg.EventType, RabbitMqTracing.ParseTraceParent(msg.TraceParent));
                     await bus.PublishAsync(msg.EventType, msg.Payload, msg.Id.ToString(), msg.CorrelationId, cancellationToken);
                     msg.MarkAsProcessed();
                     _logger.LogInformation("Published outbox message {Id} ({Type})", msg.Id, msg.EventType);

@@ -1,4 +1,5 @@
-﻿using Identity.Application.Interfaces;
+﻿using BuildingBlocks.Shared.Messaging;
+using Identity.Application.Interfaces;
 using Identity.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -68,6 +69,8 @@ public class OutboxPublisherService : BackgroundService
             {
                 try
                 {
+                    using var activity = RabbitMqTracing.StartProducerActivity(
+                        message.EventType, RabbitMqTracing.ParseTraceParent(message.TraceParent));
                     await eventBus.PublishAsync(message.EventType, message.Payload, message.Id.ToString(), message.CorrelationId, cancellationToken);
                     message.MarkAsProcessed();
                     _logger.LogInformation("Published outbox message {MessageId} of type {EventType}", message.Id, message.EventType);

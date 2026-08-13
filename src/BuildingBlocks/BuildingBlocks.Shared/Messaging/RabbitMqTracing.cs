@@ -64,6 +64,12 @@ public static class RabbitMqTracing
             _ => value?.ToString()
         };
 
+        return ParseTraceParent(traceParent);
+    }
+
+    /// <summary>Parses a W3C <c>traceparent</c> string, or returns <c>null</c> when invalid.</summary>
+    public static ActivityContext? ParseTraceParent(string? traceParent)
+    {
         if (string.IsNullOrWhiteSpace(traceParent))
             return null;
 
