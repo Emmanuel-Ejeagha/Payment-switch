@@ -112,6 +112,10 @@ public class RabbitMQConsumerService : BackgroundService
         var consumer = new AsyncEventingBasicConsumer(_channel);
         consumer.ReceivedAsync += async (sender, ea) =>
         {
+            // Resume the producer's trace (HTTP/outbox → broker → this consumer → DB).
+            using var activity = RabbitMqTracing.StartConsumerActivity(
+                ea.RoutingKey,
+                RabbitMqTracing.ExtractActivityContext(ea.BasicProperties.Headers));
             var messageId = ea.BasicProperties.MessageId ?? Guid.NewGuid().ToString();
             var eventType = ea.RoutingKey;
             var body = Encoding.UTF8.GetString(ea.Body.ToArray());

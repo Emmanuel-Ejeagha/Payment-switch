@@ -79,6 +79,10 @@ public class DeadLetterConsumerService : BackgroundService
         var consumer = new AsyncEventingBasicConsumer(channel);
         consumer.ReceivedAsync += async (sender, ea) =>
         {
+            // Resume the dead-lettered message's trace so DLQ handling stays joined to the original flow.
+            using var activity = RabbitMqTracing.StartConsumerActivity(
+                ea.RoutingKey,
+                RabbitMqTracing.ExtractActivityContext(ea.BasicProperties.Headers));
             var messageId = ea.BasicProperties.MessageId ?? Guid.NewGuid().ToString();
             var eventType = ea.RoutingKey;
             var payload = Encoding.UTF8.GetString(ea.Body.ToArray());
