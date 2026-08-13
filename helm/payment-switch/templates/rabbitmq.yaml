@@ -20,6 +20,7 @@ spec:
           ports:
             - containerPort: {{ .Values.infrastructure.rabbitmq.port }}
             - containerPort: {{ .Values.infrastructure.rabbitmq.managementPort }}
+            - containerPort: {{ .Values.infrastructure.rabbitmq.prometheusPort }}
           env:
             - name: RABBITMQ_DEFAULT_USER
               valueFrom:
@@ -49,4 +50,7 @@ spec:
     - name: management
       port: {{ .Values.infrastructure.rabbitmq.managementPort }}
       targetPort: {{ .Values.infrastructure.rabbitmq.managementPort }}
+    - name: prometheus
+      port: {{ .Values.infrastructure.rabbitmq.prometheusPort }}
+      targetPort: {{ .Values.infrastructure.rabbitmq.prometheusPort }}
 {{- end }}

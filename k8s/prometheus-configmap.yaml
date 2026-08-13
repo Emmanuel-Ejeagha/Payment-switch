@@ -8,6 +8,14 @@ data:
     global:
       scrape_interval: 15s
 
+    rule_files:
+      - /etc/prometheus/alerts.yml
+
+    alerting:
+      alertmanagers:
+        - static_configs:
+            - targets: ['alertmanager:9093']
+
     scrape_configs:
       - job_name: 'identity'
         static_configs:
@@ -27,3 +35,45 @@ data:
       - job_name: 'settlement'
         static_configs:
           - targets: ['settlement-api:8080']
+      - job_name: 'rabbitmq'
+        static_configs:
+          - targets: ['rabbitmq:15692']
+  alerts.yml: |
+    groups:
+      - name: payment-switch
+        rules:
+          - alert: ServiceDown
+            expr: up == 0
+            for: 2m
+            labels:
+              severity: critical
+            annotations:
+              summary: "{{ $labels.job }} is down"
+              description: "Prometheus cannot scrape {{ $labels.job }} ({{ $labels.instance }})."
+          - alert: High5xxErrorRate
+            expr: |
+              sum by (job) (rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[5m]))
+              /
+              sum by (job) (rate(http_server_request_duration_seconds_count[5m])) > 0.05
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "{{ $labels.job }} 5xx rate above 5%"
+              description: "{{ $labels.job }} returned 5xx for {{ printf \"%.1f\" $value }}%% of its requests over the last 5 minutes."
+          - alert: OutboxBacklogHigh
+            expr: outbox_backlog > 100
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "{{ $labels.job }} outbox backlog is high"
+              description: "{{ $labels.job }} has {{ $value }} outbox messages awaiting publication for over 5 minutes."
+          - alert: DeadLetterQueueActivity
+            expr: rate({__name__=~"ledger_dead_letters_total|notification_dead_letters_total"}[5m]) > 0
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Messages are being dead-lettered"
+              description: "{{ $labels.job }} recorded dead-lettered messages at a rate of {{ $value }}/s over the last 5 minutes."

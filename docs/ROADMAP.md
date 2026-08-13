@@ -70,7 +70,7 @@ Phase A → B → C are the non-negotiable foundation (each item is independentl
 - [ ] **G39. Use Redis** — distributed cache + rate-limit store + outbox lease store (Redis is provisioned but never used by any service).
 - [ ] **G40. Real email/SMS providers** behind config (currently log-only simulation).
 - [ ] **G41. Feature-flag abstraction.**
-- [ ] **G42. Grafana provisioning + alerts** — dashboard + datasource provisioning, alert rules (outbox lag, DLQ depth, failed payments).
+- [x] **G42. Grafana provisioning + alerts** — dashboard + datasource provisioning, alert rules (outbox lag, DLQ depth, failed payments).
 - [ ] **G43. Expand integration tests** — endpoint-level flows, gRPC, RabbitMQ consumers, webhook delivery, checkout.
 - [ ] **G44. PCI-aligned posture** — encryption-at-rest for token vault, audit trail for card-data access, key rotation.
 

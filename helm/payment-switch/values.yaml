@@ -209,6 +209,7 @@ infrastructure:
     image: rabbitmq:3-management-alpine
     port: 5672
     managementPort: 15672
+    prometheusPort: 15692
     resources:
       requests:
         cpu: 200m

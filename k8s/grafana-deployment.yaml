@@ -29,6 +29,31 @@ spec:
                   key: GrafanaAdminPassword
           ports:
             - containerPort: 3000
+          volumeMounts:
+            - name: datasources
+              mountPath: /etc/grafana/provisioning/datasources
+            - name: dashboards-provider
+              mountPath: /etc/grafana/provisioning/dashboards
+            - name: dashboards
+              mountPath: /var/lib/grafana/dashboards
+      volumes:
+        - name: datasources
+          configMap:
+            name: grafana-datasources
+        - name: dashboards-provider
+          configMap:
+            name: grafana-dashboards
+            items:
+              - key: dashboard.yml
+                path: dashboard.yml
+        - name: dashboards
+          configMap:
+            name: grafana-dashboards
+            items:
+              - key: paymentswitch-overview.json
+                path: paymentswitch-overview.json
+              - key: rabbitmq-queues.json
+                path: rabbitmq-queues.json
 ---
 apiVersion: v1
 kind: Service
