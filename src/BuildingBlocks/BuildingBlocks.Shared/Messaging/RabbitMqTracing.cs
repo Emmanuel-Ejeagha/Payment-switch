@@ -45,7 +45,7 @@ public static class RabbitMqTracing
         if (activity is null || activity.TraceId == default)
             return null;
 
-        return $"{activity.TraceId}-{activity.SpanId}-{(activity.ActivityTraceFlags.HasFlag(ActivityTraceFlags.Recorded) ? "01" : "00")}";
+        return $"00-{activity.TraceId}-{activity.SpanId}-{(activity.ActivityTraceFlags.HasFlag(ActivityTraceFlags.Recorded) ? "01" : "00")}";
     }
 
     /// <summary>
