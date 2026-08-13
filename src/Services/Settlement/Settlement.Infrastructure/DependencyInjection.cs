@@ -36,7 +36,7 @@ public static class DependencyInjection
         services.AddValidatedOptions<RabbitMQSettings>(configuration, "RabbitMQ",
             s => !string.IsNullOrEmpty(s.HostName),
             "RabbitMQ HostName is required");
-        services.AddScoped<IEventBus, RabbitMQEventBus>();
+        services.AddSingleton<IEventBus, RabbitMQEventBus>();
         services.AddHostedService<OutboxPublisherService>();
 
         services.AddGrpcClient<LedgerService.LedgerServiceClient>(o =>

@@ -61,7 +61,7 @@ public static class DependencyInjection
             "RabbitMQ HostName is required");
         services.AddOptions<PaymentExpiryOptions>()
             .Bind(configuration.GetSection(PaymentExpiryOptions.SectionName));
-        services.AddScoped<IEventBus, RabbitMQEventBus>();
+        services.AddSingleton<IEventBus, RabbitMQEventBus>();
         services.AddHostedService<OutboxPublisherService>();
         services.AddHostedService<WebhookDispatchWorker>();
         services.AddHostedService<SubscriptionBillingWorker>();

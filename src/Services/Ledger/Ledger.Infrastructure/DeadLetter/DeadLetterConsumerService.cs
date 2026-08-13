@@ -108,6 +108,12 @@ public class DeadLetterConsumerService : BackgroundService
 
         while (!cancellationToken.IsCancellationRequested)
         {
+            if (connection is not { IsOpen: true } || channel is not { IsOpen: true })
+            {
+                _logger.LogWarning("RabbitMQ connection lost; reconnecting in 10 seconds...");
+                break;
+            }
+
             try
             {
                 var declare = await channel.QueueDeclarePassiveAsync(QueueName, cancellationToken);

@@ -43,7 +43,7 @@ public static class DependencyInjection
         services.AddValidatedOptions<ReconciliationOptions>(configuration, "Reconciliation",
             o => o.IntervalMinutes >= 1,
             "Reconciliation IntervalMinutes must be >= 1");
-        services.AddScoped<IEventBus, RabbitMQEventBus>();
+        services.AddSingleton<IEventBus, RabbitMQEventBus>();
         services.AddHostedService<OutboxPublisherService>();
         services.AddHostedService<RabbitMQConsumerService>();
         services.AddHostedService<InboxCleanupService>();

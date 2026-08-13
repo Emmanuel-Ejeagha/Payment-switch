@@ -1,5 +1,7 @@
 ﻿using System.Text;
+using BuildingBlocks.Shared.Messaging;
 using Identity.Application.Interfaces;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
 
@@ -8,26 +10,26 @@ namespace Identity.Infrastructure.Messaging;
 public class RabbitMQEventBus : IEventBus, IDisposable
 {
     private readonly RabbitMQSettings _settings;
-    private readonly IConnection _connection;
-    private readonly IChannel _channel;
+    private readonly RabbitMqChannelPool _channelPool;
+    private bool _disposed;
 
-    public RabbitMQEventBus(IOptions<RabbitMQSettings> settings)
+    public RabbitMQEventBus(IOptions<RabbitMQSettings> settings, ILogger<RabbitMQEventBus> logger)
     {
         _settings = settings.Value;
-        var factory = new ConnectionFactory
-        {
-            HostName = _settings.HostName,
-            UserName = _settings.UserName,
-            Password = _settings.Password
-        };
-
-        _connection = factory.CreateConnectionAsync().GetAwaiter().GetResult();
-        _channel = _connection.CreateChannelAsync().GetAwaiter().GetResult();
-
-        _channel.ExchangeDeclareAsync(
-            exchange: _settings.ExchangeName,
-            type: ExchangeType.Topic,
-            durable: true).GetAwaiter().GetResult();
+        _channelPool = new RabbitMqChannelPool(
+            () => new ConnectionFactory
+            {
+                HostName = _settings.HostName,
+                Port = _settings.Port,
+                UserName = _settings.UserName,
+                Password = _settings.Password,
+                ClientProvidedName = "identity-bus"
+            },
+            channel => channel.ExchangeDeclareAsync(
+                exchange: _settings.ExchangeName,
+                type: ExchangeType.Topic,
+                durable: true),
+            logger);
     }
 
     public async Task PublishAsync(string eventType, string payload, string? messageId = null, string? correlationId = null, CancellationToken cancellationToken = default)
@@ -41,20 +43,38 @@ public class RabbitMQEventBus : IEventBus, IDisposable
             CorrelationId = correlationId
         };
 
-        await _channel.BasicPublishAsync(
-            exchange: _settings.ExchangeName,
-            routingKey: eventType,
-            mandatory: false,
-            basicProperties: properties,
-            body: body,
-            cancellationToken: cancellationToken);
+        var channel = await _channelPool.GetChannelAsync(cancellationToken);
+        try
+        {
+            await channel.BasicPublishAsync(
+                exchange: _settings.ExchangeName,
+                routingKey: eventType,
+                mandatory: false,
+                basicProperties: properties,
+                body: body,
+                cancellationToken: cancellationToken);
+        }
+        finally
+        {
+            await _channelPool.ReturnAsync(channel);
+        }
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (!_disposed)
+        {
+            if (disposing)
+            {
+                _channelPool.Dispose();
+            }
+            _disposed = true;
+        }
     }
 
     public void Dispose()
     {
-        _channel?.CloseAsync().GetAwaiter().GetResult();
-        _connection?.CloseAsync().GetAwaiter().GetResult();
-        _channel?.Dispose();
-        _connection?.Dispose();
+        Dispose(true);
+        GC.SuppressFinalize(this);
     }
 }

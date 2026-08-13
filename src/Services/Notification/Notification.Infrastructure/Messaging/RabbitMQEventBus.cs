@@ -1,4 +1,6 @@
 ﻿using System.Text;
+using BuildingBlocks.Shared.Messaging;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Notification.Application.Interfaces;
 using RabbitMQ.Client;
@@ -7,26 +9,27 @@ namespace Notification.Infrastructure.Messaging;
 
 public class RabbitMQEventBus : IEventBus, IDisposable
 {
-    private readonly IConnection _connection;
-    private readonly IChannel _channel;
+    private readonly RabbitMQSettings _settings;
+    private readonly RabbitMqChannelPool _channelPool;
     private bool _disposed;
 
-    public RabbitMQEventBus(IOptions<RabbitMQSettings> settings)
+    public RabbitMQEventBus(IOptions<RabbitMQSettings> settings, ILogger<RabbitMQEventBus> logger)
     {
-        var factory = new ConnectionFactory
-        {
-            HostName = settings.Value.HostName,
-            UserName = settings.Value.UserName,
-            Password = settings.Value.Password
-        };
-
-        _connection = factory.CreateConnectionAsync().GetAwaiter().GetResult();
-        _channel = _connection.CreateChannelAsync().GetAwaiter().GetResult();
-
-        _channel.ExchangeDeclareAsync(
-            exchange: settings.Value.ExchangeName,
-            type: ExchangeType.Topic,
-            durable: true).GetAwaiter().GetResult();
+        _settings = settings.Value;
+        _channelPool = new RabbitMqChannelPool(
+            () => new ConnectionFactory
+            {
+                HostName = _settings.HostName,
+                Port = _settings.Port,
+                UserName = _settings.UserName,
+                Password = _settings.Password,
+                ClientProvidedName = "notification-bus"
+            },
+            channel => channel.ExchangeDeclareAsync(
+                exchange: _settings.ExchangeName,
+                type: ExchangeType.Topic,
+                durable: true),
+            logger);
     }
 
     public async Task PublishAsync(string eventType, string payload, string? messageId = null, string? correlationId = null, CancellationToken cancellationToken = default)
@@ -40,24 +43,38 @@ public class RabbitMQEventBus : IEventBus, IDisposable
             CorrelationId = correlationId
         };
 
-        await _channel.BasicPublishAsync(
-            exchange: "notification.events",
-            routingKey: eventType,
-            mandatory: false,
-            basicProperties: properties,
-            body: body,
-            cancellationToken: cancellationToken);
+        var channel = await _channelPool.GetChannelAsync(cancellationToken);
+        try
+        {
+            await channel.BasicPublishAsync(
+                exchange: _settings.ExchangeName,
+                routingKey: eventType,
+                mandatory: false,
+                basicProperties: properties,
+                body: body,
+                cancellationToken: cancellationToken);
+        }
+        finally
+        {
+            await _channelPool.ReturnAsync(channel);
+        }
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (!_disposed)
+        {
+            if (disposing)
+            {
+                _channelPool.Dispose();
+            }
+            _disposed = true;
+        }
     }
 
     public void Dispose()
     {
-        if (!_disposed)
-        {
-            _channel?.CloseAsync().GetAwaiter().GetResult();
-            _connection?.CloseAsync().GetAwaiter().GetResult();
-            _channel?.Dispose();
-            _connection?.Dispose();
-            _disposed = true;
-        }
+        Dispose(true);
+        GC.SuppressFinalize(this);
     }
 }
