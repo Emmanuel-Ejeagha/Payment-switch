@@ -35,6 +35,8 @@ public class SendPendingNotificationHandlerTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal(NotificationStatus.Sent, notification.Status);
+        Assert.Null(notification.LeaseToken);
+        Assert.Null(notification.LeaseExpiresAt);
     }
 
     [Fact]
@@ -51,6 +53,7 @@ public class SendPendingNotificationHandlerTests
         Assert.True(result.IsSuccess); // handler still returns success, but notification status updated
         Assert.Equal(1, notification.RetryCount);
         Assert.NotNull(notification.NextRetryAt);
+        Assert.Null(notification.LeaseToken);
     }
 
     [Fact]

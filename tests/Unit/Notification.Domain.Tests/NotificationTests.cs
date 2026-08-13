@@ -75,6 +75,42 @@ public class NotificationTests
     }
 
     [Fact]
+    public void Lease_DefaultsToUnleased()
+    {
+        var n = CreatePendingNotification();
+
+        Assert.Null(n.LeaseToken);
+        Assert.Null(n.LeaseExpiresAt);
+        Assert.False(n.HasActiveLease(DateTime.UtcNow));
+    }
+
+    [Fact]
+    public void HasActiveLease_WithinWindow_TrueBeforeExpiry()
+    {
+        var n = CreatePendingNotification();
+        var now = DateTime.UtcNow;
+        n.LeaseToken = Guid.NewGuid();
+        n.LeaseExpiresAt = now.AddSeconds(55);
+
+        Assert.True(n.HasActiveLease(now.AddSeconds(10)));
+        Assert.False(n.HasActiveLease(now.AddSeconds(60)));
+    }
+
+    [Fact]
+    public void ReleaseLease_ClearsLease()
+    {
+        var n = CreatePendingNotification();
+        n.LeaseToken = Guid.NewGuid();
+        n.LeaseExpiresAt = DateTime.UtcNow.AddSeconds(30);
+
+        n.ReleaseLease();
+
+        Assert.Null(n.LeaseToken);
+        Assert.Null(n.LeaseExpiresAt);
+        Assert.False(n.HasActiveLease(DateTime.UtcNow));
+    }
+
+    [Fact]
     public void Channel_FromString_ValidAndInvalid()
     {
         Assert.Equal(NotificationChannel.Email, NotificationChannel.FromString("email"));

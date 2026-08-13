@@ -1,4 +1,5 @@
 ﻿using BuildingBlocks.Shared.Messaging;
+using BuildingBlocks.Shared.Middleware;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -14,11 +15,14 @@ using RabbitMQ.Client.Events;
 using System.Text;
 using System.Text.Json;
 
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("Notification.API.IntegrationTests")]
+
 namespace Notification.Infrastructure.Messaging;
 
 public class RabbitMQConsumerService : BackgroundService
 {
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly ICorrelationIdProvider _correlationIdProvider;
     private readonly ILogger<RabbitMQConsumerService> _logger;
     private readonly RabbitMQSettings _settings;
     private IConnection? _connection;
@@ -34,11 +38,26 @@ public class RabbitMQConsumerService : BackgroundService
     public RabbitMQConsumerService(
         IOptions<RabbitMQSettings> settings,
         IServiceScopeFactory scopeFactory,
+        ICorrelationIdProvider correlationIdProvider,
         ILogger<RabbitMQConsumerService> logger)
     {
         _scopeFactory = scopeFactory;
+        _correlationIdProvider = correlationIdProvider;
         _logger = logger;
         _settings = settings.Value;
+    }
+
+    /// <summary>
+    /// Carries the originating request's correlation ID into the consumer's async
+    /// flow (mirrors the Ledger consumer), so logging and outbox correlation stay
+    /// joined to the HTTP request that produced the event.
+    /// </summary>
+    internal void RestoreCorrelation(string? correlationId)
+    {
+        if (!string.IsNullOrWhiteSpace(correlationId))
+        {
+            _correlationIdProvider.Set(correlationId);
+        }
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -95,6 +114,8 @@ public class RabbitMQConsumerService : BackgroundService
             var messageId = ea.BasicProperties.MessageId ?? Guid.NewGuid().ToString();
             var eventType = ea.RoutingKey;
             var body = Encoding.UTF8.GetString(ea.Body.ToArray());
+
+            RestoreCorrelation(ea.BasicProperties.CorrelationId);
 
             using var scope = _scopeFactory.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
