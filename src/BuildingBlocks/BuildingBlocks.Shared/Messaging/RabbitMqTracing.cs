@@ -26,14 +26,26 @@ public static class RabbitMqTracing
     /// </summary>
     public static void InjectTracingContext(IDictionary<string, object?> headers)
     {
-        var activity = Activity.Current;
-        if (activity is null || activity.TraceId == default)
+        var traceParent = CurrentTraceParent();
+        if (traceParent is null)
             return;
 
-        var traceParent = $"{activity.TraceId}-{activity.SpanId}-{(activity.ActivityTraceFlags.HasFlag(ActivityTraceFlags.Recorded) ? "01" : "00")}";
         headers[TraceParentHeader] = traceParent;
-        if (!string.IsNullOrEmpty(activity.TraceStateString))
-            headers[TraceStateHeader] = activity.TraceStateString;
+        if (!string.IsNullOrEmpty(Activity.Current?.TraceStateString))
+            headers[TraceStateHeader] = Activity.Current!.TraceStateString;
+    }
+
+    /// <summary>
+    /// Returns the current activity's W3C <c>traceparent</c> string, or <c>null</c>
+    /// when there is no ambient trace (used to stamp outbox rows at save time).
+    /// </summary>
+    public static string? CurrentTraceParent()
+    {
+        var activity = Activity.Current;
+        if (activity is null || activity.TraceId == default)
+            return null;
+
+        return $"{activity.TraceId}-{activity.SpanId}-{(activity.ActivityTraceFlags.HasFlag(ActivityTraceFlags.Recorded) ? "01" : "00")}";
     }
 
     /// <summary>
