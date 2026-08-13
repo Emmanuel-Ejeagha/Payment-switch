@@ -42,6 +42,10 @@ public class RabbitMQEventBus : IEventBus, IDisposable
             MessageId = messageId,
             CorrelationId = correlationId
         };
+        var headers = new Dictionary<string, object?>();
+        RabbitMqTracing.InjectTracingContext(headers);
+        if (headers.Count > 0)
+            properties.Headers = headers;
 
         var channel = await _channelPool.GetChannelAsync(cancellationToken);
         try
