@@ -1,4 +1,5 @@
 ﻿using BuildingBlocks.Shared.Messaging;
+using BuildingBlocks.Shared.Observability;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -73,16 +74,20 @@ public class OutboxPublisherService : BackgroundService
                         msg.EventType, RabbitMqTracing.ParseTraceParent(msg.TraceParent));
                     await bus.PublishAsync(msg.EventType, msg.Payload, msg.Id.ToString(), msg.CorrelationId, cancellationToken);
                     msg.MarkAsProcessed();
+                    OutboxMetrics.RecordPublished();
                     _logger.LogInformation("Published outbox message {Id} ({Type})", msg.Id, msg.EventType);
                 }
                 catch (Exception ex)
                 {
                     msg.ReleaseLease();
+                    OutboxMetrics.RecordFailed();
                     _logger.LogError(ex, "Failed to publish outbox message {Id}", msg.Id);
                 }
             }
 
             await db.SaveChangesAsync(cancellationToken);
         }
+
+        OutboxMetrics.SetBacklog(await db.OutboxMessages.CountAsync(m => !m.Processed, cancellationToken));
     }
 }

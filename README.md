@@ -185,9 +185,9 @@ kubectl apply -f k8s/
 |------------|----------------------------|-------------------------------------|
 | Jaeger     | http://localhost:16686     | Distributed traces across services  |
 | Prometheus | http://localhost:9090      | Metrics scraping                    |
-| Grafana    | http://localhost:3000      | Dashboards (admin / admin)          |
+| Grafana    | http://localhost:3000      | Dashboards (admin / `GRAFANA_ADMIN_PASSWORD`) |
 
-*(Grafana dashboard and datasource provisioning is a work in progress; see the Roadmap.)*
+*(Grafana datasource + dashboards are provisioned from `infra/grafana/provisioning`; alert rules live in `infra/prometheus/alerts.yml`.)*
 
 CI/CD Pipeline
 The project uses GitHub Actions:
