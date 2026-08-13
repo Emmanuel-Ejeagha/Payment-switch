@@ -55,12 +55,23 @@ public class RabbitMQConsumerService : BackgroundService
             {
                 await TryConnectAndConsume(stoppingToken);
             }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                break;
+            }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "RabbitMQ consumer error. Retrying in 10 seconds...");
             }
 
-            await Task.Delay(10_000, stoppingToken);
+            try
+            {
+                await Task.Delay(10_000, stoppingToken);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
         }
     }
 
@@ -301,12 +312,28 @@ public class RabbitMQConsumerService : BackgroundService
         }
     }
 
+    /// <summary>
+    /// Graceful teardown: after the consume loop exits, close the channel and
+    /// connection so any in-flight unacknowledged deliveries are requeued by the
+    /// broker (autoAck is off), never dropped. Async avoids sync-over-async.
+    /// </summary>
+    public override async Task StopAsync(CancellationToken cancellationToken)
+    {
+        await base.StopAsync(cancellationToken);
+        if (_channel is not null)
+        {
+            await _channel.CloseAsync(CancellationToken.None);
+            await _channel.DisposeAsync();
+        }
+        if (_connection is not null)
+        {
+            await _connection.CloseAsync(CancellationToken.None);
+            await _connection.DisposeAsync();
+        }
+    }
+
     public override void Dispose()
     {
-        _channel?.CloseAsync().GetAwaiter().GetResult();
-        _connection?.CloseAsync().GetAwaiter().GetResult();
-        _channel?.Dispose();
-        _connection?.Dispose();
         base.Dispose();
     }
 }

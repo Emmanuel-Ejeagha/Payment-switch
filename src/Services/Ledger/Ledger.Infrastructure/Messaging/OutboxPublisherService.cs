@@ -1,4 +1,5 @@
-﻿using BuildingBlocks.Shared.Messaging;
+﻿using BuildingBlocks.Shared.BackgroundServices;
+using BuildingBlocks.Shared.Messaging;
 using BuildingBlocks.Shared.Observability;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -24,19 +25,12 @@ public class OutboxPublisherService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        while (!stoppingToken.IsCancellationRequested)
-        {
-            try
-            {
-                await ProcessOutbox(stoppingToken);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error processing outbox messages");
-            }
-
-            await Task.Delay(_pollingInterval, stoppingToken);
-        }
+        await WorkerLoop.RunAsync(
+            ProcessOutbox,
+            _pollingInterval,
+            _logger,
+            stoppingToken,
+            "outbox publisher");
     }
 
     private async Task ProcessOutbox(CancellationToken cancellationToken)

@@ -9,7 +9,6 @@ using BuildingBlocks.Shared.Versioning;
 using BuildingBlocks.Shared.Caching;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using Notification.API.Hubs;
@@ -119,20 +118,7 @@ builder.Services.AddPaymentSwitchOutputCache();
 
 builder.Services.AddPaymentSwitchHealthChecks()
     .AddDbContextCheck<AppDbContext>("db", tags: ["ready"])
-    .AddCheck("rabbitmq", () =>
-    {
-        try
-        {
-            using var tcp = new System.Net.Sockets.TcpClient();
-            var port = int.TryParse(builder.Configuration["RabbitMQ:Port"], out var p) ? p : 5672;
-            tcp.Connect(builder.Configuration["RabbitMQ:HostName"] ?? "localhost", port);
-            return HealthCheckResult.Healthy();
-        }
-        catch (Exception ex)
-        {
-            return HealthCheckResult.Unhealthy("RabbitMQ unreachable", ex);
-        }
-    }, tags: ["ready"]);
+    .AddRabbitMqHealthCheck(builder.Configuration);
 
 var app = builder.Build();
 
