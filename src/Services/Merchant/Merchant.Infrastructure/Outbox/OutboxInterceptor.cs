@@ -1,4 +1,5 @@
-﻿using BuildingBlocks.Shared.Middleware;
+﻿using BuildingBlocks.Shared.Messaging;
+using BuildingBlocks.Shared.Middleware;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using System.Text.Json;
@@ -33,6 +34,7 @@ public class OutboxInterceptor : SaveChangesInterceptor
         var correlationId = string.IsNullOrWhiteSpace(_correlationIdProvider.CorrelationId)
             ? null
             : _correlationIdProvider.CorrelationId;
+        var traceParent = RabbitMqTracing.CurrentTraceParent();
 
         var aggregates = dbContext.ChangeTracker.Entries<AggregateRoot>()
             .Where(e => e.Entity.DomainEvents.Any())
@@ -45,7 +47,8 @@ public class OutboxInterceptor : SaveChangesInterceptor
                 var outboxMessage = new OutboxMessage(
                     domainEvent.GetType().Name,
                     JsonSerializer.Serialize(domainEvent, domainEvent.GetType()),
-                    correlationId);
+                    correlationId,
+                    traceParent);
                 dbContext.Set<OutboxMessage>().Add(outboxMessage);
             }
             entry.Entity.ClearDomainEvents();

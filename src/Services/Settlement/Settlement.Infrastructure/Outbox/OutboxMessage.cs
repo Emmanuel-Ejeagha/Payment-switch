@@ -8,12 +8,13 @@ public class OutboxMessage
     public DateTime OccurredOn { get; private set; }
     public bool Processed { get; private set; }
     public string? CorrelationId { get; private set; }
+    public string? TraceParent { get; private set; }
     public Guid? LeaseToken { get; private set; }
     public DateTime? LeaseExpiresAt { get; private set; }
 
     private OutboxMessage() { }
 
-    public OutboxMessage(string eventType, string payload, string? correlationId = null)
+    public OutboxMessage(string eventType, string payload, string? correlationId = null, string? traceParent = null)
     {
         Id = Guid.NewGuid();
         EventType = eventType;
@@ -21,6 +22,7 @@ public class OutboxMessage
         OccurredOn = DateTime.UtcNow;
         Processed = false;
         CorrelationId = correlationId;
+        TraceParent = traceParent;
     }
 
     public void AcquireLease(Guid token, DateTime expiresAt)

@@ -1,4 +1,5 @@
 ﻿using BuildingBlocks.Shared.Aggregate;
+using BuildingBlocks.Shared.Messaging;
 using BuildingBlocks.Shared.Middleware;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -46,6 +47,7 @@ public class OutboxInterceptor : SaveChangesInterceptor
         var correlationId = string.IsNullOrWhiteSpace(_correlationIdProvider.CorrelationId)
             ? null
             : _correlationIdProvider.CorrelationId;
+        var traceParent = RabbitMqTracing.CurrentTraceParent();
 
         var aggregates = dbContext.ChangeTracker.Entries<AggregateRoot>()
             .Where(e => e.Entity.DomainEvents.Any())
@@ -59,7 +61,8 @@ public class OutboxInterceptor : SaveChangesInterceptor
                 var outboxMessage = new OutboxMessage(
                     domainEvent.GetType().Name,
                     payload,
-                    correlationId);
+                    correlationId,
+                    traceParent);
                 dbContext.Set<OutboxMessage>().Add(outboxMessage);
 
                 if (entry.Entity is PaymentIntent intent
