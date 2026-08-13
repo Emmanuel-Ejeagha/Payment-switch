@@ -1,6 +1,7 @@
 ﻿using BuildingBlocks.Shared.Configuration;
 using Ledger.Application.Interfaces;
 using Ledger.Application.Options;
+using Ledger.Infrastructure.DeadLetter;
 using Ledger.Infrastructure.Inbox;
 using Ledger.Infrastructure.Messaging;
 using Ledger.Infrastructure.Outbox;
@@ -47,6 +48,7 @@ public static class DependencyInjection
         services.AddHostedService<RabbitMQConsumerService>();
         services.AddHostedService<InboxCleanupService>();
         services.AddHostedService<ReconciliationBackgroundService>();
+        services.AddHostedService<DeadLetterConsumerService>();
 
         return services;
     }

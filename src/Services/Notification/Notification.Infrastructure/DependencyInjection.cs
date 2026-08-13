@@ -2,6 +2,7 @@
 using BuildingBlocks.Shared.Configuration;
 using BuildingBlocks.Shared.Resilience;
 using Notification.Application.Interfaces;
+using Notification.Infrastructure.DeadLetter;
 using Notification.Infrastructure.Inbox;
 using Notification.Infrastructure.Outbox;
 using Notification.Infrastructure.Persistence;
@@ -45,6 +46,7 @@ public static class DependencyInjection
         services.AddHostedService<RabbitMQConsumerService>();
         services.AddHostedService<OutboxPublisherService>();
         services.AddHostedService<InboxCleanupService>();
+        services.AddHostedService<DeadLetterConsumerService>();
 
         services.AddValidatedOptions<RabbitMQSettings>(configuration, "RabbitMQ",
             s => !string.IsNullOrEmpty(s.HostName),

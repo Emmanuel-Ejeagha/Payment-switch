@@ -24,6 +24,7 @@ public static class OpenTelemetryExtensions
             .WithMetrics(metrics =>
             {
                 metrics.AddAspNetCoreInstrumentation();
+                metrics.AddMeter("PaymentSwitch");
             });
     }
 }

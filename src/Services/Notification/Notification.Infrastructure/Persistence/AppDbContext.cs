@@ -1,4 +1,5 @@
 ﻿using Notification.Domain;
+using Notification.Infrastructure.DeadLetter;
 using Notification.Infrastructure.Outbox;
 using Notification.Infrastructure.Inbox;
 using Microsoft.EntityFrameworkCore;
@@ -13,6 +14,7 @@ public class AppDbContext : DbContext
     public DbSet<NotificationPreferenceEntity> NotificationPreferences { get; set; }
     public DbSet<OutboxMessage> OutboxMessages { get; set; }
     public DbSet<InboxMessage> InboxMessages { get; set; }
+    public DbSet<DeadLetterRecord> DeadLetterRecords { get; set; }
 
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
