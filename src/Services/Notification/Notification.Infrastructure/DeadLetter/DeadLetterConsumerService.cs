@@ -50,12 +50,23 @@ public class DeadLetterConsumerService : BackgroundService
             {
                 await TryConnectAndConsume(stoppingToken);
             }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                break;
+            }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Dead-letter consumer error. Retrying in 10 seconds...");
             }
 
-            await Task.Delay(10_000, stoppingToken);
+            try
+            {
+                await Task.Delay(10_000, stoppingToken);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
         }
     }
 
