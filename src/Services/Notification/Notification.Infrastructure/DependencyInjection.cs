@@ -51,7 +51,7 @@ public static class DependencyInjection
         services.AddValidatedOptions<RabbitMQSettings>(configuration, "RabbitMQ",
             s => !string.IsNullOrEmpty(s.HostName),
             "RabbitMQ HostName is required");
-        services.AddScoped<IEventBus, RabbitMQEventBus>();
+        services.AddSingleton<IEventBus, RabbitMQEventBus>();
         services.AddScoped<HttpClient>(_ => new HttpClient());
 
         // The merchant gRPC channel is a documented in-network exception

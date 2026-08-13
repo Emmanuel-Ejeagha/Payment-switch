@@ -162,9 +162,16 @@ public class RabbitMQConsumerService : BackgroundService
 
         await _channel.BasicConsumeAsync(_queueName, autoAck: false, consumer: consumer, cancellationToken: cancellationToken);
 
-        // Keep the connection alive until cancelled
+        // Keep the connection alive until cancelled. If the broker drops mid-run
+        // the connection closes; exit so ExecuteAsync reconnects and re-declares
+        // the topology instead of blocking on a dead channel.
         while (!cancellationToken.IsCancellationRequested)
         {
+            if (_connection is not { IsOpen: true })
+            {
+                _logger.LogWarning("RabbitMQ connection lost; reconnecting in 10 seconds...");
+                break;
+            }
             await Task.Delay(1000, cancellationToken);
         }
     }
