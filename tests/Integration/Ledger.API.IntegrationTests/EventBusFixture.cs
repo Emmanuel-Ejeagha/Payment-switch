@@ -18,8 +18,8 @@ public class EventBusFixture : IAsyncLifetime
         .WithPassword(TestSecrets.RabbitMqPassword)
         .Build();
 
-    private string HostName => _rabbitMq.Hostname;
-    private int Port => _rabbitMq.GetMappedPublicPort(5672);
+    public string HostName => _rabbitMq.Hostname;
+    public int Port => _rabbitMq.GetMappedPublicPort(5672);
 
     public async Task InitializeAsync()
     {

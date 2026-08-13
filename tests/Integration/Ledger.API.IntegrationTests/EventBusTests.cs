@@ -1,7 +1,12 @@
+using System.Diagnostics;
 using System.Text;
 using BuildingBlocks.Shared.Messaging;
+using Ledger.Infrastructure.Messaging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
+using PaymentSwitch.IntegrationTests.Shared;
 using RabbitMQ.Client;
+using RabbitMQ.Client.Events;
 
 namespace Ledger.API.IntegrationTests;
 
@@ -71,6 +76,42 @@ public class EventBusTests : IClassFixture<EventBusFixture>
         await AssertQueueDepthAsync(queueAfter, 1);
     }
 
+    [Fact]
+    public async Task Bus_PublishWithAmbientActivity_InjectsTraceParentHeader()
+    {
+        // The real Ledger bus must carry the ambient trace context onto the wire,
+        // so a consumer can resume the parent trace (TASK-028 acceptance: one trace
+        // spans HTTP → outbox → RabbitMQ → consumer).
+        var queueName = await AddScratchQueueAsync();
+        var bus = new RabbitMQEventBus(
+            new OptionsWrapper<RabbitMQSettings>(new RabbitMQSettings
+            {
+                HostName = _fixture.HostName,
+                Port = _fixture.Port,
+                UserName = TestSecrets.RabbitMqUserName,
+                Password = TestSecrets.RabbitMqPassword,
+                ExchangeName = ExchangeName
+            }),
+            NullLogger<RabbitMQEventBus>.Instance);
+
+        var publishActivity = new Activity("POST /payments/authorize").Start();
+        try
+        {
+            await bus.PublishAsync("PaymentAuthorizedDomainEvent", "{}");
+        }
+        finally
+        {
+            publishActivity.Stop();
+        }
+        bus.Dispose();
+
+        var traceParent = await ConsumeFirstTraceParentAsync(queueName);
+
+        Assert.NotNull(traceParent);
+        Assert.StartsWith("00-", traceParent);
+        Assert.Equal(publishActivity.TraceId.ToString(), traceParent!.Split('-')[1]);
+    }
+
     private RabbitMqChannelPool CreatePool() => new(
         () => _fixture.NewFactory(),
         channel => channel.ExchangeDeclareAsync(ExchangeName, ExchangeType.Topic, durable: true),
@@ -115,6 +156,29 @@ public class EventBusTests : IClassFixture<EventBusFixture>
         await using var channel = await connection.CreateChannelAsync();
         var declare = await channel.QueueDeclarePassiveAsync(queueName);
         return declare.MessageCount;
+    }
+
+    private async Task<string?> ConsumeFirstTraceParentAsync(string queueName)
+    {
+        await using var connection = await _fixture.NewFactory().CreateConnectionAsync();
+        await using var channel = await connection.CreateChannelAsync();
+        var completion = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var consumer = new AsyncEventingBasicConsumer(channel);
+        consumer.ReceivedAsync += (_, ea) =>
+        {
+            var value = ea.BasicProperties.Headers?.TryGetValue(RabbitMqTracing.TraceParentHeader, out var headerValue) == true
+                ? headerValue switch
+                {
+                    string s => s,
+                    byte[] b => Encoding.UTF8.GetString(b),
+                    _ => headerValue?.ToString()
+                }
+                : null;
+            completion.TrySetResult(value);
+            return Task.CompletedTask;
+        };
+        await channel.BasicConsumeAsync(queueName, autoAck: true, consumer: consumer);
+        return await completion.Task.WaitAsync(TimeSpan.FromSeconds(15));
     }
 
     private Task AssertQueueDepthAsync(string queueName, long expected)
