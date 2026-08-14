@@ -41,6 +41,13 @@ spec:
             - "--storage.path=/alertmanager"
           ports:
             - containerPort: 9093
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
           volumeMounts:
             - name: config
               mountPath: /etc/alertmanager

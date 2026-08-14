@@ -14,7 +14,7 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 
 {{- define "payment-switch.image" -}}
-{{- $registry := .Values.imageRegistry }}
+{{- $registry := .Values.imageRegistry | default "" }}
 {{- $repository := .image.repository }}
 {{- $tag := .image.tag | default .Chart.AppVersion }}
 {{- if $registry }}
