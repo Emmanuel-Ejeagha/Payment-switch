@@ -112,7 +112,7 @@ public class UserTests
     public void RevokeRefreshToken_UnknownToken_ShouldNotThrow()
     {
         var user = CreateUser();
-        user.RevokeRefreshToken("nonexistent"); 
+        user.RevokeRefreshToken("nonexistent");
     }
 
     [Fact]

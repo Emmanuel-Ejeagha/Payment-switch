@@ -10,7 +10,7 @@ public class ApiKeyConfiguration : IEntityTypeConfiguration<ApiKey>
     public void Configure(EntityTypeBuilder<ApiKey> builder)
     {
         builder.HasKey(k => k.Id);
-        builder.Property(k => k.Id).ValueGeneratedNever(); 
+        builder.Property(k => k.Id).ValueGeneratedNever();
         builder.Property(k => k.KeyHash).IsRequired();
         builder.Property(k => k.Environment).IsRequired();
         builder.Property(k => k.CreatedAt);

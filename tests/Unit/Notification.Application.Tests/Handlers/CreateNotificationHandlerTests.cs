@@ -4,7 +4,7 @@ using FluentValidation.Results;
 using Moq;
 using Notification.Application.Features.Commands.CreateNotification;
 using Notification.Application.Interfaces;
-using NotificationEntity =  Notification.Domain.Entities.Notification;
+using NotificationEntity = Notification.Domain.Entities.Notification;
 
 namespace Notification.Application.Tests.Handlers;
 

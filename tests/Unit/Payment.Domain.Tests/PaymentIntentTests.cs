@@ -158,7 +158,8 @@ public class PaymentIntentTests
         var intent = CreatePendingIntent();
         intent.Fail();
         Assert.Equal(PaymentStatus.Failed, intent.Status);
-    }    [Fact]
+    }
+    [Fact]
     public void Fail_FromAuthorized_Throws()
     {
         var intent = CreateAuthorizedIntent();

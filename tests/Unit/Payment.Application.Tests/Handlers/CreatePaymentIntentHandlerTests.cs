@@ -70,7 +70,8 @@ public class CreatePaymentIntentHandlerTests
 
     [Fact]
     public async Task Handle_GatewayDeclines_ShouldFailIntent()
-    {        var command = new CreatePaymentIntentCommand(Guid.NewGuid(), 100, "USD", "Card", "1234", "Visa", "declined-key");
+    {
+        var command = new CreatePaymentIntentCommand(Guid.NewGuid(), 100, "USD", "Card", "1234", "Visa", "declined-key");
         SetupValidatorSuccess(command);
         _repoMock.Setup(r => r.GetByIdempotencyKeyAsync(command.MerchantId, command.IdempotencyKey, It.IsAny<CancellationToken>())).ReturnsAsync((PaymentIntent?)null);
         SetupMerchantConfig(autoCapture: true);
@@ -137,7 +138,8 @@ public class CreatePaymentIntentHandlerTests
 
     [Fact]
     public async Task Handle_InvalidCommand_ShouldReturnValidationErrors()
-    {        var command = new CreatePaymentIntentCommand(Guid.Empty, 0, "", "", null, null, "");
+    {
+        var command = new CreatePaymentIntentCommand(Guid.Empty, 0, "", "", null, null, "");
         SetupValidatorFailure(command, "Amount", "Amount must be greater than zero.");
 
         var result = await _handler.Handle(command);

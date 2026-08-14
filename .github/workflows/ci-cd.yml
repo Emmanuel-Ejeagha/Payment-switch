@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [ main ]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   REGISTRY: ghcr.io
   NAMESPACE: payment-switch
@@ -26,18 +30,37 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/Directory.Packages.props', '**/packages.lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
       - name: Restore dependencies
         run: dotnet restore PaymentSwitch.slnx
+
+      - name: Verify formatting
+        run: dotnet format PaymentSwitch.slnx --verify-no-changes --no-restore
 
       - name: Build solution
         run: dotnet build PaymentSwitch.slnx --configuration Release --no-restore
 
-      - name: Run unit tests
+      - name: Run unit tests with coverage
         run: |
           # Excludes the Testcontainers integration suites (which need Docker and
           # are slow); they run serially in the dedicated 'integration' job below.
           dotnet test PaymentSwitch.slnx --configuration Release --no-build \
-            --filter "FullyQualifiedName!~API.IntegrationTests" --verbosity normal
+            --filter "FullyQualifiedName!~API.IntegrationTests" --verbosity normal \
+            --collect:"XPlat Code Coverage" \
+            --results-directory TestResults
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: TestResults/
 
   integration:
     name: Integration Tests
@@ -50,6 +73,14 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/Directory.Packages.props', '**/packages.lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
 
       - name: Restore dependencies
         run: dotnet restore PaymentSwitch.slnx
@@ -90,6 +121,9 @@ jobs:
 
       - name: Install workspace dependencies
         run: npm ci
+
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
 
       - name: Typecheck admin
         run: npm run typecheck --workspace=admin
@@ -143,11 +177,28 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service }}-api:${{ github.sha }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service }}-api:latest
 
+      - name: Scan image for vulnerabilities
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service }}-api:${{ github.sha }}
+          severity: HIGH,CRITICAL
+          format: sarif
+          output: trivy-${{ matrix.service }}.sarif
+          exit-code: '1'
+          ignore-unfixed: true
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v3
+        if: success() || failure()
+        with:
+          sarif_file: trivy-${{ matrix.service }}.sarif
+
   deploy:
-    name: Deploy to Kubernetes
+    name: Deploy to Kubernetes (production)
     needs: docker
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    environment: production
     steps:
       - uses: actions/checkout@v4
 
@@ -158,6 +209,14 @@ jobs:
         run: |
           mkdir -p $HOME/.kube
           echo "${{ secrets.KUBE_CONFIG }}" | base64 --decode > $HOME/.kube/config
+
+      - name: Record previous image (for rollback)
+        run: |
+          services=("identity" "merchant" "payment" "ledger" "notification" "settlement")
+          for svc in "${services[@]}"; do
+            kubectl get deployment/${svc}-api --namespace ${{ env.NAMESPACE }} \
+              -o jsonpath="{.spec.template.spec.containers[0].image}" | tee /tmp/${svc}-previous-image.txt
+          done
 
       - name: Update deployments with new images
         run: |
@@ -176,3 +235,13 @@ jobs:
           kubectl rollout status deployment/ledger-api --namespace ${{ env.NAMESPACE }} --timeout=120s
           kubectl rollout status deployment/notification-api --namespace ${{ env.NAMESPACE }} --timeout=120s
           kubectl rollout status deployment/settlement-api --namespace ${{ env.NAMESPACE }} --timeout=120s
+
+      - name: Rollback on rollout failure
+        if: failure()
+        run: |
+          services=("identity" "merchant" "payment" "ledger" "notification" "settlement")
+          for svc in "${services[@]}"; do
+            PREV=$(cat /tmp/${svc}-previous-image.txt)
+            kubectl set image deployment/${svc}-api ${svc}-api=$PREV --namespace ${{ env.NAMESPACE }}
+          done
+          echo "Deployment failed; images reverted to previously-recorded versions."
