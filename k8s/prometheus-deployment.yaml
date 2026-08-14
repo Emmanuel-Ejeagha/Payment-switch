@@ -18,6 +18,13 @@ spec:
           image: prom/prometheus:v2.53.0
           ports:
             - containerPort: 9090
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
           volumeMounts:
             - name: config
               mountPath: /etc/prometheus/prometheus.yml

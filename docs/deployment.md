@@ -1,5 +1,13 @@
 # Deployment Guide
 
+## Runtime Note
+
+The **current production runtime is Docker Compose on EC2** (see
+`infra/` + `docker-compose.yml`). The Kubernetes manifests (`k8s/`) and Helm
+chart (`helm/payment-switch`) are **implemented and CI-tested but are not the
+live production runtime**. Treat them as the target platform for a future
+migration; verify them against a staging cluster before relying on them.
+
 ## Prerequisites
 
 - Kubernetes cluster (v1.29+)

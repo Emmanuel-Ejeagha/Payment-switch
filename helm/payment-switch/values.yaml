@@ -24,7 +24,7 @@ services:
       livenessPath: /health/live
       readinessPath: /health/ready
     hpa:
-      enabled: false
+      enabled: true
       minReplicas: 1
       maxReplicas: 3
       targetCPUUtilizationPercentage: 80
@@ -48,7 +48,7 @@ services:
       livenessPath: /health/live
       readinessPath: /health/ready
     hpa:
-      enabled: false
+      enabled: true
       minReplicas: 1
       maxReplicas: 3
       targetCPUUtilizationPercentage: 80
@@ -72,7 +72,7 @@ services:
       livenessPath: /health/live
       readinessPath: /health/ready
     hpa:
-      enabled: false
+      enabled: true
       minReplicas: 1
       maxReplicas: 3
       targetCPUUtilizationPercentage: 80
@@ -96,7 +96,7 @@ services:
       livenessPath: /health/live
       readinessPath: /health/ready
     hpa:
-      enabled: false
+      enabled: true
       minReplicas: 1
       maxReplicas: 3
       targetCPUUtilizationPercentage: 80
@@ -120,7 +120,7 @@ services:
       livenessPath: /health/live
       readinessPath: /health/ready
     hpa:
-      enabled: false
+      enabled: true
       minReplicas: 1
       maxReplicas: 3
       targetCPUUtilizationPercentage: 80
@@ -144,7 +144,7 @@ services:
       livenessPath: /health/live
       readinessPath: /health/ready
     hpa:
-      enabled: false
+      enabled: true
       minReplicas: 1
       maxReplicas: 3
       targetCPUUtilizationPercentage: 80
@@ -197,6 +197,8 @@ infrastructure:
     enabled: true
     image: postgres:16-alpine
     port: 5432
+    storageSize: 1Gi
+    storageClassName: ""
     resources:
       requests:
         cpu: 200m
@@ -234,3 +236,10 @@ ingress:
   tls:
     enabled: false
     secretName: payment-switch-tls
+
+networkPolicy:
+  enabled: true
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
