@@ -9,6 +9,14 @@ namespace Notification.Infrastructure.Outbox;
 
 public class OutboxInterceptor : SaveChangesInterceptor
 {
+    /// <summary>
+    /// Event types with a real RabbitMQ consumer. Empty: this service currently
+    /// publishes nothing onto the bus — its domain events have no consumer, so
+    /// writing them to the outbox would drop them into a void.
+    /// See docs/messaging-registry.md.
+    /// </summary>
+    private static readonly HashSet<string> PublishedEventTypes = new();
+
     private readonly ICorrelationIdProvider _correlationIdProvider;
 
     public OutboxInterceptor(ICorrelationIdProvider correlationIdProvider)
@@ -45,6 +53,9 @@ public class OutboxInterceptor : SaveChangesInterceptor
         {
             foreach (var domainEvent in entry.Entity.DomainEvents)
             {
+                if (!PublishedEventTypes.Contains(domainEvent.GetType().Name))
+                    continue;
+
                 var outboxMessage = new OutboxMessage(
                     domainEvent.GetType().Name,
                     JsonSerializer.Serialize(domainEvent, domainEvent.GetType()),

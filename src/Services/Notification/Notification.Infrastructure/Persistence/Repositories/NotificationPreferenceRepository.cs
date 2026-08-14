@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Notification.Application.Interfaces;
 using Notification.Domain.Entities;
+using Notification.Domain.ValueObjects;
 
 namespace Notification.Infrastructure.Persistence.Repositories;
 
@@ -19,7 +20,7 @@ public class NotificationPreferenceRepository : INotificationPreferenceRepositor
         return await _context.NotificationPreferences
             .FirstOrDefaultAsync(p =>
                 p.Recipient == recipient &&
-                p.Channel.Value == channel &&
+                p.Channel == NotificationChannel.FromString(channel) &&
                 p.EventType == eventType, cancellationToken);
     }
 

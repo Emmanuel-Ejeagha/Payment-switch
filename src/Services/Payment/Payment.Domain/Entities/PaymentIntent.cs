@@ -138,7 +138,7 @@ public class PaymentIntent : AggregateRoot
         var transaction = new Transaction(TransactionType.Void, Amount, idempotencyKey: idempotencyKey);
         _transactions.Add(transaction);
 
-        AddDomainEvent(new PaymentVoidedDomainEvent(Id));
+        AddDomainEvent(new PaymentVoidedDomainEvent(Id, MerchantId));
     }
 
     public void Refund(Money? amount = null, string? idempotencyKey = null)

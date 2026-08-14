@@ -2,4 +2,4 @@
 
 namespace Payment.Domain.DomainEvents;
 
-public record PaymentVoidedDomainEvent(Guid IntentId) : DomainEvent;
+public record PaymentVoidedDomainEvent(Guid IntentId, Guid MerchantId) : DomainEvent;
