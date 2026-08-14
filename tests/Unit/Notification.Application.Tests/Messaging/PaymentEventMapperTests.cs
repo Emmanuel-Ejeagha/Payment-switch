@@ -50,6 +50,32 @@ public class PaymentEventMapperTests
     }
 
     [Fact]
+    public void MapIntentCreated_UsesResolvedMerchantEmail()
+    {
+        var e = new PaymentIntentCreatedEvent(Guid.NewGuid(), Guid.NewGuid(), new MoneyPayload(1999, "USD"), "idem-key");
+
+        var command = PaymentEventMapper.MapIntentCreated(e, MerchantEmail, "{}");
+
+        Assert.Equal(MerchantEmail, command.Recipient);
+        Assert.Equal("email", command.Channel);
+        Assert.Equal("Payment Started", command.Subject);
+        Assert.Contains("1999", command.Body);
+        Assert.Contains("USD", command.Body);
+    }
+
+    [Fact]
+    public void MapVoided_UsesResolvedMerchantEmail()
+    {
+        var e = new PaymentVoidedEvent(Guid.NewGuid(), Guid.NewGuid());
+
+        var command = PaymentEventMapper.MapVoided(e, MerchantEmail, "{}");
+
+        Assert.Equal(MerchantEmail, command.Recipient);
+        Assert.Equal("email", command.Channel);
+        Assert.Equal("Payment Voided", command.Subject);
+    }
+
+    [Fact]
     public void Map_NeverUsesPlaceholderRecipient()
     {
         var body = "{}";

@@ -46,6 +46,7 @@ public static class DependencyInjection
         services.AddSingleton<IEventBus, RabbitMQEventBus>();
         services.AddHostedService<OutboxPublisherService>();
         services.AddHostedService<RabbitMQConsumerService>();
+        services.AddHostedService<MerchantEventConsumerService>();
         services.AddHostedService<InboxCleanupService>();
         services.AddHostedService<ReconciliationBackgroundService>();
         services.AddHostedService<DeadLetterConsumerService>();

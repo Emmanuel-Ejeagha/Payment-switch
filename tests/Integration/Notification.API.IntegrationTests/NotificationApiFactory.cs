@@ -1,6 +1,8 @@
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Notification.Application.Interfaces;
 using Notification.Infrastructure.Persistence;
 using PaymentSwitch.IntegrationTests.Shared;
 using RabbitMQ.Client;
@@ -25,6 +27,17 @@ public class NotificationApiFactory : WebApplicationFactory<Program>, IAsyncLife
         .Build();
 
     public NotificationApiFactory() => TestSecrets.ApplyEnvironment("NotificationService");
+
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        builder.ConfigureServices(services =>
+        {
+            // In tests no Merchant service runs, so its gRPC contact lookup can
+            // never resolve a recipient. Stub it so the notification-creation
+            // flow can be exercised end-to-end.
+            services.AddScoped<IMerchantContactService, StubMerchantContactService>();
+        });
+    }
 
     public async Task InitializeAsync()
     {
@@ -64,5 +77,11 @@ public class NotificationApiFactory : WebApplicationFactory<Program>, IAsyncLife
     {
         await _postgres.DisposeAsync();
         await _rabbitMq.DisposeAsync();
+    }
+
+    private sealed class StubMerchantContactService : IMerchantContactService
+    {
+        public Task<string?> GetMerchantEmailAsync(Guid merchantId, CancellationToken cancellationToken = default)
+            => Task.FromResult<string?>($"merchant-{merchantId}@example.com");
     }
 }

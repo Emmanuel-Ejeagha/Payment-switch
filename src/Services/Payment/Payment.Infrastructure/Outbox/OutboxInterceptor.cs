@@ -21,6 +21,21 @@ public class OutboxInterceptor : SaveChangesInterceptor
         "PaymentVoidedDomainEvent"
     };
 
+    /// <summary>
+    /// Event types with a real RabbitMQ consumer. Everything else is only ever
+    /// delivered in-process (webhooks) or carries no cross-service value, so it
+    /// is not written to the outbox — publishing it would drop it into a void.
+    /// See docs/messaging-registry.md.
+    /// </summary>
+    private static readonly HashSet<string> PublishedEventTypes = new()
+    {
+        "PaymentIntentCreatedDomainEvent",
+        "PaymentAuthorizedDomainEvent",
+        "PaymentCapturedDomainEvent",
+        "PaymentRefundedDomainEvent",
+        "PaymentVoidedDomainEvent"
+    };
+
     private readonly ICorrelationIdProvider _correlationIdProvider;
 
     public OutboxInterceptor(ICorrelationIdProvider correlationIdProvider)
@@ -57,22 +72,27 @@ public class OutboxInterceptor : SaveChangesInterceptor
         {
             foreach (var domainEvent in entry.Entity.DomainEvents)
             {
-                var payload = JsonSerializer.Serialize(domainEvent, domainEvent.GetType());
-                var outboxMessage = new OutboxMessage(
-                    domainEvent.GetType().Name,
-                    payload,
-                    correlationId,
-                    traceParent);
-                dbContext.Set<OutboxMessage>().Add(outboxMessage);
+                var eventType = domainEvent.GetType().Name;
+
+                if (PublishedEventTypes.Contains(eventType))
+                {
+                    var payload = JsonSerializer.Serialize(domainEvent, domainEvent.GetType());
+                    var outboxMessage = new OutboxMessage(
+                        eventType,
+                        payload,
+                        correlationId,
+                        traceParent);
+                    dbContext.Set<OutboxMessage>().Add(outboxMessage);
+                }
 
                 if (entry.Entity is PaymentIntent intent
-                    && WebhookEventTypes.Contains(domainEvent.GetType().Name))
+                    && WebhookEventTypes.Contains(eventType))
                 {
                     dbContext.Set<WebhookEvent>().Add(new WebhookEvent(
                         Guid.NewGuid(),
                         intent.MerchantId,
-                        domainEvent.GetType().Name,
-                        payload,
+                        eventType,
+                        JsonSerializer.Serialize(domainEvent, domainEvent.GetType()),
                         correlationId));
                 }
             }

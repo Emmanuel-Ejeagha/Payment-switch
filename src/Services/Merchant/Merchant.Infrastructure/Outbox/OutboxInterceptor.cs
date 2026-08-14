@@ -8,6 +8,16 @@ namespace Merchant.Infrastructure.Outbox;
 
 public class OutboxInterceptor : SaveChangesInterceptor
 {
+    /// <summary>
+    /// Event types with a real RabbitMQ consumer. Everything else carries no
+    /// cross-service value and is not written to the outbox — publishing it
+    /// would drop it into a void. See docs/messaging-registry.md.
+    /// </summary>
+    private static readonly HashSet<string> PublishedEventTypes = new()
+    {
+        "MerchantOnboardedEvent"
+    };
+
     private readonly ICorrelationIdProvider _correlationIdProvider;
 
     public OutboxInterceptor(ICorrelationIdProvider correlationIdProvider)
@@ -44,6 +54,9 @@ public class OutboxInterceptor : SaveChangesInterceptor
         {
             foreach (var domainEvent in entry.Entity.DomainEvents)
             {
+                if (!PublishedEventTypes.Contains(domainEvent.GetType().Name))
+                    continue;
+
                 var outboxMessage = new OutboxMessage(
                     domainEvent.GetType().Name,
                     JsonSerializer.Serialize(domainEvent, domainEvent.GetType()),
