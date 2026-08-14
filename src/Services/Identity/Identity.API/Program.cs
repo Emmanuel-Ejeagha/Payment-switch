@@ -81,7 +81,7 @@ builder.Services.AddCors(options =>
     });
 });
 
-builder.Services.AddApplication(); 
+builder.Services.AddApplication();
 builder.Services.AddIdentityInfrastructure(builder.Configuration);
 
 builder.Services.AddCorrelationId();

@@ -27,7 +27,7 @@ public class AuthorizePaymentHandler
         IDomainEventDispatcher dispatcher,
         IValidator<AuthorizePaymentCommand> validator,
         IMerchantService merchantService,
-        ILogger<AuthorizePaymentHandler> logger)                
+        ILogger<AuthorizePaymentHandler> logger)
     {
         _repository = repository;
         _gateway = gateway;

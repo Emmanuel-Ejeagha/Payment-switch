@@ -25,7 +25,7 @@ public class Merchant : AggregateRoot
     public DateTime CreatedAt { get; private set; }
     public DateTime? UpdatedAt { get; private set; }
 
-    private Merchant() : base() { } 
+    private Merchant() : base() { }
 
     public Merchant(Guid id, Guid? ownerId, BusinessName businessName, MerchantEmail email) : base(id)
     {

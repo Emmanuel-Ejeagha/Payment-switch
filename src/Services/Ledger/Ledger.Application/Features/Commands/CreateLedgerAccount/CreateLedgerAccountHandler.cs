@@ -36,7 +36,7 @@ public class CreateLedgerAccountHandler
 
         var existing = await _repository.GetByMerchantIdAndCurrencyAsync(command.MerchantId, command.Currency, cancellationToken);
         if (existing is not null)
-            return Result.Success(); 
+            return Result.Success();
 
         var account = new LedgerAccount(Guid.NewGuid(), command.MerchantId, command.Currency);
         await _unitOfWork.BeginTransactionAsync(cancellationToken);

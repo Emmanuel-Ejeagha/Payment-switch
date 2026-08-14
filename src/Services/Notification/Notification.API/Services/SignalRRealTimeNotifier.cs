@@ -1,5 +1,5 @@
 ﻿using Microsoft.AspNetCore.SignalR;
-using Notification.API.Hubs; 
+using Notification.API.Hubs;
 using Notification.Application.Interfaces;
 
 namespace Notification.API.Services;

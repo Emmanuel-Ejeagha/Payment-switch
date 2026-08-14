@@ -107,7 +107,7 @@ public class DomainEventDispatcherTests
         var dispatcher = provider.GetRequiredService<IDomainEventDispatcher>();
         var domainEvent = new TestDomainEvent("Cancel");
         using var cts = new CancellationTokenSource();
-        cts.Cancel(); 
+        cts.Cancel();
 
         // Act & Assert
         await dispatcher.DispatchAsync(new[] { domainEvent }, cts.Token);

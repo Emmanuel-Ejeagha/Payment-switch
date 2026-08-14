@@ -16,7 +16,7 @@ public class CommonExtensionsTests
     public void Guard_AgainstNull_WithNonNull_ShouldNotThrow()
     {
         var value = new object();
-        Guard.AgainstNull(value, nameof(value)); 
+        Guard.AgainstNull(value, nameof(value));
     }
 
     [Fact]

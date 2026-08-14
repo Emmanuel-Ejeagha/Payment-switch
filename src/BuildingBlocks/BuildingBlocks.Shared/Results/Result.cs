@@ -9,7 +9,7 @@ public class Result
     public bool IsFailure => !IsSuccess;
     public IReadOnlyList<Error> Errors { get; }
 
-    protected Result(IReadOnlyList<Error> errors) 
+    protected Result(IReadOnlyList<Error> errors)
     {
         Errors = errors;
     }

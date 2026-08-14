@@ -74,3 +74,36 @@ kubectl port-forward -n payment-switch svc/grafana 3000:3000
 The GitHub Actions workflow (`.github/workflows/ci-cd.yml`) automatically builds, tests, and deploys
 the services when changes are pushed to the `main` branch. Ensure the `KUBE_CONFIG` secret is set in
 your repository.
+
+The pipeline gates deploys per environment:
+
+- **Pull requests** run build, unit, integration, and frontend checks, plus static analysis
+  (`dotnet format --verify-no-changes`), dependency audits (`npm audit`, Dependabot), and security
+  scans (CodeQL, Trivy, Gitleaks). No deploy happens from a PR.
+- **Pushes to `main`** build and push images (immutable `:<sha>` plus `:latest`), scan them with
+  Trivy (HIGH/CRITICAL fail the build), then deploy to the `production` environment, which is
+  subject to **environment protection rules** (reviewers/approvals) in the repository settings.
+
+### Rollback
+
+Deploys are immutable-sha based, so rollback is a one-line image pin:
+
+```bash
+# Revert all services to a previous build (replace <previous-sha>):
+for svc in identity merchant payment ledger notification settlement; do
+  kubectl set image deployment/${svc}-api ${svc}-api=ghcr.io/<owner>/<repo>/${svc}-api:<previous-sha> \
+    --namespace payment-switch
+done
+kubectl rollout status deployment/identity-api --namespace payment-switch
+```
+
+If a rollout fails, the pipeline records the previous image per service and automatically reverts
+to it. For manual intervention, `kubectl rollout undo deployment/<svc>-api --namespace payment-switch`
+returns to the last good revision.
+
+### Environment protection
+
+Enable **branch protection** on `main` (require `build-test`, `integration`, `frontend`, and the
+security checks to pass before merging) and add required reviewers to the `production` environment
+(Settings → Environments → `production` → Required reviewers). Keep `latest` tags for development
+convenience; production always deploys by immutable `:<sha>`.

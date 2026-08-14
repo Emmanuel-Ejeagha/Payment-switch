@@ -15,7 +15,7 @@ public static class SecretValidationExtensions
         this IConfiguration configuration,
         string databaseName)
     {
-        ValidateJwtSecret(configuration["Jwt:Secret"]);        var connectionString = configuration.GetConnectionString(databaseName);
+        ValidateJwtSecret(configuration["Jwt:Secret"]); var connectionString = configuration.GetConnectionString(databaseName);
         if (string.IsNullOrWhiteSpace(connectionString))
         {
             throw new InvalidOperationException(
