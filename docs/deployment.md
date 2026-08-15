@@ -50,7 +50,8 @@ kubectl create secret generic payment-switch-secret \
 kubectl apply -f k8s/
 ```
 
-This deploys PostgreSQL, Redis, RabbitMQ, Jaeger, Prometheus, Grafana, all six microservices, and the Ingress.
+This deploys PostgreSQL, Redis, RabbitMQ, Jaeger, Prometheus, Grafana, all six microservices, the two
+frontend portals (`merchant-web`, `admin-web`), and the Ingress.
 
 ## Step 4 – Verify
 
@@ -59,7 +60,14 @@ kubectl get pods -n payment-switch
 kubectl get ingress -n payment-switch
 ```
 
-Access the APIs via `http://localhost/<service>/swagger`.
+Access the APIs via `http://localhost/<service>/swagger`, the merchant portal at `/`, and the admin
+portal at `/admin` (the admin app uses `basePath: /admin`; see `apps/admin/next.config.js`).
+
+> **Note on the frontends:** `NEXT_PUBLIC_API_URL` is inlined at build time, so the web images are
+> built with the HTTPS origin (see `.github/workflows/ci-cd.yml`, `docker-frontend` job and the
+> `FRONTEND_API_URL` repository variable). The value is also injected at runtime from the
+> `payment-switch-config` ConfigMap so the Next.js server-side API proxy resolves the same origin.
+> No secrets are baked into the images.
 
 ## Optional – Port‑Forward Observability Tools
 
@@ -90,8 +98,9 @@ Deploys are immutable-sha based, so rollback is a one-line image pin:
 
 ```bash
 # Revert all services to a previous build (replace <previous-sha>):
-for svc in identity merchant payment ledger notification settlement; do
-  kubectl set image deployment/${svc}-api ${svc}-api=ghcr.io/<owner>/<repo>/${svc}-api:<previous-sha> \
+for t in identity-api merchant-api payment-api ledger-api notification-api settlement-api \
+         merchant-web admin-web; do
+  kubectl set image deployment/$t $t=ghcr.io/<owner>/<repo>/$t:<previous-sha> \
     --namespace payment-switch
 done
 kubectl rollout status deployment/identity-api --namespace payment-switch

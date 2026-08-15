@@ -191,6 +191,52 @@ config:
   grafana:
     adminUser: "admin"
     adminPassword: ""
+  frontend:
+    # NEXT_PUBLIC_API_URL is inlined at build time; set the HTTPS origin (e.g.
+    # https://paymentswitch.example.com). See docs/tls.md.
+    apiUrl: "http://localhost"
+
+frontends:
+  merchant:
+    enabled: true
+    name: merchant-web
+    replicaCount: 1
+    image:
+      repository: paymentswitch/merchant-web
+      tag: latest
+    containerPort: 3000
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    hpa:
+      enabled: true
+      minReplicas: 1
+      maxReplicas: 3
+      targetCPUUtilizationPercentage: 80
+  admin:
+    enabled: true
+    name: admin-web
+    replicaCount: 1
+    image:
+      repository: paymentswitch/admin-web
+      tag: latest
+    containerPort: 3001
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    hpa:
+      enabled: true
+      minReplicas: 1
+      maxReplicas: 3
+      targetCPUUtilizationPercentage: 80
 
 infrastructure:
   postgres:

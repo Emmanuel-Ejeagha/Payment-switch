@@ -14,4 +14,19 @@ spec:
 ---
 {{- end }}
 {{- end }}
+{{- range $name, $front := .Values.frontends }}
+{{- if $front.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $front.name }}
+  namespace: {{ $.Values.namespace }}
+spec:
+  minAvailable: {{ $.Values.podDisruptionBudget.minAvailable }}
+  selector:
+    matchLabels:
+      app: {{ $front.name }}
+---
+{{- end }}
+{{- end }}
 {{- end }}

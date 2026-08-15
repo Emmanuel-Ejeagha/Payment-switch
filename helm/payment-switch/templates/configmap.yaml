@@ -16,3 +16,4 @@ data:
   Smtp__FromAddress: {{ .Values.config.smtp.fromAddress | quote }}
   Smtp__FromName: {{ .Values.config.smtp.fromName | quote }}
   Sms__Enabled: {{ .Values.config.sms.enabled | quote }}
+  NEXT_PUBLIC_API_URL: {{ .Values.config.frontend.apiUrl | quote }}

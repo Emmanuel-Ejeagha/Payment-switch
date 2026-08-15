@@ -193,9 +193,59 @@ jobs:
         with:
           sarif_file: trivy-${{ matrix.service }}.sarif
 
+  docker-frontend:
+    name: Docker Build & Push (frontends)
+    needs: [frontend, build-test]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        app:
+          - name: merchant
+            port: 3000
+          - name: admin
+            port: 3001
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: apps/${{ matrix.app.name }}/Dockerfile
+          build-args: |
+            NEXT_PUBLIC_API_URL=${{ vars.FRONTEND_API_URL }}
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.app.name }}-web:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.app.name }}-web:latest
+
+      - name: Scan image for vulnerabilities
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.app.name }}-web:${{ github.sha }}
+          severity: HIGH,CRITICAL
+          format: sarif
+          output: trivy-${{ matrix.app.name }}-web.sarif
+          exit-code: '1'
+          ignore-unfixed: true
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v3
+        if: success() || failure()
+        with:
+          sarif_file: trivy-${{ matrix.app.name }}-web.sarif
+
   deploy:
     name: Deploy to Kubernetes (production)
-    needs: docker
+    needs: [docker, docker-frontend]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: production
@@ -210,22 +260,24 @@ jobs:
           mkdir -p $HOME/.kube
           echo "${{ secrets.KUBE_CONFIG }}" | base64 --decode > $HOME/.kube/config
 
-      - name: Record previous image (for rollback)
+      - name: Record previous images (for rollback)
         run: |
-          services=("identity" "merchant" "payment" "ledger" "notification" "settlement")
-          for svc in "${services[@]}"; do
-            kubectl get deployment/${svc}-api --namespace ${{ env.NAMESPACE }} \
-              -o jsonpath="{.spec.template.spec.containers[0].image}" | tee /tmp/${svc}-previous-image.txt
+          targets=("identity-api" "merchant-api" "payment-api" "ledger-api" "notification-api" "settlement-api" "merchant-web" "admin-web")
+          for t in "${targets[@]}"; do
+            kubectl get deployment/$t --namespace ${{ env.NAMESPACE }} \
+              -o jsonpath="{.spec.template.spec.containers[0].image}" | tee /tmp/$t-previous-image.txt
           done
 
       - name: Update deployments with new images
         run: |
-          services=("identity" "merchant" "payment" "ledger" "notification" "settlement")
-          for svc in "${services[@]}"; do
-            kubectl set image deployment/${svc}-api \
-              ${svc}-api=${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${svc}-api:${{ github.sha }} \
-              --namespace ${{ env.NAMESPACE }}
-          done
+          kubectl set image deployment/identity-api identity-api=${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/identity-api:${{ github.sha }} --namespace ${{ env.NAMESPACE }}
+          kubectl set image deployment/merchant-api merchant-api=${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/merchant-api:${{ github.sha }} --namespace ${{ env.NAMESPACE }}
+          kubectl set image deployment/payment-api payment-api=${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/payment-api:${{ github.sha }} --namespace ${{ env.NAMESPACE }}
+          kubectl set image deployment/ledger-api ledger-api=${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/ledger-api:${{ github.sha }} --namespace ${{ env.NAMESPACE }}
+          kubectl set image deployment/notification-api notification-api=${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/notification-api:${{ github.sha }} --namespace ${{ env.NAMESPACE }}
+          kubectl set image deployment/settlement-api settlement-api=${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/settlement-api:${{ github.sha }} --namespace ${{ env.NAMESPACE }}
+          kubectl set image deployment/merchant-web merchant-web=${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/merchant-web:${{ github.sha }} --namespace ${{ env.NAMESPACE }}
+          kubectl set image deployment/admin-web admin-web=${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/admin-web:${{ github.sha }} --namespace ${{ env.NAMESPACE }}
 
       - name: Verify rollout status
         run: |
@@ -235,13 +287,15 @@ jobs:
           kubectl rollout status deployment/ledger-api --namespace ${{ env.NAMESPACE }} --timeout=120s
           kubectl rollout status deployment/notification-api --namespace ${{ env.NAMESPACE }} --timeout=120s
           kubectl rollout status deployment/settlement-api --namespace ${{ env.NAMESPACE }} --timeout=120s
+          kubectl rollout status deployment/merchant-web --namespace ${{ env.NAMESPACE }} --timeout=120s
+          kubectl rollout status deployment/admin-web --namespace ${{ env.NAMESPACE }} --timeout=120s
 
       - name: Rollback on rollout failure
         if: failure()
         run: |
-          services=("identity" "merchant" "payment" "ledger" "notification" "settlement")
-          for svc in "${services[@]}"; do
-            PREV=$(cat /tmp/${svc}-previous-image.txt)
-            kubectl set image deployment/${svc}-api ${svc}-api=$PREV --namespace ${{ env.NAMESPACE }}
+          targets=("identity-api" "merchant-api" "payment-api" "ledger-api" "notification-api" "settlement-api" "merchant-web" "admin-web")
+          for t in "${targets[@]}"; do
+            PREV=$(cat /tmp/$t-previous-image.txt)
+            kubectl set image deployment/$t $t=$PREV --namespace ${{ env.NAMESPACE }}
           done
           echo "Deployment failed; images reverted to previously-recorded versions."

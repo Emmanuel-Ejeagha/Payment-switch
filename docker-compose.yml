@@ -260,6 +260,44 @@ services:
     networks:
       - paymentswitch-network
 
+  merchant-web:
+    build:
+      context: .
+      dockerfile: apps/merchant/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${FRONTEND_BASE_URL:-http://localhost}
+    restart: always
+    environment:
+      - NEXT_PUBLIC_API_URL=${FRONTEND_BASE_URL:-http://localhost}
+    depends_on:
+      - identity-api
+      - merchant-api
+      - payment-api
+      - ledger-api
+      - notification-api
+      - settlement-api
+    networks:
+      - paymentswitch-network
+
+  admin-web:
+    build:
+      context: .
+      dockerfile: apps/admin/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${FRONTEND_BASE_URL:-http://localhost}
+    restart: always
+    environment:
+      - NEXT_PUBLIC_API_URL=${FRONTEND_BASE_URL:-http://localhost}
+    depends_on:
+      - identity-api
+      - merchant-api
+      - payment-api
+      - ledger-api
+      - notification-api
+      - settlement-api
+    networks:
+      - paymentswitch-network
+
   nginx:
     image: nginx:alpine
     restart: always
@@ -280,6 +318,8 @@ services:
       - ledger-api
       - notification-api
       - settlement-api
+      - merchant-web
+      - admin-web
     networks:
       - paymentswitch-network
 

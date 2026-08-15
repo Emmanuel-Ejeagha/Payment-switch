@@ -49,6 +49,8 @@ mode folders are committed:
    ```bash
    curl -I https://paymentswitch.example.com/merchant/api/v1/health
    curl -I http://paymentswitch.example.com/merchant/api/v1/health   # expect 301
+   curl -I https://paymentswitch.example.com/                         # merchant portal
+   curl -I https://paymentswitch.example.com/admin/login              # admin portal
    ```
 
 The TLS server sets HSTS (`max-age=31536000; includeSubDomains`), forwards
@@ -88,5 +90,11 @@ secrets or a gitignored `apps/<app>/.env.production`:
 ```bash
 NEXT_PUBLIC_API_URL=https://paymentswitch.example.com npm run build
 ```
+
+The apps are served through nginx/Ingress on the same origin: the merchant
+portal at `/` and the admin portal at `/admin` (admin sets `basePath: "/admin"`
+in `next.config.js`; nginx and the Ingress route `/admin` to `admin-web` and
+`/` to `merchant-web` — no rewrite on those locations so the admin basePath
+paths reach the app unchanged).
 
 See `apps/<app>/.env.production.example`.

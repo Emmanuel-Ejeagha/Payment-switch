@@ -62,4 +62,25 @@ spec:
   minAvailable: 1
   selector:
     matchLabels:
-      app: settlement-api
+      app: settlement-api---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: merchant-web
+  namespace: payment-switch
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: merchant-web
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: admin-web
+  namespace: payment-switch
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: admin-web
