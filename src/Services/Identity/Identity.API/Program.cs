@@ -1,5 +1,6 @@
 using Asp.Versioning.ApiExplorer;
 using BuildingBlocks.Shared;
+using BuildingBlocks.Shared.Auth;
 using BuildingBlocks.Shared.Configuration;
 using BuildingBlocks.Shared.Data;
 using BuildingBlocks.Shared.HealthChecks;
@@ -11,14 +12,10 @@ using Identity.API.Middlewares;
 using Identity.Application;
 using Identity.Infrastructure;
 using Identity.Infrastructure.Persistence;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using OpenTelemetry.Metrics;
 using Serilog;
 using System.Reflection;
-using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -52,22 +49,7 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-var jwtSettings = builder.Configuration.GetSection("Jwt");
-var key = Encoding.UTF8.GetBytes(jwtSettings["Secret"]!);
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
-    {
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = true,
-            ValidateAudience = true,
-            ValidateLifetime = true,
-            ValidateIssuerSigningKey = true,
-            ValidIssuer = jwtSettings["Issuer"],
-            ValidAudience = jwtSettings["Audience"],
-            IssuerSigningKey = new SymmetricSecurityKey(key)
-        };
-    });
+builder.Services.AddPaymentSwitchJwtBearer(builder.Configuration);
 
 builder.Services.AddAuthorization();
 

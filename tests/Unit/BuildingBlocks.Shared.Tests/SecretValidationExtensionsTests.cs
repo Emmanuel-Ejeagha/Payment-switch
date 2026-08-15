@@ -101,4 +101,49 @@ public class SecretValidationExtensionsTests
 
         config.ValidateSecuritySecrets("IdentityDb");
     }
+
+    [Fact]
+    public void Validate_WithShortPreviousJwtSecret_Throws()
+    {
+        var config = BuildConfig(new[]
+        {
+            ("Jwt:Secret", "a-strong-32-byte-secret-key-for-testing!!"),
+            ("Jwt:PreviousSecret", "short"),
+            ("ConnectionStrings:IdentityDb", "Host=localhost;Password=strong-password;")
+        }.Concat(ValidRabbitMq).ToArray());
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            config.ValidateSecuritySecrets("IdentityDb"));
+
+        Assert.Contains("PreviousSecret", ex.Message);
+    }
+
+    [Fact]
+    public void Validate_WithInsecurePreviousJwtSecret_Throws()
+    {
+        var config = BuildConfig(new[]
+        {
+            ("Jwt:Secret", "a-strong-32-byte-secret-key-for-testing!!"),
+            ("Jwt:PreviousSecret", "your-super-secret-key-minimum-32-bytes!"),
+            ("ConnectionStrings:IdentityDb", "Host=localhost;Password=strong-password;")
+        }.Concat(ValidRabbitMq).ToArray());
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            config.ValidateSecuritySecrets("IdentityDb"));
+
+        Assert.Contains("PreviousSecret", ex.Message);
+    }
+
+    [Fact]
+    public void Validate_WithEmptyPreviousJwtSecret_DoesNotThrow()
+    {
+        var config = BuildConfig(new[]
+        {
+            ("Jwt:Secret", "a-strong-32-byte-secret-key-for-testing!!"),
+            ("Jwt:PreviousSecret", ""),
+            ("ConnectionStrings:IdentityDb", "Host=localhost;Username=paymentswitch;Password=strong-db-password")
+        }.Concat(ValidRabbitMq).ToArray());
+
+        config.ValidateSecuritySecrets("IdentityDb");
+    }
 }

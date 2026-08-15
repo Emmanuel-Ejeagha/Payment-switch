@@ -1,5 +1,6 @@
 using Asp.Versioning.ApiExplorer;
 using BuildingBlocks.Shared;
+using BuildingBlocks.Shared.Auth;
 using BuildingBlocks.Shared.Configuration;
 using BuildingBlocks.Shared.Data;
 using BuildingBlocks.Shared.HealthChecks;
@@ -9,7 +10,6 @@ using BuildingBlocks.Shared.Versioning;
 using BuildingBlocks.Shared.Caching;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using Notification.API.Hubs;
 using Notification.API.Middlewares;
@@ -21,7 +21,6 @@ using Notification.Infrastructure.Persistence;
 using OpenTelemetry.Metrics;
 using Serilog;
 using System.Reflection;
-using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -55,37 +54,23 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-var jwtSettings = builder.Configuration.GetSection("Jwt");
-var key = Encoding.UTF8.GetBytes(jwtSettings["Secret"]!);
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
+builder.Services.AddPaymentSwitchJwtBearer(builder.Configuration, options =>
+{
+    options.Events = new JwtBearerEvents
     {
-        options.TokenValidationParameters = new TokenValidationParameters
+        OnMessageReceived = context =>
         {
-            ValidateIssuer = true,
-            ValidateAudience = true,
-            ValidateLifetime = true,
-            ValidateIssuerSigningKey = true,
-            ValidIssuer = jwtSettings["Issuer"],
-            ValidAudience = jwtSettings["Audience"],
-            IssuerSigningKey = new SymmetricSecurityKey(key)
-        };
-
-        options.Events = new JwtBearerEvents
-        {
-            OnMessageReceived = context =>
+            var accessToken = context.Request.Query["access_token"];
+            var path = context.HttpContext.Request.Path;
+            if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
             {
-                var accessToken = context.Request.Query["access_token"];
-                var path = context.HttpContext.Request.Path;
-                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
-                {
-                    context.Token = accessToken;
-                }
-
-                return Task.CompletedTask;
+                context.Token = accessToken;
             }
-        };
-    });
+
+            return Task.CompletedTask;
+        }
+    };
+});
 
 builder.Services.AddAuthorization();
 

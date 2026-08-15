@@ -15,7 +15,9 @@ public static class SecretValidationExtensions
         this IConfiguration configuration,
         string databaseName)
     {
-        ValidateJwtSecret(configuration["Jwt:Secret"]); var connectionString = configuration.GetConnectionString(databaseName);
+        ValidateJwtSecret(configuration["Jwt:Secret"]);
+        ValidateJwtPreviousSecret(configuration["Jwt:PreviousSecret"]);
+        var connectionString = configuration.GetConnectionString(databaseName);
         if (string.IsNullOrWhiteSpace(connectionString))
         {
             throw new InvalidOperationException(
@@ -86,6 +88,26 @@ public static class SecretValidationExtensions
         {
             throw new InvalidOperationException(
                 "Jwt:Secret is set to a known insecure placeholder. Set a unique, strong secret.");
+        }
+    }
+
+    private static void ValidateJwtPreviousSecret(string? previousSecret)
+    {
+        if (string.IsNullOrWhiteSpace(previousSecret))
+        {
+            return;
+        }
+
+        if (previousSecret.Length < 32)
+        {
+            throw new InvalidOperationException(
+                $"Jwt:PreviousSecret must be at least 32 characters (got {previousSecret.Length}).");
+        }
+
+        if (KnownInsecureSecrets.Contains(previousSecret))
+        {
+            throw new InvalidOperationException(
+                "Jwt:PreviousSecret is set to a known insecure placeholder. Set a unique, strong secret.");
         }
     }
 

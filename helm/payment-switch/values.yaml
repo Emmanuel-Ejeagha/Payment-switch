@@ -155,6 +155,10 @@ config:
     audience: "PaymentSwitch"
     # REQUIRED: provide a strong secret via --set config.jwt.secret="..." or a secrets values file
     secret: ""
+    # Optional: the previous signing key during a rotation dual-write window.
+    # Set alongside config.jwt.secret on the first rotation step; remove once
+    # the window closes (see infra/secrets/rotate-jwt.sh).
+    previousSecret: ""
   rabbitmq:
     hostName: "rabbitmq"
     # REQUIRED: provide a strong username/password via --set or a secrets values file
