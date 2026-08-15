@@ -32,4 +32,22 @@ spec:
                   number: 80
           {{- end }}
           {{- end }}
+          {{- if .Values.frontends.admin.enabled }}
+          - path: /admin
+            pathType: Prefix
+            backend:
+              service:
+                name: admin-web
+                port:
+                  number: 80
+          {{- end }}
+          {{- if .Values.frontends.merchant.enabled }}
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: merchant-web
+                port:
+                  number: 80
+          {{- end }}
 {{- end }}

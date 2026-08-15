@@ -1,0 +1,87 @@
+{{- range $name, $front := .Values.frontends }}
+{{- if $front.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $front.name }}
+  namespace: {{ $.Values.namespace }}
+  labels:
+    app: {{ $front.name }}
+    {{- include "payment-switch.labels" $ | nindent 4 }}
+spec:
+  replicas: {{ $front.replicaCount }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: {{ $front.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ $front.name }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: {{ $front.name }}
+          image: {{ include "payment-switch.image" (dict "image" $front.image "Chart" $.Chart "Release" $.Release "Values" $.Values.global) }}
+          imagePullPolicy: {{ $.Values.global.imagePullPolicy }}
+          env:
+            - name: NEXT_PUBLIC_API_URL
+              value: {{ $.Values.config.frontend.apiUrl | quote }}
+            - name: NODE_ENV
+              value: "production"
+            - name: HOSTNAME
+              value: "0.0.0.0"
+          ports:
+            - containerPort: {{ $front.containerPort }}
+          # Next.js standalone writes caches to /tmp and .next/cache; keep the
+          # root filesystem read-only and mount writable dirs instead.
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: next-cache
+              mountPath: /app/apps/{{ $name }}/.next/cache
+          resources:
+            {{- toYaml $front.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+          startupProbe:
+            httpGet:
+              path: {{ if eq $name "admin" }}/admin{{ else }}/{{ end }}
+              port: {{ $front.containerPort }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: {{ if eq $name "admin" }}/admin{{ else }}/{{ end }}
+              port: {{ $front.containerPort }}
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: {{ if eq $name "admin" }}/admin{{ else }}/{{ end }}
+              port: {{ $front.containerPort }}
+            initialDelaySeconds: 10
+            periodSeconds: 5
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: next-cache
+          emptyDir: {}
+---
+{{- end }}
+{{- end }}

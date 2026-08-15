@@ -16,3 +16,6 @@ data:
   Smtp__FromAddress: "noreply@paymentswitch.com"
   Smtp__FromName: "PaymentSwitch"
   Sms__Enabled: "false"
+  # Frontend API base URL (inlined at build time, also injected at runtime so
+  # the Next.js server-side API proxy reaches the right origin). HTTPS in prod.
+  NEXT_PUBLIC_API_URL: "http://localhost"

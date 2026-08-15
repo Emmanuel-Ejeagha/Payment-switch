@@ -31,6 +31,28 @@ spec:
       ports:
         - protocol: TCP
           port: 8080
+    # Ingress controller (nginx) traffic to the frontend web apps.
+    - from:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 3000
+        - protocol: TCP
+          port: 3001
+    # Frontend web apps reach the APIs for server-side proxy calls.
+    - from:
+        - podSelector:
+            matchLabels:
+              app: merchant-web
+        - podSelector:
+            matchLabels:
+              app: admin-web
+      ports:
+        - protocol: TCP
+          port: 8080
   egress:
     # DNS
     - to:

@@ -1,0 +1,36 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: payment-switch-frontend
+  namespace: payment-switch
+  annotations:
+    # No rewrite-target here: the merchant app serves at / and the admin app
+    # uses basePath /admin, so paths must reach the backends unchanged.
+    # Force HTTPS: HTTP requests are redirected to https (TASK-004).
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - paymentswitch.example.com
+      secretName: payment-switch-tls
+  rules:
+    - host: paymentswitch.example.com
+      http:
+        paths:
+          - path: /admin
+            pathType: Prefix
+            backend:
+              service:
+                name: admin-web
+                port:
+                  number: 80
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: merchant-web
+                port:
+                  number: 80
