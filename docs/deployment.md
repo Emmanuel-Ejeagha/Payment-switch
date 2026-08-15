@@ -1,5 +1,9 @@
 # Deployment Guide
 
+> **Compose (EC2) is the live runtime.** For day-to-day operations — deploy,
+> TLS, backups, incident response — see the **[Operations Runbook](runbook.md)**.
+> Secret provisioning and rotation live in **[Secret Management](secrets.md)**.
+
 ## Runtime Note
 
 The **current production runtime is Docker Compose on EC2** (see
