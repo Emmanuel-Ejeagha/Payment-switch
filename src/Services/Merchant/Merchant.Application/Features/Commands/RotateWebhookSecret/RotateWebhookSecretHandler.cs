@@ -36,6 +36,12 @@ public class RotateWebhookSecretHandler
         if (!command.Caller.CanAccess(merchant.OwnerId))
             return MerchantErrors.Unauthorized();
 
+        if (!command.Caller.EmailVerified)
+            return MerchantErrors.EmailNotVerified();
+
+        if (merchant.Status != MerchantStatus.Active)
+            return MerchantErrors.MerchantNotActive();
+
         try
         {
             var secret = merchant.RotateWebhookSecret();

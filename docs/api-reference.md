@@ -20,13 +20,14 @@ All endpoints return JSON. Authentication uses JWT Bearer tokens obtained from t
 
 | Method | Endpoint                              | Auth   | Description                    |
 |--------|---------------------------------------|--------|--------------------------------|
-| POST   | `/api/v1/merchants`                   | None   | Onboard a new merchant         |
+| POST   | `/api/v1/merchants`                   | User   | Onboard a new merchant (authenticated, verified owner only) |
 | GET    | `/api/v1/merchants/{id}`              | User   | Get merchant details           |
 | GET    | `/api/v1/merchants/by-email/{email}`  | User   | Get merchant by email          |
 | POST   | `/api/v1/merchants/{id}/activate`     | Admin  | Activate a pending merchant    |
 | POST   | `/api/v1/merchants/{id}/suspend`      | Admin  | Suspend an active merchant     |
-| PUT    | `/api/v1/merchants/{id}/configuration`| User   | Update webhook/payment methods |
+| PUT    | `/api/v1/merchants/{id}/configuration`| User   | Update webhook/payment methods (verified, active) |
 | GET    | `/api/v1/merchants`                   | Admin  | List merchants (paginated)     |
+| POST   | `/api/v1/merchants/{id}/webhook-secret/rotate` | User | Rotate webhook signing secret (verified, active) |
 | POST   | `/api/v1/merchants/{id}/apikeys`      | User   | Generate a secret key (`sk_live_...` / `sk_test_...`) |
 | GET    | `/api/v1/merchants/{id}/apikeys`      | User   | List secret keys (never returns the secret) |
 | DELETE | `/api/v1/merchants/{id}/apikeys/{keyId}` | User | Revoke a secret key          |
