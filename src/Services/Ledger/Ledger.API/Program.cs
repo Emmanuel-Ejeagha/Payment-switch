@@ -8,6 +8,7 @@ using BuildingBlocks.Shared.RateLimiting;
 using BuildingBlocks.Shared.Versioning;
 using BuildingBlocks.Shared.Caching;
 using BuildingBlocks.Shared.Auth;
+using BuildingBlocks.Shared.Http;
 using Ledger.API.Middlewares;
 using Ledger.API.Services;
 using Ledger.Application;
@@ -73,15 +74,7 @@ builder.Services.AddAuthorization(options =>
         policy.RequireClaim(ServiceTokenOptions.ClientTypeClaim, ServiceTokenOptions.ClientTypeService));
 });
 
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowFrontend", policy =>
-    {
-        policy.WithOrigins("http://localhost:5173", "http://localhost:3000", "http://localhost:3001", "http://localhost:3002")
-              .AllowAnyMethod()
-              .AllowAnyHeader();
-    });
-});
+builder.Services.AddPaymentSwitchCors(builder.Configuration);
 
 builder.Services.AddLedgerApplication();
 builder.Services.AddLedgerInfrastructure(builder.Configuration);
@@ -100,6 +93,7 @@ var app = builder.Build();
 app.MigrateDatabase<AppDbContext>();
 
 app.UsePaymentSwitchSecurityHeaders();
+app.UsePaymentSwitchForwardedHeaders(builder.Configuration);
 app.UseCorrelationId();
 app.UseRequestSizeLimit();
 app.UseMiddleware<ExceptionMiddleware>();

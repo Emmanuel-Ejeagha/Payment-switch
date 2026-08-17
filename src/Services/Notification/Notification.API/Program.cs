@@ -8,6 +8,7 @@ using BuildingBlocks.Shared.Middleware;
 using BuildingBlocks.Shared.RateLimiting;
 using BuildingBlocks.Shared.Versioning;
 using BuildingBlocks.Shared.Caching;
+using BuildingBlocks.Shared.Http;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi;
@@ -74,17 +75,7 @@ builder.Services.AddPaymentSwitchJwtBearer(builder.Configuration, options =>
 
 builder.Services.AddAuthorization();
 
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowFrontend", policy =>
-    {
-        policy.SetIsOriginAllowed(origin =>
-            origin.StartsWith("http://localhost", StringComparison.OrdinalIgnoreCase)
-            || origin.StartsWith("http://127.0.0.1", StringComparison.OrdinalIgnoreCase))
-              .AllowAnyMethod()
-              .AllowAnyHeader();
-    });
-});
+builder.Services.AddPaymentSwitchCors(builder.Configuration);
 builder.Services.AddSignalR();
 
 builder.Services.AddHttpClient<IMerchantGroupResolver, MerchantGroupResolver>(client =>
@@ -110,6 +101,7 @@ var app = builder.Build();
 app.MigrateDatabase<AppDbContext>();
 
 app.UsePaymentSwitchSecurityHeaders();
+app.UsePaymentSwitchForwardedHeaders(builder.Configuration);
 app.UseCorrelationId();
 app.UseRequestSizeLimit();
 app.UseMiddleware<ExceptionMiddleware>();

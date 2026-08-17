@@ -8,6 +8,7 @@ using BuildingBlocks.Shared.Middleware;
 using BuildingBlocks.Shared.RateLimiting;
 using BuildingBlocks.Shared.Versioning;
 using BuildingBlocks.Shared.Caching;
+using BuildingBlocks.Shared.Http;
 using Identity.API.Middlewares;
 using Identity.Application;
 using Identity.Infrastructure;
@@ -53,15 +54,7 @@ builder.Services.AddPaymentSwitchJwtBearer(builder.Configuration);
 
 builder.Services.AddAuthorization();
 
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowFrontend", policy =>
-    {
-        policy.WithOrigins("http://localhost:5173", "http://localhost:3000", "http://localhost:3001", "http://localhost:3002")
-              .AllowAnyMethod()
-              .AllowAnyHeader();
-    });
-});
+builder.Services.AddPaymentSwitchCors(builder.Configuration);
 
 builder.Services.AddApplication();
 builder.Services.AddIdentityInfrastructure(builder.Configuration);
@@ -86,6 +79,7 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.UsePaymentSwitchSecurityHeaders();
+app.UsePaymentSwitchForwardedHeaders(builder.Configuration);
 app.UseCorrelationId();
 app.UseRequestSizeLimit();
 app.UseMiddleware<ExceptionMiddleware>();
