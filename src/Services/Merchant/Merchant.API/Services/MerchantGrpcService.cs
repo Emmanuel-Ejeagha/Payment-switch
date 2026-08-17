@@ -62,6 +62,7 @@ public class MerchantGrpcService : MerchantService.MerchantServiceBase
         {
             response.Email = merchant.Email.Value;
             response.BusinessName = merchant.BusinessName.Value;
+            response.OwnerId = merchant.OwnerId?.ToString() ?? string.Empty;
         }
         return response;
     }

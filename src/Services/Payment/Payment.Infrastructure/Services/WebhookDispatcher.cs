@@ -88,6 +88,40 @@ public static class WebhookSignature
         var hash = hmac.ComputeHash(body);
         return $"sha256={Convert.ToHexString(hash).ToLowerInvariant()}";
     }
+
+    /// <summary>
+    /// Constant-time verification of a received webhook signature. Used by
+    /// merchants to validate a delivery (see docs/webhooks.md). The signature
+    /// is an HMAC-SHA256 of "<timestamp>.<base64(payload)>" with the signing
+    /// secret, formatted "sha256=&lt;hex&gt;".
+    /// </summary>
+    public static bool Verify(string? secret, byte[] payload, string timestamp, string signature)
+    {
+        if (string.IsNullOrWhiteSpace(signature))
+            return false;
+
+        var expected = Compute(secret, payload, out _);
+        if (expected is null || !expected.StartsWith("sha256=", StringComparison.Ordinal))
+            return false;
+
+        var expectedHex = expected[7..];
+        var providedHex = signature.Length == expected.Length && signature.StartsWith("sha256=", StringComparison.Ordinal)
+            ? signature[7..]
+            : null;
+        if (providedHex is null)
+            return false;
+
+        try
+        {
+            return CryptographicOperations.FixedTimeEquals(
+                Convert.FromHexString(expectedHex),
+                Convert.FromHexString(providedHex));
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+    }
 }
 
 /// <summary>

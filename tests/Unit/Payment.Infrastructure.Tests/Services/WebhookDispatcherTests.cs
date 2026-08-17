@@ -32,6 +32,50 @@ public class WebhookSignatureTests
 
         Assert.StartsWith("sha256=", signature);
     }
+
+    [Fact]
+    public void Verify_ValidSignature_ShouldPass()
+    {
+        var payload = System.Text.Encoding.UTF8.GetBytes("{\"id\":1}");
+        var signature = WebhookSignature.Compute("secret", payload, out var timestamp);
+
+        Assert.True(WebhookSignature.Verify("secret", payload, timestamp, signature));
+    }
+
+    [Fact]
+    public void Verify_TamperedPayload_ShouldFail()
+    {
+        var payload = System.Text.Encoding.UTF8.GetBytes("{\"id\":1}");
+        var signature = WebhookSignature.Compute("secret", payload, out var timestamp);
+
+        var tampered = System.Text.Encoding.UTF8.GetBytes("{\"id\":2}");
+        Assert.False(WebhookSignature.Verify("secret", tampered, timestamp, signature));
+    }
+
+    [Fact]
+    public void Verify_WrongSecret_ShouldFail()
+    {
+        var payload = System.Text.Encoding.UTF8.GetBytes("payload");
+        var signature = WebhookSignature.Compute("secret-a", payload, out var timestamp);
+
+        Assert.False(WebhookSignature.Verify("secret-b", payload, timestamp, signature));
+    }
+
+    [Fact]
+    public void Verify_EmptySignature_ShouldFail()
+    {
+        var payload = System.Text.Encoding.UTF8.GetBytes("payload");
+
+        Assert.False(WebhookSignature.Verify("secret", payload, "1755500000", string.Empty));
+    }
+
+    [Fact]
+    public void Verify_MalformedSignature_ShouldFail()
+    {
+        var payload = System.Text.Encoding.UTF8.GetBytes("payload");
+
+        Assert.False(WebhookSignature.Verify("secret", payload, "1755500000", "sha256=zz-not-hex"));
+    }
 }
 
 public class WebhookEventTests
