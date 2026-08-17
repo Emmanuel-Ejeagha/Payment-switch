@@ -40,12 +40,6 @@ public class UserRepository : IUserRepository
         await _context.Users.AddAsync(user, cancellationToken);
     }
 
-    public async Task UpdateAsync(User user, CancellationToken cancellationToken = default)
-    {
-        _context.Users.Update(user);
-        await Task.CompletedTask;
-    }
-
     public async Task<bool> ExistsByEmailAsync(string email, CancellationToken cancellationToken = default)
     {
         // Stored emails are normalized to lowercase (Email.cs), so compare against

@@ -34,12 +34,6 @@ public class SettlementBatchRepository : ISettlementBatchRepository
         await _context.SettlementBatches.AddAsync(batch, cancellationToken);
     }
 
-    public Task UpdateAsync(SettlementBatch batch, CancellationToken cancellationToken = default)
-    {
-        _context.SettlementBatches.Update(batch);
-        return Task.CompletedTask;
-    }
-
     public async Task<List<SettlementBatchDto>> ListAsync(DateTime? from, DateTime? to, int skip, int take, CancellationToken cancellationToken = default)
     {
         var query = _context.SettlementBatches.AsQueryable();

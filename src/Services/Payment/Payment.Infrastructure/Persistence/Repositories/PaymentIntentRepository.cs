@@ -33,12 +33,6 @@ public class PaymentIntentRepository : IPaymentIntentRepository
         await _context.PaymentIntents.AddAsync(intent, cancellationToken);
     }
 
-    public Task UpdateAsync(PaymentIntent intent, CancellationToken cancellationToken = default)
-    {
-        _context.PaymentIntents.Update(intent);
-        return Task.CompletedTask;
-    }
-
     public async Task<List<PaymentIntentDto>> ListByMerchantAsync(Guid merchantId, int skip, int take, CancellationToken cancellationToken = default)
     {
         var intents = await _context.PaymentIntents
