@@ -1,5 +1,4 @@
-﻿using BuildingBlocks.Shared.Events;
-using BuildingBlocks.Shared.Results;
+﻿using BuildingBlocks.Shared.Results;
 using Moq;
 using Notification.Application.Features.Commands.SendPendingNotification;
 using Notification.Application.Interfaces;
@@ -13,13 +12,12 @@ public class SendPendingNotificationHandlerTests
     private readonly Mock<INotificationRepository> _repoMock = new();
     private readonly Mock<INotificationSender> _senderMock = new();
     private readonly Mock<IUnitOfWork> _uowMock = new();
-    private readonly Mock<IDomainEventDispatcher> _dispatcherMock = new();
     private readonly Mock<ILogger<SendPendingNotificationHandler>> _loggerMock = new();
     private readonly SendPendingNotificationHandler _handler;
 
     public SendPendingNotificationHandlerTests()
     {
-        _handler = new SendPendingNotificationHandler(_repoMock.Object, _senderMock.Object, _uowMock.Object, _dispatcherMock.Object, _loggerMock.Object);
+        _handler = new SendPendingNotificationHandler(_repoMock.Object, _senderMock.Object, _uowMock.Object, _loggerMock.Object);
     }
 
     [Fact]

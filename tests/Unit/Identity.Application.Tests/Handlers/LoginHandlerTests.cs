@@ -1,5 +1,4 @@
-﻿using BuildingBlocks.Shared.Events;
-using FluentValidation;
+﻿using FluentValidation;
 using FluentValidation.Results;
 using Identity.Application.Commands.Auth.Login;
 using Identity.Application.Interfaces;
@@ -15,7 +14,6 @@ public class LoginHandlerTests
     private readonly Mock<IPasswordHasher> _passwordHasherMock = new();
     private readonly Mock<ITokenService> _tokenServiceMock = new();
     private readonly Mock<IUnitOfWork> _unitOfWorkMock = new();
-    private readonly Mock<IDomainEventDispatcher> _dispatcherMock = new();
     private readonly Mock<IValidator<LoginCommand>> _validatorMock = new();
     private readonly Mock<ILogger<LoginHandler>> _loggerMock = new();
     private readonly LoginHandler _handler;
@@ -27,7 +25,6 @@ public class LoginHandlerTests
             _passwordHasherMock.Object,
             _tokenServiceMock.Object,
             _unitOfWorkMock.Object,
-            _dispatcherMock.Object,
             _validatorMock.Object, _loggerMock.Object);
     }
 
@@ -49,6 +46,7 @@ public class LoginHandlerTests
             .Returns("refresh_token");
         _tokenServiceMock.Setup(t => t.HashRefreshToken(It.IsAny<string>()))
             .Returns<string>(token => $"hash-{token}");
+        _tokenServiceMock.Setup(t => t.AccessTokenExpirationSeconds).Returns(3600);
         _unitOfWorkMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);
 

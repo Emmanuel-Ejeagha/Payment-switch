@@ -1,5 +1,4 @@
-﻿using BuildingBlocks.Shared.Events;
-using BuildingBlocks.Shared.Exceptions;
+﻿using BuildingBlocks.Shared.Exceptions;
 using BuildingBlocks.Shared.Results;
 using FluentValidation;
 using Payment.Application.Interfaces;
@@ -15,7 +14,6 @@ public class AuthorizePaymentHandler
     private readonly IPaymentIntentRepository _repository;
     private readonly IPaymentGatewayService _gateway;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IDomainEventDispatcher _dispatcher;
     private readonly IValidator<AuthorizePaymentCommand> _validator;
     private readonly IMerchantService _merchantService;
     private readonly ILogger<AuthorizePaymentHandler> _logger;
@@ -24,7 +22,6 @@ public class AuthorizePaymentHandler
         IPaymentIntentRepository repository,
         IPaymentGatewayService gateway,
         IUnitOfWork unitOfWork,
-        IDomainEventDispatcher dispatcher,
         IValidator<AuthorizePaymentCommand> validator,
         IMerchantService merchantService,
         ILogger<AuthorizePaymentHandler> logger)
@@ -32,7 +29,6 @@ public class AuthorizePaymentHandler
         _repository = repository;
         _gateway = gateway;
         _unitOfWork = unitOfWork;
-        _dispatcher = dispatcher;
         _validator = validator;
         _merchantService = merchantService;
         _logger = logger;
@@ -103,8 +99,6 @@ public class AuthorizePaymentHandler
             await _unitOfWork.RollbackAsync(cancellationToken);
             return PaymentErrors.ConcurrencyConflict;
         }
-
-        await _dispatcher.DispatchAsync(intent.DomainEvents, cancellationToken);
 
         return new AuthorizePaymentResponse(intent.AuthorizationCode?.Value ?? gwResponse.GatewayReference!, gwResponse.GatewayReference!, intent.Status.Value);
     }

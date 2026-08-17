@@ -1,5 +1,4 @@
-﻿using BuildingBlocks.Shared.Events;
-using FluentValidation;
+﻿using FluentValidation;
 using FluentValidation.Results;
 using Ledger.Application.Features.Commands.ReserveFunds;
 using Ledger.Application.Interfaces;
@@ -13,14 +12,13 @@ public class ReserveFundsHandlerTests
 {
     private readonly Mock<ILedgerAccountRepository> _repoMock = new();
     private readonly Mock<IUnitOfWork> _uowMock = new();
-    private readonly Mock<IDomainEventDispatcher> _dispatcherMock = new();
     private readonly Mock<IValidator<ReserveFundsCommand>> _validatorMock = new();
     private readonly Mock<ILogger<ReserveFundsHandler>> _loggerMock = new();
     private readonly ReserveFundsHandler _handler;
 
     public ReserveFundsHandlerTests()
     {
-        _handler = new ReserveFundsHandler(_repoMock.Object, _uowMock.Object, _dispatcherMock.Object, _validatorMock.Object, _loggerMock.Object);
+        _handler = new ReserveFundsHandler(_repoMock.Object, _uowMock.Object, _validatorMock.Object, _loggerMock.Object);
     }
 
     [Fact]
@@ -41,7 +39,6 @@ public class ReserveFundsHandlerTests
         Assert.Equal(100L, account.PendingBalance);
         Assert.Equal(100L, account.ReservedBalance);
         Assert.Single(account.Journal, j => j.Type == EntryType.Credit && j.CreditAccount == GlAccountCode.Reserve);
-        _dispatcherMock.Verify(d => d.DispatchAsync(It.IsAny<IReadOnlyList<DomainEvent>>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

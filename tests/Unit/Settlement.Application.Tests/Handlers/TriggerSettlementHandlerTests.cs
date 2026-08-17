@@ -1,5 +1,4 @@
-﻿using BuildingBlocks.Shared.Events;
-using BuildingBlocks.Shared.Exceptions;
+﻿using BuildingBlocks.Shared.Exceptions;
 using BuildingBlocks.Shared.Results;
 using FluentValidation;
 using FluentValidation.Results;
@@ -16,7 +15,6 @@ public class TriggerSettlementHandlerTests
     private readonly Mock<ISettlementBatchRepository> _repoMock = new();
     private readonly Mock<ILedgerService> _ledgerMock = new();
     private readonly Mock<IUnitOfWork> _uowMock = new();
-    private readonly Mock<IDomainEventDispatcher> _dispatcherMock = new();
     private readonly Mock<IValidator<TriggerSettlementCommand>> _validatorMock = new();
     private readonly Mock<ILogger<TriggerSettlementHandler>> _loggerMock = new();
     private readonly TriggerSettlementHandler _handler;
@@ -25,7 +23,7 @@ public class TriggerSettlementHandlerTests
     {
         _handler = new TriggerSettlementHandler(
             _repoMock.Object, _ledgerMock.Object,
-            _uowMock.Object, _dispatcherMock.Object, _validatorMock.Object, _loggerMock.Object);
+            _uowMock.Object, _validatorMock.Object, _loggerMock.Object);
     }
 
     [Fact]
@@ -48,7 +46,6 @@ public class TriggerSettlementHandlerTests
         Assert.NotEqual(Guid.Empty, result.Value!.Id);
         _repoMock.Verify(r => r.AddAsync(It.Is<SettlementBatch>(b => b.BatchDate == command.BatchDate && b.Payouts.Count == 2), It.IsAny<CancellationToken>()), Times.Once);
         _uowMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
-        _dispatcherMock.Verify(d => d.DispatchAsync(It.IsAny<IReadOnlyList<DomainEvent>>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

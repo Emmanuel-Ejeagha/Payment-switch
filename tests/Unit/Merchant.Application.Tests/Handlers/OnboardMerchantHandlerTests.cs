@@ -6,14 +6,13 @@ public class OnboardMerchantHandlerTests
 {
     private readonly Mock<IMerchantRepository> _repoMock = new();
     private readonly Mock<IUnitOfWork> _uowMock = new();
-    private readonly Mock<IDomainEventDispatcher> _dispatcherMock = new();
     private readonly Mock<IValidator<OnboardMerchantCommand>> _validatorMock = new();
     private readonly Mock<ILogger<OnboardMerchantHandler>> _loggerMock = new();
     private readonly OnboardMerchantHandler _handler;
 
     public OnboardMerchantHandlerTests()
     {
-        _handler = new OnboardMerchantHandler(_repoMock.Object, _uowMock.Object, _dispatcherMock.Object, _validatorMock.Object, _loggerMock.Object);
+        _handler = new OnboardMerchantHandler(_repoMock.Object, _uowMock.Object, _validatorMock.Object, _loggerMock.Object);
     }
 
     [Fact]
@@ -30,7 +29,6 @@ public class OnboardMerchantHandlerTests
         Assert.NotEqual(Guid.Empty, result.Value!.MerchantId);
         _repoMock.Verify(r => r.AddAsync(It.Is<MerchantEntity>(m => m.BusinessName.Value == command.BusinessName && m.OwnerId == command.OwnerId), It.IsAny<CancellationToken>()), Times.Once);
         _uowMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
-        _dispatcherMock.Verify(d => d.DispatchAsync(It.IsAny<IReadOnlyList<DomainEvent>>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

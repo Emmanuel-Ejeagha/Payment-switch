@@ -1,5 +1,4 @@
-﻿using BuildingBlocks.Shared.Events;
-using FluentValidation;
+﻿using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using Payment.Application.Features.Command.AuthorizePayment;
 using Payment.Application.Features.Command.ArchivePlan;
@@ -72,8 +71,6 @@ public static class DependencyInjection
         services.AddScoped<GetSubscriptionByIdHandler>();
         services.AddScoped<ListSubscriptionsByMerchantHandler>();
         services.AddScoped<ListInvoicesHandler>();
-
-        services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
 
         services.AddValidatorsFromAssemblyContaining<CreatePaymentIntentCommandValidator>();
 

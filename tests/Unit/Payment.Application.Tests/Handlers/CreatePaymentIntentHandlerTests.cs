@@ -1,5 +1,4 @@
-﻿using BuildingBlocks.Shared.Events;
-using BuildingBlocks.Shared.Results;
+﻿using BuildingBlocks.Shared.Results;
 using FluentValidation;
 using FluentValidation.Results;
 using Moq;
@@ -18,14 +17,13 @@ public class CreatePaymentIntentHandlerTests
     private readonly Mock<IMerchantService> _merchantServiceMock = new();
     private readonly Mock<ICardTokenRepository> _cardTokenRepoMock = new();
     private readonly Mock<IUnitOfWork> _uowMock = new();
-    private readonly Mock<IDomainEventDispatcher> _dispatcherMock = new();
     private readonly Mock<IValidator<CreatePaymentIntentCommand>> _validatorMock = new();
     private readonly Mock<ILogger<CreatePaymentIntentHandler>> _loggerMock = new();
     private readonly CreatePaymentIntentHandler _handler;
 
     public CreatePaymentIntentHandlerTests()
     {
-        _handler = new CreatePaymentIntentHandler(_repoMock.Object, _gatewayMock.Object, _merchantServiceMock.Object, _cardTokenRepoMock.Object, _uowMock.Object, _dispatcherMock.Object, _validatorMock.Object, _loggerMock.Object);
+        _handler = new CreatePaymentIntentHandler(_repoMock.Object, _gatewayMock.Object, _merchantServiceMock.Object, _cardTokenRepoMock.Object, _uowMock.Object, _validatorMock.Object, _loggerMock.Object);
     }
 
     [Fact]
@@ -47,7 +45,6 @@ public class CreatePaymentIntentHandlerTests
         Assert.NotNull(result.Value!.ClientSecret);
         _repoMock.Verify(r => r.AddAsync(It.Is<PaymentIntent>(i => i.IdempotencyKey.Value == command.IdempotencyKey), It.IsAny<CancellationToken>()), Times.Once);
         _uowMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
-        _dispatcherMock.Verify(d => d.DispatchAsync(It.IsAny<IReadOnlyList<DomainEvent>>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

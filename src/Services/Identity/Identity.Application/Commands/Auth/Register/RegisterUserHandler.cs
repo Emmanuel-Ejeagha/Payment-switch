@@ -1,5 +1,4 @@
 ﻿using BuildingBlocks.Shared.Email;
-using BuildingBlocks.Shared.Events;
 using BuildingBlocks.Shared.Results;
 using BuildingBlocks.Shared.Security;
 using FluentValidation;
@@ -20,7 +19,6 @@ public class RegisterUserHandler
     private readonly IUserRepository _userRepository;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IDomainEventDispatcher _dispatcher;
     private readonly IEmailVerificationTokenFactory _tokenFactory;
     private readonly IEmailSender _emailSender;
     private readonly EmailVerificationOptions _options;
@@ -31,7 +29,6 @@ public class RegisterUserHandler
         IUserRepository userRepository,
         IPasswordHasher passwordHasher,
         IUnitOfWork unitOfWork,
-        IDomainEventDispatcher dispatcher,
         IEmailVerificationTokenFactory tokenFactory,
         IEmailSender emailSender,
         IOptions<EmailVerificationOptions> options,
@@ -41,7 +38,6 @@ public class RegisterUserHandler
         _userRepository = userRepository;
         _passwordHasher = passwordHasher;
         _unitOfWork = unitOfWork;
-        _dispatcher = dispatcher;
         _tokenFactory = tokenFactory;
         _emailSender = emailSender;
         _options = options.Value;
@@ -80,7 +76,6 @@ public class RegisterUserHandler
             // (TASK-014): map to the same graceful 409 as the primary path.
             return IdentityErrors.EmailAlreadyInUse(command.Email);
         }
-        await _dispatcher.DispatchAsync(user.DomainEvents, cancellationToken);
 
         var message = VerificationEmailBuilder.Build(user.Email.Value, token.PlainText, _options.Subject, _options.FrontendBaseUrl);
         var sendResult = await _emailSender.SendAsync(message, cancellationToken);

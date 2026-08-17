@@ -1,5 +1,4 @@
-﻿using BuildingBlocks.Shared.Events;
-using BuildingBlocks.Shared.Results;
+﻿using BuildingBlocks.Shared.Results;
 using BuildingBlocks.Shared.Security;
 using FluentValidation;
 using FluentValidation.Results;
@@ -15,17 +14,15 @@ public class LoginHandler
     private readonly IPasswordHasher _passwordHasher;
     private readonly ITokenService _tokenService;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IDomainEventDispatcher _dispatcher;
     private readonly IValidator<LoginCommand> _validator;
     private readonly ILogger<LoginHandler> _logger;
 
-    public LoginHandler(IUserRepository userRepository, IPasswordHasher passwordHasher, ITokenService tokenService, IUnitOfWork unitOfWork, IDomainEventDispatcher dispatcher, IValidator<LoginCommand> validator, ILogger<LoginHandler> logger)
+    public LoginHandler(IUserRepository userRepository, IPasswordHasher passwordHasher, ITokenService tokenService, IUnitOfWork unitOfWork, IValidator<LoginCommand> validator, ILogger<LoginHandler> logger)
     {
         _userRepository = userRepository;
         _passwordHasher = passwordHasher;
         _tokenService = tokenService;
         _unitOfWork = unitOfWork;
-        _dispatcher = dispatcher;
         _validator = validator;
         _logger = logger;
     }
@@ -62,12 +59,11 @@ public class LoginHandler
 
         var accessToken = _tokenService.GenerateAccessToken(user);
         var refreshToken = _tokenService.GenerateRefreshToken();
-        var expiresIn = 3600; // 1 hour, should come from config but hardcoded for now
+        var expiresIn = _tokenService.AccessTokenExpirationSeconds;
 
         user.AddRefreshToken(_tokenService.HashRefreshToken(refreshToken), DateTime.UtcNow.AddDays(7));
         user.EnforceRefreshTokenCap();
         await _unitOfWork.SaveChangesAsync(cancellationToken);
-        await _dispatcher.DispatchAsync(user.DomainEvents, cancellationToken);
 
         return new LoginResponse(accessToken, refreshToken, expiresIn, user.EmailConfirmed);
     }

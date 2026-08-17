@@ -1,4 +1,3 @@
-using BuildingBlocks.Shared.Events;
 using BuildingBlocks.Shared.Exceptions;
 using BuildingBlocks.Shared.Results;
 using FluentValidation;
@@ -19,7 +18,6 @@ public class ConfirmPaymentIntentHandlerTests
     private readonly Mock<IPaymentGatewayService> _gatewayMock = new();
     private readonly Mock<IMerchantService> _merchantServiceMock = new();
     private readonly Mock<IUnitOfWork> _uowMock = new();
-    private readonly Mock<IDomainEventDispatcher> _dispatcherMock = new();
     private readonly Mock<IValidator<ConfirmPaymentIntentCommand>> _validatorMock = new();
     private readonly Mock<ILogger<ConfirmPaymentIntentHandler>> _loggerMock = new();
     private readonly ConfirmPaymentIntentHandler _handler;
@@ -31,7 +29,6 @@ public class ConfirmPaymentIntentHandlerTests
             _gatewayMock.Object,
             _merchantServiceMock.Object,
             _uowMock.Object,
-            _dispatcherMock.Object,
             _validatorMock.Object,
             _loggerMock.Object);
     }
@@ -53,7 +50,6 @@ public class ConfirmPaymentIntentHandlerTests
         Assert.True(result.IsSuccess);
         Assert.Equal("Authorized", result.Value!.Status);
         Assert.Equal(intent.Id, result.Value!.IntentId);
-        _dispatcherMock.Verify(d => d.DispatchAsync(intent.DomainEvents, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

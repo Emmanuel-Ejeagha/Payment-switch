@@ -1,5 +1,4 @@
-﻿using BuildingBlocks.Shared.Events;
-using BuildingBlocks.Shared.Exceptions;
+﻿using BuildingBlocks.Shared.Exceptions;
 using FluentValidation;
 using FluentValidation.Results;
 using Ledger.Application.Features.Commands.CaptureFunds;
@@ -17,12 +16,11 @@ public class CaptureFundsHandlerTests
 {
     private readonly Mock<ILedgerAccountRepository> _repoMock = new();
     private readonly Mock<IUnitOfWork> _uowMock = new();
-    private readonly Mock<IDomainEventDispatcher> _dispatcherMock = new();
     private readonly Mock<IValidator<CaptureFundsCommand>> _validatorMock = new();
     private readonly Mock<ILogger<CaptureFundsHandler>> _loggerMock = new();
 
     private CaptureFundsHandler CreateHandler(LedgerOptions options)
-        => new(_repoMock.Object, _uowMock.Object, _dispatcherMock.Object, _validatorMock.Object, Microsoft.Extensions.Options.Options.Create(options), _loggerMock.Object);
+        => new(_repoMock.Object, _uowMock.Object, _validatorMock.Object, Microsoft.Extensions.Options.Options.Create(options), _loggerMock.Object);
 
     [Fact]
     public async Task Handle_ValidCommand_ShouldCaptureFunds()

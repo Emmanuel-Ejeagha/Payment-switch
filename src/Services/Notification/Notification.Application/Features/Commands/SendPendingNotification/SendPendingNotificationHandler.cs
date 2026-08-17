@@ -1,5 +1,4 @@
-﻿using BuildingBlocks.Shared.Events;
-using BuildingBlocks.Shared.Results;
+﻿using BuildingBlocks.Shared.Results;
 using Microsoft.Extensions.Logging;
 using Notification.Application.Interfaces;
 
@@ -10,20 +9,17 @@ public class SendPendingNotificationHandler
     private readonly INotificationRepository _repository;
     private readonly INotificationSender _sender;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IDomainEventDispatcher _dispatcher;
     private readonly ILogger<SendPendingNotificationHandler> _logger;
 
     public SendPendingNotificationHandler(
         INotificationRepository repository,
         INotificationSender sender,
         IUnitOfWork unitOfWork,
-        IDomainEventDispatcher dispatcher,
         ILogger<SendPendingNotificationHandler> logger)
     {
         _repository = repository;
         _sender = sender;
         _unitOfWork = unitOfWork;
-        _dispatcher = dispatcher;
         _logger = logger;
     }
 
@@ -51,7 +47,6 @@ public class SendPendingNotificationHandler
         notification.ReleaseLease();
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
-        await _dispatcher.DispatchAsync(notification.DomainEvents, cancellationToken);
 
         return Result.Success();
     }

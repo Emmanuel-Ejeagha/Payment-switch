@@ -1,4 +1,3 @@
-using BuildingBlocks.Shared.Events;
 using BuildingBlocks.Shared.Exceptions;
 using BuildingBlocks.Shared.Results;
 using FluentValidation;
@@ -16,7 +15,6 @@ public class ConfirmPaymentIntentHandler
     private readonly IPaymentGatewayService _gateway;
     private readonly IMerchantService _merchantService;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IDomainEventDispatcher _dispatcher;
     private readonly IValidator<ConfirmPaymentIntentCommand> _validator;
     private readonly ILogger<ConfirmPaymentIntentHandler> _logger;
 
@@ -25,7 +23,6 @@ public class ConfirmPaymentIntentHandler
         IPaymentGatewayService gateway,
         IMerchantService merchantService,
         IUnitOfWork unitOfWork,
-        IDomainEventDispatcher dispatcher,
         IValidator<ConfirmPaymentIntentCommand> validator,
         ILogger<ConfirmPaymentIntentHandler> logger)
     {
@@ -33,7 +30,6 @@ public class ConfirmPaymentIntentHandler
         _gateway = gateway;
         _merchantService = merchantService;
         _unitOfWork = unitOfWork;
-        _dispatcher = dispatcher;
         _validator = validator;
         _logger = logger;
     }
@@ -94,8 +90,6 @@ public class ConfirmPaymentIntentHandler
             await _unitOfWork.RollbackAsync(cancellationToken);
             return PaymentErrors.ConcurrencyConflict;
         }
-
-        await _dispatcher.DispatchAsync(intent.DomainEvents, cancellationToken);
 
         string? clientSecret = intent.Transactions.LastOrDefault(t => t.Type == TransactionType.Capture)?.Id.ToString();
         return new ConfirmPaymentIntentResponse(intent.Id, intent.Status.Value, clientSecret);

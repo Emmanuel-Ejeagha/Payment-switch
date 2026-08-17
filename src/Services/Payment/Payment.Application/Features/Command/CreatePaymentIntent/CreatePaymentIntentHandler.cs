@@ -1,5 +1,4 @@
-﻿using BuildingBlocks.Shared.Events;
-using BuildingBlocks.Shared.Exceptions;
+﻿using BuildingBlocks.Shared.Exceptions;
 using BuildingBlocks.Shared.Results;
 using FluentValidation;
 using Payment.Application.DTOs;
@@ -19,7 +18,6 @@ public class CreatePaymentIntentHandler
     private readonly IMerchantService _merchantService;
     private readonly ICardTokenRepository _cardTokenRepository;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IDomainEventDispatcher _dispatcher;
     private readonly IValidator<CreatePaymentIntentCommand> _validator;
     private readonly ILogger<CreatePaymentIntentHandler> _logger;
 
@@ -29,7 +27,6 @@ public class CreatePaymentIntentHandler
         IMerchantService merchantService,
         ICardTokenRepository cardTokenRepository,
         IUnitOfWork unitOfWork,
-        IDomainEventDispatcher dispatcher,
         IValidator<CreatePaymentIntentCommand> validator,
         ILogger<CreatePaymentIntentHandler> logger)
     {
@@ -38,7 +35,6 @@ public class CreatePaymentIntentHandler
         _merchantService = merchantService;
         _cardTokenRepository = cardTokenRepository;
         _unitOfWork = unitOfWork;
-        _dispatcher = dispatcher;
         _validator = validator;
         _logger = logger;
     }
@@ -104,7 +100,6 @@ public class CreatePaymentIntentHandler
                 await _unitOfWork.RollbackAsync(cancellationToken);
                 return PaymentErrors.ConcurrencyConflict;
             }
-            await _dispatcher.DispatchAsync(intent.DomainEvents, cancellationToken);
             return new PaymentIntentResponse(intent.Id, intent.Status.Value, null);
         }
 
@@ -136,7 +131,6 @@ public class CreatePaymentIntentHandler
             await _unitOfWork.RollbackAsync(cancellationToken);
             return PaymentErrors.ConcurrencyConflict;
         }
-        await _dispatcher.DispatchAsync(intent.DomainEvents, cancellationToken);
 
         return ToResponse(intent);
     }

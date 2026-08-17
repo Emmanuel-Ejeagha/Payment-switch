@@ -1,5 +1,4 @@
-﻿using BuildingBlocks.Shared.Events;
-using BuildingBlocks.Shared.Exceptions;
+﻿using BuildingBlocks.Shared.Exceptions;
 using BuildingBlocks.Shared.Results;
 using FluentValidation;
 using Ledger.Application.Interfaces;
@@ -14,20 +13,17 @@ public class ReserveFundsHandler
 {
     private readonly ILedgerAccountRepository _repository;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IDomainEventDispatcher _dispatcher;
     private readonly IValidator<ReserveFundsCommand> _validator;
     private readonly ILogger<ReserveFundsHandler> _logger;
 
     public ReserveFundsHandler(
         ILedgerAccountRepository repository,
         IUnitOfWork unitOfWork,
-        IDomainEventDispatcher dispatcher,
         IValidator<ReserveFundsCommand> validator,
         ILogger<ReserveFundsHandler> logger)
     {
         _repository = repository;
         _unitOfWork = unitOfWork;
-        _dispatcher = dispatcher;
         _validator = validator;
         _logger = logger;
     }
@@ -70,8 +66,6 @@ public class ReserveFundsHandler
             await _unitOfWork.RollbackAsync(cancellationToken);
             return LedgerErrors.ConcurrencyConflict;
         }
-
-        await _dispatcher.DispatchAsync(account.DomainEvents, cancellationToken);
 
         return Result.Success();
     }

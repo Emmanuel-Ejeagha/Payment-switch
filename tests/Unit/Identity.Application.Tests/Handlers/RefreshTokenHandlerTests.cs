@@ -1,5 +1,4 @@
 ﻿using BuildingBlocks.Shared;
-using BuildingBlocks.Shared.Events;
 using FluentValidation;
 using FluentValidation.Results;
 using Identity.Application.Commands.Auth.Tokens;
@@ -15,7 +14,6 @@ public class RefreshTokenHandlerTests
     private readonly Mock<IUserRepository> _userRepositoryMock = new();
     private readonly Mock<ITokenService> _tokenServiceMock = new();
     private readonly Mock<IUnitOfWork> _unitOfWorkMock = new();
-    private readonly Mock<IDomainEventDispatcher> _dispatcherMock = new();
     private readonly Mock<IValidator<RefreshTokenCommand>> _validatorMock = new();
     private readonly Mock<ILogger<RefreshTokenHandler>> _loggerMock = new();
     private readonly RefreshTokenHandler _handler;
@@ -26,7 +24,6 @@ public class RefreshTokenHandlerTests
             _userRepositoryMock.Object,
             _tokenServiceMock.Object,
             _unitOfWorkMock.Object,
-            _dispatcherMock.Object,
             _validatorMock.Object, _loggerMock.Object);
 
         _tokenServiceMock.Setup(t => t.HashRefreshToken(It.IsAny<string>()))

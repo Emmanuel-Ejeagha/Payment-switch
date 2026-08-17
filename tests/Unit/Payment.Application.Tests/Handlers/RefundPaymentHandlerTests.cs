@@ -1,5 +1,4 @@
-﻿using BuildingBlocks.Shared.Events;
-using BuildingBlocks.Shared.Results;
+﻿using BuildingBlocks.Shared.Results;
 using FluentValidation;
 using FluentValidation.Results;
 using Moq;
@@ -16,14 +15,13 @@ public class RefundPaymentHandlerTests
     private readonly Mock<IPaymentIntentRepository> _repoMock = new();
     private readonly Mock<IPaymentGatewayService> _gatewayMock = new();
     private readonly Mock<IUnitOfWork> _uowMock = new();
-    private readonly Mock<IDomainEventDispatcher> _dispatcherMock = new();
     private readonly Mock<IValidator<RefundPaymentCommand>> _validatorMock = new();
     private readonly Mock<ILogger<RefundPaymentHandler>> _loggerMock = new();
     private readonly RefundPaymentHandler _handler;
 
     public RefundPaymentHandlerTests()
     {
-        _handler = new RefundPaymentHandler(_repoMock.Object, _gatewayMock.Object, _uowMock.Object, _dispatcherMock.Object, _validatorMock.Object, _loggerMock.Object);
+        _handler = new RefundPaymentHandler(_repoMock.Object, _gatewayMock.Object, _uowMock.Object, _validatorMock.Object, _loggerMock.Object);
     }
 
     [Fact]

@@ -1,5 +1,4 @@
-﻿using BuildingBlocks.Shared.Events;
-using BuildingBlocks.Shared.Exceptions;
+﻿using BuildingBlocks.Shared.Exceptions;
 using BuildingBlocks.Shared.Results;
 using FluentValidation;
 using Payment.Application.Interfaces;
@@ -15,7 +14,6 @@ public class CapturePaymentHandler
     private readonly IPaymentIntentRepository _repository;
     private readonly IPaymentGatewayService _gateway;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IDomainEventDispatcher _dispatcher;
     private readonly IValidator<CapturePaymentCommand> _validator;
     private readonly ILogger<CapturePaymentHandler> _logger;
 
@@ -23,14 +21,12 @@ public class CapturePaymentHandler
         IPaymentIntentRepository repository,
         IPaymentGatewayService gateway,
         IUnitOfWork unitOfWork,
-        IDomainEventDispatcher dispatcher,
         IValidator<CapturePaymentCommand> validator,
         ILogger<CapturePaymentHandler> logger)
     {
         _repository = repository;
         _gateway = gateway;
         _unitOfWork = unitOfWork;
-        _dispatcher = dispatcher;
         _validator = validator;
         _logger = logger;
     }
@@ -88,8 +84,6 @@ public class CapturePaymentHandler
             await _unitOfWork.RollbackAsync(cancellationToken);
             return PaymentErrors.ConcurrencyConflict;
         }
-
-        await _dispatcher.DispatchAsync(intent.DomainEvents, cancellationToken);
 
         var captureTx = intent.Transactions.Last(t => t.Type == TransactionType.Capture);
         return new CapturePaymentResponse(captureTx.Id, intent.Status.Value);

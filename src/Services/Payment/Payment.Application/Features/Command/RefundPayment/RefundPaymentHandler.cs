@@ -1,5 +1,4 @@
-﻿using BuildingBlocks.Shared.Events;
-using BuildingBlocks.Shared.Exceptions;
+﻿using BuildingBlocks.Shared.Exceptions;
 using BuildingBlocks.Shared.Results;
 using FluentValidation;
 using Payment.Application.Interfaces;
@@ -15,7 +14,6 @@ public class RefundPaymentHandler
     private readonly IPaymentIntentRepository _repository;
     private readonly IPaymentGatewayService _gateway;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IDomainEventDispatcher _dispatcher;
     private readonly IValidator<RefundPaymentCommand> _validator;
     private readonly ILogger<RefundPaymentHandler> _logger;
 
@@ -23,14 +21,12 @@ public class RefundPaymentHandler
         IPaymentIntentRepository repository,
         IPaymentGatewayService gateway,
         IUnitOfWork unitOfWork,
-        IDomainEventDispatcher dispatcher,
         IValidator<RefundPaymentCommand> validator,
         ILogger<RefundPaymentHandler> logger)
     {
         _repository = repository;
         _gateway = gateway;
         _unitOfWork = unitOfWork;
-        _dispatcher = dispatcher;
         _validator = validator;
         _logger = logger;
     }
@@ -92,8 +88,6 @@ public class RefundPaymentHandler
             await _unitOfWork.RollbackAsync(cancellationToken);
             return PaymentErrors.ConcurrencyConflict;
         }
-
-        await _dispatcher.DispatchAsync(intent.DomainEvents, cancellationToken);
 
         var refundTx = intent.Transactions.Last(t => t.Type == TransactionType.Refund);
         return new RefundPaymentResponse(refundTx.Id, intent.Status.Value);

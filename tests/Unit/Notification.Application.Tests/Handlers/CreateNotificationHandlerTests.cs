@@ -1,5 +1,4 @@
-﻿using BuildingBlocks.Shared.Events;
-using FluentValidation;
+﻿using FluentValidation;
 using FluentValidation.Results;
 using Moq;
 using Notification.Application.Features.Commands.CreateNotification;
@@ -12,14 +11,13 @@ public class CreateNotificationHandlerTests
 {
     private readonly Mock<INotificationRepository> _repoMock = new();
     private readonly Mock<IUnitOfWork> _uowMock = new();
-    private readonly Mock<IDomainEventDispatcher> _dispatcherMock = new();
     private readonly Mock<IValidator<CreateNotificationCommand>> _validatorMock = new();
     private readonly Mock<ILogger<CreateNotificationHandler>> _loggerMock = new();
     private readonly CreateNotificationHandler _handler;
 
     public CreateNotificationHandlerTests()
     {
-        _handler = new CreateNotificationHandler(_repoMock.Object, _uowMock.Object, _dispatcherMock.Object, _validatorMock.Object, _loggerMock.Object);
+        _handler = new CreateNotificationHandler(_repoMock.Object, _uowMock.Object, _validatorMock.Object, _loggerMock.Object);
     }
 
     [Fact]
@@ -35,7 +33,6 @@ public class CreateNotificationHandlerTests
         Assert.NotEqual(Guid.Empty, result.Value);
         _repoMock.Verify(r => r.AddAsync(It.Is<NotificationEntity>(n => n.Recipient == command.Recipient), It.IsAny<CancellationToken>()), Times.Once);
         _uowMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
-        _dispatcherMock.Verify(d => d.DispatchAsync(It.IsAny<IReadOnlyList<DomainEvent>>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

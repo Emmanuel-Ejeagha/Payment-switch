@@ -8,14 +8,13 @@ public class UpdateSettlementInfoHandlerTests
 {
     private readonly Mock<IMerchantRepository> _repoMock = new();
     private readonly Mock<IUnitOfWork> _uowMock = new();
-    private readonly Mock<IDomainEventDispatcher> _dispatcherMock = new();
     private readonly Mock<IValidator<UpdateSettlementInfoCommand>> _validatorMock = new();
     private readonly Mock<ILogger<UpdateSettlementInfoHandler>> _loggerMock = new();
     private readonly UpdateSettlementInfoHandler _handler;
 
     public UpdateSettlementInfoHandlerTests()
     {
-        _handler = new UpdateSettlementInfoHandler(_repoMock.Object, _uowMock.Object, _dispatcherMock.Object, _validatorMock.Object, _loggerMock.Object);
+        _handler = new UpdateSettlementInfoHandler(_repoMock.Object, _uowMock.Object, _validatorMock.Object, _loggerMock.Object);
     }
 
     [Fact]
