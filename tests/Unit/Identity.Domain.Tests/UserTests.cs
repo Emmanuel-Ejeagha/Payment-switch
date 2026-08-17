@@ -23,7 +23,6 @@ public class UserTests
         Assert.True(user.IsActive);
         Assert.Contains("Merchant", user.Roles);
         Assert.Empty(user.RefreshTokens);
-        Assert.Empty(user.ApiKeys);
         Assert.NotEmpty(user.DomainEvents); // UserRegistered event
         Assert.Single(user.DomainEvents, e => e is UserRegisteredDomainEvent);
     }
@@ -63,31 +62,6 @@ public class UserTests
         var user = CreateUser();
         user.RemoveRole("Merchant");
         Assert.DoesNotContain("Merchant", user.Roles);
-    }
-
-    [Fact]
-    public void GenerateApiKey_ShouldAddKeyAndRaiseEvent()
-    {
-        var user = CreateUser();
-        var keyId = Guid.NewGuid();
-        var keyHash = "abc123";
-        user.GenerateApiKey(keyHash, "live");
-
-        Assert.Single(user.ApiKeys);
-        Assert.Equal(keyHash, user.ApiKeys[0].KeyHash);
-        Assert.Contains(user.DomainEvents, e => e is ApiKeyGeneratedDomainEvent);
-    }
-
-    [Fact]
-    public void RevokeApiKey_ShouldRevokeAndRaiseEvent()
-    {
-        var user = CreateUser();
-        var apiKey = user.GenerateApiKey("hash", "test");
-        user.ClearDomainEvents();
-
-        user.RevokeApiKey(apiKey.Id);
-        Assert.NotNull(apiKey.RevokedAt);
-        Assert.Single(user.DomainEvents, e => e is ApiKeyRevokedDomainEvent);
     }
 
     [Fact]

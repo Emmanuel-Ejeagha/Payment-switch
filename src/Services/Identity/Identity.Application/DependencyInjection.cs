@@ -1,6 +1,5 @@
 ﻿using BuildingBlocks.Shared.Events;
 using FluentValidation;
-using Identity.Application.Commands.ApiKey;
 using Identity.Application.Commands.Auth.ChangePassword;
 using Identity.Application.Commands.Auth.ForgotPassword;
 using Identity.Application.Commands.Auth.Login;
@@ -28,12 +27,9 @@ public static class DependencyInjection
         services.AddScoped<ForgotPasswordHandler>();
         services.AddScoped<ResetPasswordHandler>();
         services.AddScoped<ChangePasswordHandler>();
-        services.AddScoped<GenerateApiKeyHandler>();
-        services.AddScoped<RevokeApiKeyHandler>();
         services.AddScoped<AssignRoleHandler>();
         services.AddScoped<GetUserByIdHandler>();
         services.AddScoped<GetUserByEmailHandler>();
-        services.AddScoped<GetApiKeysHandler>();
         services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
 
 

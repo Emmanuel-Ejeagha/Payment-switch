@@ -20,10 +20,8 @@ public class User : AggregateRoot
     public DateTime? LockoutEnd { get; private set; }
     private readonly List<string> _roles = new();
     private readonly List<TokenValue> _refreshTokens = new();
-    private readonly List<ApiKey> _apiKeys = new();
     public IReadOnlyList<string> Roles => _roles.AsReadOnly();
     public IReadOnlyList<TokenValue> RefreshTokens => _refreshTokens.AsReadOnly();
-    public IReadOnlyList<ApiKey> ApiKeys => _apiKeys.AsReadOnly();
 
     private User() : base() { }
 
@@ -175,23 +173,6 @@ public class User : AggregateRoot
     public void RemoveRole(string role)
     {
         _roles.Remove(role);
-    }
-
-    public ApiKey GenerateApiKey(string keyHash, string environment)
-    {
-        var apiKey = new ApiKey(keyHash, environment);
-        _apiKeys.Add(apiKey);
-        AddDomainEvent(new ApiKeyGeneratedDomainEvent(Id, Guid.Empty, environment));
-        return apiKey;
-    }
-
-    public void RevokeApiKey(Guid keyId)
-    {
-        var apiKey = _apiKeys.FirstOrDefault(k => k.Id == keyId);
-        if (apiKey == null)
-            throw new InvalidOperationException("API key not found.");
-        apiKey.Revoke();
-        AddDomainEvent(new ApiKeyRevokedDomainEvent(Id, keyId));
     }
 
     public TokenValue AddRefreshToken(string tokenHash, DateTime expiresAt)
