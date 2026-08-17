@@ -1,8 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Shield, User, Key, Check, Trash2, Plus, Copy } from "lucide-react"
-import type { UserDto, ApiKeyDto } from "@paymentswitch/shared"
+import { Shield, User, Check } from "lucide-react"
+import type { UserDto } from "@paymentswitch/shared"
 
 export default function AdminPage() {
   const [user, setUser] = useState<UserDto | null>(null)
@@ -12,12 +12,6 @@ export default function AdminPage() {
   const [role, setRole] = useState("Admin")
   const [assigning, setAssigning] = useState(false)
   const [assignResult, setAssignResult] = useState<string | null>(null)
-
-  const [apiKeys, setApiKeys] = useState<ApiKeyDto[]>([])
-  const [keysLoading, setKeysLoading] = useState(true)
-  const [environment, setEnvironment] = useState("Development")
-  const [generating, setGenerating] = useState(false)
-  const [newKey, setNewKey] = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -29,15 +23,6 @@ export default function AdminPage() {
       }
     }
     load()
-  }, [])
-
-  useEffect(() => {
-    async function loadKeys() {
-      const res = await fetch("/api/proxy/identity/api/v1/apikeys")
-      if (res.ok) setApiKeys(await res.json())
-      setKeysLoading(false)
-    }
-    loadKeys()
   }, [])
 
   const handleAssignRole = async () => {
@@ -59,52 +44,16 @@ export default function AdminPage() {
     }
   }
 
-  const handleGenerateKey = async () => {
-    setGenerating(true)
-    setNewKey(null)
-    try {
-      const res = await fetch("/api/proxy/identity/api/v1/apikeys", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ environment }),
-      })
-      if (res.ok) {
-        const data = await res.json()
-        setNewKey(data.plainTextKey)
-        setApiKeys((prev) => [
-          { keyId: data.keyId, environment: data.environment, createdAt: data.createdAt, revokedAt: null },
-          ...prev,
-        ])
-      }
-    } finally {
-      setGenerating(false)
-    }
-  }
-
-  const handleRevokeKey = async (keyId: string) => {
-    const res = await fetch(`/api/proxy/identity/api/v1/apikeys/${keyId}`, {
-      method: "DELETE",
-    })
-    if (res.ok) {
-      setApiKeys((prev) =>
-        prev.map((k) => (k.keyId === keyId ? { ...k, revokedAt: new Date().toISOString() } : k)),
-      )
-    }
-  }
-
-  const activeKeys = apiKeys.filter((k) => !k.revokedAt)
-  const revokedKeys = apiKeys.filter((k) => k.revokedAt)
-
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-semibold">Admin</h1>
         <p className="text-sm text-muted-foreground">
-          User management and API keys
+          User management
         </p>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-6 lg:grid-cols-2">
         <div className="rounded-xl border p-6">
           <div className="flex items-center gap-2 mb-4">
             <User className="h-5 w-5 text-muted-foreground" />
@@ -178,91 +127,6 @@ export default function AdminPage() {
               <p className={`text-sm ${assignResult === "Role assigned successfully" ? "text-emerald-600" : "text-destructive"}`}>
                 {assignResult}
               </p>
-            )}
-          </div>
-        </div>
-
-        <div className="rounded-xl border p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Key className="h-5 w-5 text-muted-foreground" />
-            <h2 className="font-semibold">API Keys</h2>
-          </div>
-
-          <div className="space-y-4">
-            <div className="flex gap-2">
-              <select
-                value={environment}
-                onChange={(e) => setEnvironment(e.target.value)}
-                className="flex h-10 flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              >
-                <option value="Development">Development</option>
-                <option value="Staging">Staging</option>
-                <option value="Production">Production</option>
-              </select>
-              <button
-                onClick={handleGenerateKey}
-                disabled={generating}
-                className="inline-flex h-10 items-center gap-1 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-              >
-                <Plus className="h-4 w-4" /> Generate
-              </button>
-            </div>
-
-            {newKey && (
-              <div className="rounded-lg border border-emerald-500/50 bg-emerald-500/10 p-3">
-                <p className="text-xs font-medium text-emerald-600 mb-1">Copy your new API key now — it won&apos;t be shown again:</p>
-                <div className="flex items-center gap-2">
-                  <code className="flex-1 truncate rounded bg-background px-2 py-1 text-xs font-mono">{newKey}</code>
-                  <button
-                    onClick={() => { navigator.clipboard.writeText(newKey); setNewKey(null) }}
-                    className="shrink-0 rounded p-1 hover:bg-emerald-500/20"
-                  >
-                    <Copy className="h-4 w-4 text-emerald-600" />
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {keysLoading ? (
-              <div className="h-20 animate-pulse rounded bg-muted" />
-            ) : activeKeys.length === 0 && revokedKeys.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No API keys yet.</p>
-            ) : (
-              <div className="space-y-3">
-                {activeKeys.map((k) => (
-                  <div key={k.keyId} className="flex items-center justify-between rounded-lg border p-3">
-                    <div>
-                      <p className="text-sm font-medium">{k.environment}</p>
-                      <p className="text-xs text-muted-foreground">
-                        Created {new Date(k.createdAt).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => handleRevokeKey(k.keyId)}
-                      className="rounded p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                ))}
-                {revokedKeys.length > 0 && (
-                  <details className="text-xs text-muted-foreground">
-                    <summary className="cursor-pointer py-1">
-                      {revokedKeys.length} revoked key{revokedKeys.length !== 1 ? "s" : ""}
-                    </summary>
-                    <div className="mt-2 space-y-2">
-                      {revokedKeys.map((k) => (
-                        <div key={k.keyId} className="flex items-center justify-between rounded-lg border border-dashed p-2 opacity-60">
-                          <div>
-                            <p className="text-sm font-medium">{k.environment}</p>
-                            <p className="text-xs">Revoked {k.revokedAt ? new Date(k.revokedAt).toLocaleDateString() : ""}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </details>
-                )}
-              </div>
             )}
           </div>
         </div>

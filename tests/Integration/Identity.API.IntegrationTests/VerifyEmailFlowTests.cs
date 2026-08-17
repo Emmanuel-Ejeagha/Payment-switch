@@ -7,11 +7,10 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Identity.API.IntegrationTests;
 
 /// <summary>
-/// Phase 3 exit criterion: proves the register → verify → login → gated-flow
-/// works end-to-end through the real Identity API and database. Registering a
-/// user must produce a verification email, the plaintext token from that email
-/// must confirm the account (single-use), and API-key generation must be blocked
-/// until the email is verified.
+/// Phase 3 exit criterion: proves the register → verify → login flow works
+/// end-to-end through the real Identity API and database. Registering a user
+/// must produce a verification email, the plaintext token from that email must
+/// confirm the account (single-use), and logins must report email confirmation.
 /// </summary>
 public class VerifyEmailFlowTests : IClassFixture<IdentityApiFactory>
 {
@@ -25,7 +24,7 @@ public class VerifyEmailFlowTests : IClassFixture<IdentityApiFactory>
     }
 
     [Fact]
-    public async Task Register_Verify_Login_AndGenerateApiKey_FullFlow()
+    public async Task Register_Verify_Login_FullFlow()
     {
         var email = $"verify-{Guid.NewGuid()}@example.com";
         var password = "Test123456!";
@@ -37,14 +36,9 @@ public class VerifyEmailFlowTests : IClassFixture<IdentityApiFactory>
         var token = AssertTokenFrom(email);
         Assert.False(await IsVerifiedAsync(userId));
 
-        // Gated: generating an API key before verification is refused.
-        var accessToken = await LoginAsync(email, password);
-        var blocked = await _client.SendAsync(new HttpRequestMessage(HttpMethod.Post, "/api/v1/ApiKeys")
-        {
-            Headers = { Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken) },
-            Content = JsonContent.Create(new { Environment = "test" })
-        });
-        Assert.Equal(System.Net.HttpStatusCode.Forbidden, blocked.StatusCode);
+        // Login before verification reports the account as unconfirmed.
+        var loginBefore = await LoginAsync(email, password);
+        Assert.False(loginBefore.EmailConfirmed);
 
         // Verify with the captured token → sealed.
         var verify = await _client.PostAsJsonAsync("/api/v1/auth/verify-email", new
@@ -63,16 +57,9 @@ public class VerifyEmailFlowTests : IClassFixture<IdentityApiFactory>
         });
         Assert.Equal(System.Net.HttpStatusCode.Conflict, duplicate.StatusCode);
 
-        // Gating lifts: API-key generation now succeeds.
-        var allowed = await _client.SendAsync(new HttpRequestMessage(HttpMethod.Post, "/api/v1/ApiKeys")
-        {
-            Headers = { Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken) },
-            Content = JsonContent.Create(new { Environment = "test" })
-        });
-        Assert.Equal(System.Net.HttpStatusCode.OK, allowed.StatusCode);
-        var key = await allowed.Content.ReadFromJsonAsync<ApiKeyResponse>();
-        Assert.NotNull(key);
-        Assert.StartsWith("sk_test_", key!.PlainTextKey);
+        // Login after verification reports the account as confirmed.
+        var loginAfter = await LoginAsync(email, password);
+        Assert.True(loginAfter.EmailConfirmed);
     }
 
     [Fact]
@@ -161,7 +148,7 @@ public class VerifyEmailFlowTests : IClassFixture<IdentityApiFactory>
         return result!.UserId;
     }
 
-    private async Task<string> LoginAsync(string email, string password)
+    private async Task<LoginResponse> LoginAsync(string email, string password)
     {
         var loginResponse = await _client.PostAsJsonAsync("/api/v1/auth/login", new
         {
@@ -172,7 +159,7 @@ public class VerifyEmailFlowTests : IClassFixture<IdentityApiFactory>
         Assert.Equal(System.Net.HttpStatusCode.OK, loginResponse.StatusCode);
         var result = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>();
         Assert.NotNull(result);
-        return result!.AccessToken;
+        return result!;
     }
 
     private string AssertTokenFrom(string email)
@@ -198,6 +185,5 @@ public class VerifyEmailFlowTests : IClassFixture<IdentityApiFactory>
     }
 
     private record RegisterResponse(Guid UserId);
-    private record LoginResponse(string AccessToken, string RefreshToken, int ExpiresIn);
-    private record ApiKeyResponse(Guid KeyId, string PlainTextKey, string Environment, DateTime CreatedAt);
+    private record LoginResponse(string AccessToken, string RefreshToken, int ExpiresIn, bool EmailConfirmed);
 }

@@ -43,15 +43,6 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
             rt.ToTable("RefreshTokens");
         });
 
-        builder.HasMany(u => u.ApiKeys)
-           .WithOne()
-           .HasForeignKey("UserId")
-           .OnDelete(DeleteBehavior.Cascade);
-
-        builder.Navigation(u => u.ApiKeys)
-       .UsePropertyAccessMode(PropertyAccessMode.Field)
-       .HasField("_apiKeys");
-
         builder.Property(u => u.IsActive).IsRequired();
         builder.Property(u => u.EmailConfirmed).IsRequired();
         builder.Property(u => u.EmailVerifiedAt);
