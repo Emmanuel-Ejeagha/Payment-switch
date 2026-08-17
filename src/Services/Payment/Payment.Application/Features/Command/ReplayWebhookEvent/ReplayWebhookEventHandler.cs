@@ -1,4 +1,3 @@
-using BuildingBlocks.Shared.Events;
 using BuildingBlocks.Shared.Results;
 using FluentValidation;
 using Microsoft.Extensions.Logging;
@@ -12,20 +11,17 @@ public class ReplayWebhookEventHandler
 {
     private readonly IWebhookEventRepository _repository;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IDomainEventDispatcher _dispatcher;
     private readonly IValidator<ReplayWebhookEventCommand> _validator;
     private readonly ILogger<ReplayWebhookEventHandler> _logger;
 
     public ReplayWebhookEventHandler(
         IWebhookEventRepository repository,
         IUnitOfWork unitOfWork,
-        IDomainEventDispatcher dispatcher,
         IValidator<ReplayWebhookEventCommand> validator,
         ILogger<ReplayWebhookEventHandler> logger)
     {
         _repository = repository;
         _unitOfWork = unitOfWork;
-        _dispatcher = dispatcher;
         _validator = validator;
         _logger = logger;
     }

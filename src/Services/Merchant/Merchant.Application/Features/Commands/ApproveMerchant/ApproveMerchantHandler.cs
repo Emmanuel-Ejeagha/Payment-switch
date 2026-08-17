@@ -6,20 +6,17 @@ public class ApproveMerchantHandler
 {
     private readonly IMerchantRepository _repository;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IDomainEventDispatcher _dispatcher;
     private readonly IValidator<ApproveMerchantCommand> _validator;
     private readonly ILogger<ApproveMerchantHandler> _logger;
 
     public ApproveMerchantHandler(
         IMerchantRepository repository,
         IUnitOfWork unitOfWork,
-        IDomainEventDispatcher dispatcher,
         IValidator<ApproveMerchantCommand> validator,
         ILogger<ApproveMerchantHandler> logger)
     {
         _repository = repository;
         _unitOfWork = unitOfWork;
-        _dispatcher = dispatcher;
         _validator = validator;
         _logger = logger;
     }
@@ -46,7 +43,6 @@ public class ApproveMerchantHandler
         }
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
-        await _dispatcher.DispatchAsync(merchant.DomainEvents, cancellationToken);
         return Result.Success();
     }
 }

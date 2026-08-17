@@ -6,20 +6,17 @@ public class UpdateContactDetailsHandler
 {
     private readonly IMerchantRepository _repository;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IDomainEventDispatcher _dispatcher;
     private readonly IValidator<UpdateContactDetailsCommand> _validator;
     private readonly ILogger<UpdateContactDetailsHandler> _logger;
 
     public UpdateContactDetailsHandler(
         IMerchantRepository repository,
         IUnitOfWork unitOfWork,
-        IDomainEventDispatcher dispatcher,
         IValidator<UpdateContactDetailsCommand> validator,
         ILogger<UpdateContactDetailsHandler> logger)
     {
         _repository = repository;
         _unitOfWork = unitOfWork;
-        _dispatcher = dispatcher;
         _validator = validator;
         _logger = logger;
     }
@@ -42,7 +39,6 @@ public class UpdateContactDetailsHandler
         merchant.UpdateContactDetails(new ContactDetails(command.Phone, command.Address, command.ContactPerson));
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
-        await _dispatcher.DispatchAsync(merchant.DomainEvents, cancellationToken);
         return Result.Success();
     }
 }

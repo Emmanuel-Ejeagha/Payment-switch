@@ -7,14 +7,13 @@ public class ApproveMerchantHandlerTests
 {
     private readonly Mock<IMerchantRepository> _repoMock = new();
     private readonly Mock<IUnitOfWork> _uowMock = new();
-    private readonly Mock<IDomainEventDispatcher> _dispatcherMock = new();
     private readonly Mock<IValidator<ApproveMerchantCommand>> _validatorMock = new();
     private readonly Mock<ILogger<ApproveMerchantHandler>> _loggerMock = new();
     private readonly ApproveMerchantHandler _handler;
 
     public ApproveMerchantHandlerTests()
     {
-        _handler = new ApproveMerchantHandler(_repoMock.Object, _uowMock.Object, _dispatcherMock.Object, _validatorMock.Object, _loggerMock.Object);
+        _handler = new ApproveMerchantHandler(_repoMock.Object, _uowMock.Object, _validatorMock.Object, _loggerMock.Object);
     }
 
     [Fact]

@@ -1,5 +1,4 @@
 ﻿using BuildingBlocks.Shared;
-using BuildingBlocks.Shared.Events;
 using FluentValidation;
 using Ledger.Application.Features.Commands.CaptureFunds;
 using Ledger.Application.Features.Commands.CreateLedgerAccount;
@@ -29,8 +28,6 @@ public static class DependencyInjection
         services.AddScoped<RunReconciliationHandler>();
         services.AddScoped<GetLatestReconciliationHandler>();
         services.AddScoped<ListReconciliationReportsHandler>();
-
-        services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
 
         services.AddValidatorsFromAssemblyContaining<CreateLedgerAccountCommandValidator>();
 

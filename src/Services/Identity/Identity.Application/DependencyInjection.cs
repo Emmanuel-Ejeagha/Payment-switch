@@ -1,5 +1,4 @@
-﻿using BuildingBlocks.Shared.Events;
-using FluentValidation;
+﻿using FluentValidation;
 using Identity.Application.Commands.Auth.ChangePassword;
 using Identity.Application.Commands.Auth.ForgotPassword;
 using Identity.Application.Commands.Auth.Login;
@@ -30,8 +29,6 @@ public static class DependencyInjection
         services.AddScoped<AssignRoleHandler>();
         services.AddScoped<GetUserByIdHandler>();
         services.AddScoped<GetUserByEmailHandler>();
-        services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
-
 
         services.AddValidatorsFromAssemblyContaining<RegisterUserCommandValidator>();
 

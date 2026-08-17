@@ -6,20 +6,17 @@ public class UpdateSettlementInfoHandler
 {
     private readonly IMerchantRepository _repository;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IDomainEventDispatcher _dispatcher;
     private readonly IValidator<UpdateSettlementInfoCommand> _validator;
     private readonly ILogger<UpdateSettlementInfoHandler> _logger;
 
     public UpdateSettlementInfoHandler(
         IMerchantRepository repository,
         IUnitOfWork unitOfWork,
-        IDomainEventDispatcher dispatcher,
         IValidator<UpdateSettlementInfoCommand> validator,
         ILogger<UpdateSettlementInfoHandler> logger)
     {
         _repository = repository;
         _unitOfWork = unitOfWork;
-        _dispatcher = dispatcher;
         _validator = validator;
         _logger = logger;
     }
@@ -49,7 +46,6 @@ public class UpdateSettlementInfoHandler
         merchant.UpdateSettlementInfo(settlementInfo);
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
-        await _dispatcher.DispatchAsync(merchant.DomainEvents, cancellationToken);
         return Result.Success();
     }
 }

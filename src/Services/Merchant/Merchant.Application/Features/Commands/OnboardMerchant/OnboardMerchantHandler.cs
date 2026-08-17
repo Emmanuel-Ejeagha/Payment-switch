@@ -6,20 +6,17 @@ public class OnboardMerchantHandler
 {
     private readonly IMerchantRepository _repository;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IDomainEventDispatcher _dispatcher;
     private readonly IValidator<OnboardMerchantCommand> _validator;
     private readonly ILogger<OnboardMerchantHandler> _logger;
 
     public OnboardMerchantHandler(
         IMerchantRepository repository,
         IUnitOfWork unitOfWork,
-        IDomainEventDispatcher dispatcher,
         IValidator<OnboardMerchantCommand> validator,
         ILogger<OnboardMerchantHandler> logger)
     {
         _repository = repository;
         _unitOfWork = unitOfWork;
-        _dispatcher = dispatcher;
         _validator = validator;
         _logger = logger;
     }
@@ -41,7 +38,6 @@ public class OnboardMerchantHandler
 
         await _repository.AddAsync(merchant, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
-        await _dispatcher.DispatchAsync(merchant.DomainEvents, cancellationToken);
 
         return new OnboardMerchantResponse(merchant.Id);
     }

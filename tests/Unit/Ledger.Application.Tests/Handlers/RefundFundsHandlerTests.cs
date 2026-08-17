@@ -1,4 +1,3 @@
-using BuildingBlocks.Shared.Events;
 using FluentValidation;
 using FluentValidation.Results;
 using Ledger.Application.Features.Commands.RefundFunds;
@@ -13,12 +12,11 @@ public class RefundFundsHandlerTests
 {
     private readonly Mock<ILedgerAccountRepository> _repoMock = new();
     private readonly Mock<IUnitOfWork> _uowMock = new();
-    private readonly Mock<IDomainEventDispatcher> _dispatcherMock = new();
     private readonly Mock<IValidator<RefundFundsCommand>> _validatorMock = new();
     private readonly Mock<ILogger<RefundFundsHandler>> _loggerMock = new();
 
     private RefundFundsHandler CreateHandler()
-        => new(_repoMock.Object, _uowMock.Object, _dispatcherMock.Object, _validatorMock.Object, _loggerMock.Object);
+        => new(_repoMock.Object, _uowMock.Object, _validatorMock.Object, _loggerMock.Object);
 
     [Fact]
     public async Task Handle_ValidCommand_ShouldRefundFunds()
@@ -37,7 +35,6 @@ public class RefundFundsHandlerTests
         Assert.True(result.IsSuccess);
         Assert.Equal(800L, account.AvailableBalance);
         Assert.Single(account.Journal, j => j.Type == EntryType.Debit && j.Amount.Amount == 200L);
-        _dispatcherMock.Verify(d => d.DispatchAsync(It.IsAny<IReadOnlyList<DomainEvent>>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

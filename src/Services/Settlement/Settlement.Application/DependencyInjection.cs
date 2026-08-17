@@ -1,5 +1,4 @@
-﻿using BuildingBlocks.Shared.Events;
-using FluentValidation;
+﻿using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using Settlement.Application.Features.Command.TriggerSettlement;
 using Settlement.Application.Features.Queries.GetSettlementBatch;
@@ -14,8 +13,6 @@ public static class DependencyInjection
         services.AddScoped<TriggerSettlementHandler>();
         services.AddScoped<GetSettlementBatchHandler>();
         services.AddScoped<ListSettlementBatchesHandler>();
-
-        services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
 
         services.AddValidatorsFromAssemblyContaining<TriggerSettlementCommandValidator>();
 

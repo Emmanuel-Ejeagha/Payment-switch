@@ -1,5 +1,4 @@
-﻿using BuildingBlocks.Shared.Events;
-using BuildingBlocks.Shared.Results;
+﻿using BuildingBlocks.Shared.Results;
 using FluentValidation;
 using Identity.Application.Interfaces;
 using Microsoft.Extensions.Logging;
@@ -14,16 +13,14 @@ public class RefreshTokenHandler
     private readonly IUserRepository _userRepository;
     private readonly ITokenService _tokenService;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IDomainEventDispatcher _dispatcher;
     private readonly IValidator<RefreshTokenCommand> _validator;
     private readonly ILogger<RefreshTokenHandler> _logger;
 
-    public RefreshTokenHandler(IUserRepository userRepository, ITokenService tokenService, IUnitOfWork unitOfWork, IDomainEventDispatcher dispatcher, IValidator<RefreshTokenCommand> validator, ILogger<RefreshTokenHandler> logger)
+    public RefreshTokenHandler(IUserRepository userRepository, ITokenService tokenService, IUnitOfWork unitOfWork, IValidator<RefreshTokenCommand> validator, ILogger<RefreshTokenHandler> logger)
     {
         _userRepository = userRepository;
         _tokenService = tokenService;
         _unitOfWork = unitOfWork;
-        _dispatcher = dispatcher;
         _validator = validator;
         _logger = logger;
     }
@@ -59,8 +56,7 @@ public class RefreshTokenHandler
         user.EnforceRefreshTokenCap();
         await _userRepository.PruneRefreshTokensAsync(cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
-        await _dispatcher.DispatchAsync(user.DomainEvents, cancellationToken);
 
-        return new RefreshTokenResponse(newAccessToken, newRefreshToken, 3600);
+        return new RefreshTokenResponse(newAccessToken, newRefreshToken, _tokenService.AccessTokenExpirationSeconds);
     }
 }

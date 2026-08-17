@@ -39,8 +39,6 @@ public static class DependencyInjection
         services.AddScoped<ListMerchantsHandler>();
         services.AddScoped<GetMerchantApiKeysHandler>();
 
-        services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
-
         services.AddValidatorsFromAssemblyContaining<OnboardMerchantCommandValidator>();
 
         return services;

@@ -1,4 +1,3 @@
-using BuildingBlocks.Shared.Events;
 using BuildingBlocks.Shared.Results;
 using Microsoft.Extensions.Logging;
 using Payment.Application.Features.Command.CapturePayment;
@@ -21,7 +20,6 @@ public class CollectSubscriptionCycleHandler
     private readonly CreatePaymentIntentHandler _createIntent;
     private readonly CapturePaymentHandler _capture;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IDomainEventDispatcher _dispatcher;
     private readonly ILogger<CollectSubscriptionCycleHandler> _logger;
 
     public CollectSubscriptionCycleHandler(
@@ -31,7 +29,6 @@ public class CollectSubscriptionCycleHandler
         CreatePaymentIntentHandler createIntent,
         CapturePaymentHandler capture,
         IUnitOfWork unitOfWork,
-        IDomainEventDispatcher dispatcher,
         ILogger<CollectSubscriptionCycleHandler> logger)
     {
         _subscriptions = subscriptions;
@@ -40,7 +37,6 @@ public class CollectSubscriptionCycleHandler
         _createIntent = createIntent;
         _capture = capture;
         _unitOfWork = unitOfWork;
-        _dispatcher = dispatcher;
         _logger = logger;
     }
 
@@ -76,7 +72,6 @@ public class CollectSubscriptionCycleHandler
 
             await _invoices.AddAsync(invoice, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
-            await _dispatcher.DispatchAsync(invoice.DomainEvents, cancellationToken);
 
             _logger.LogInformation(
                 "Issued invoice {InvoiceCode} for subscription {SubscriptionCode} covering {PeriodStart:o}",
@@ -88,7 +83,6 @@ public class CollectSubscriptionCycleHandler
             // A prior attempt collected but did not roll the period forward; finish the job.
             subscription.MarkCyclePaid(plan.Interval);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
-            await _dispatcher.DispatchAsync(subscription.DomainEvents, cancellationToken);
 
             return Success(subscription, invoice);
         }
@@ -146,8 +140,6 @@ public class CollectSubscriptionCycleHandler
         subscription.MarkCyclePaid(plan.Interval);
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
-        await _dispatcher.DispatchAsync(invoice.DomainEvents, cancellationToken);
-        await _dispatcher.DispatchAsync(subscription.DomainEvents, cancellationToken);
 
         _logger.LogInformation(
             "Collected invoice {InvoiceCode} for subscription {SubscriptionCode}; next billing {NextBillingAt:o}",
@@ -186,8 +178,6 @@ public class CollectSubscriptionCycleHandler
         }
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
-        await _dispatcher.DispatchAsync(invoice.DomainEvents, cancellationToken);
-        await _dispatcher.DispatchAsync(subscription.DomainEvents, cancellationToken);
 
         return new CollectSubscriptionCycleResponse(
             subscription.Id,

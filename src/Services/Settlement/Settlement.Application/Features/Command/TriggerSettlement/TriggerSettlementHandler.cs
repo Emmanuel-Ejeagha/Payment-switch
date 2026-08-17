@@ -1,5 +1,4 @@
-﻿using BuildingBlocks.Shared.Events;
-using BuildingBlocks.Shared.Exceptions;
+﻿using BuildingBlocks.Shared.Exceptions;
 using BuildingBlocks.Shared.Results;
 using FluentValidation;
 using Microsoft.Extensions.Logging;
@@ -16,7 +15,6 @@ public class TriggerSettlementHandler
     private readonly ISettlementBatchRepository _repository;
     private readonly ILedgerService _ledgerService;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IDomainEventDispatcher _dispatcher;
     private readonly IValidator<TriggerSettlementCommand> _validator;
     private readonly ILogger<TriggerSettlementHandler> _logger;
 
@@ -24,14 +22,12 @@ public class TriggerSettlementHandler
         ISettlementBatchRepository repository,
         ILedgerService ledgerService,
         IUnitOfWork unitOfWork,
-        IDomainEventDispatcher dispatcher,
         IValidator<TriggerSettlementCommand> validator,
         ILogger<TriggerSettlementHandler> logger)
     {
         _repository = repository;
         _ledgerService = ledgerService;
         _unitOfWork = unitOfWork;
-        _dispatcher = dispatcher;
         _validator = validator;
         _logger = logger;
     }
@@ -106,7 +102,6 @@ public class TriggerSettlementHandler
                 return new TriggerSettlementResponse(existingBatch.Id);
             return new Error("Settlement.BatchCreateFailed", "Could not create settlement batch.");
         }
-        await _dispatcher.DispatchAsync(batch.DomainEvents, cancellationToken);
 
         return new TriggerSettlementResponse(batch.Id);
     }

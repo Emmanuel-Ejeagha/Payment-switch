@@ -6,20 +6,17 @@ public class SuspendMerchantHandler
 {
     private readonly IMerchantRepository _repository;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IDomainEventDispatcher _dispatcher;
     private readonly IValidator<SuspendMerchantCommand> _validator;
     private readonly ILogger<SuspendMerchantHandler> _logger;
 
     public SuspendMerchantHandler(
         IMerchantRepository repository,
         IUnitOfWork unitOfWork,
-        IDomainEventDispatcher dispatcher,
         IValidator<SuspendMerchantCommand> validator,
         ILogger<SuspendMerchantHandler> logger)
     {
         _repository = repository;
         _unitOfWork = unitOfWork;
-        _dispatcher = dispatcher;
         _validator = validator;
         _logger = logger;
     }
@@ -46,7 +43,6 @@ public class SuspendMerchantHandler
         }
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
-        await _dispatcher.DispatchAsync(merchant.DomainEvents, cancellationToken);
         return Result.Success();
     }
 }

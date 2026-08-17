@@ -1,6 +1,5 @@
 ﻿using BuildingBlocks.Shared;
 using BuildingBlocks.Shared.Email;
-using BuildingBlocks.Shared.Events;
 using BuildingBlocks.Shared.Results;
 using FluentValidation;
 using FluentValidation.Results;
@@ -20,7 +19,6 @@ public class RegisterUserHandlerTests
     private readonly Mock<IUserRepository> _userRepositoryMock = new();
     private readonly Mock<IPasswordHasher> _passwordHasherMock = new();
     private readonly Mock<IUnitOfWork> _unitOfWorkMock = new();
-    private readonly Mock<IDomainEventDispatcher> _dispatcherMock = new();
     private readonly Mock<IEmailVerificationTokenFactory> _tokenFactoryMock = new();
     private readonly Mock<IEmailSender> _emailSenderMock = new();
     private readonly IOptions<EmailVerificationOptions> _options;
@@ -40,7 +38,6 @@ public class RegisterUserHandlerTests
             _userRepositoryMock.Object,
             _passwordHasherMock.Object,
             _unitOfWorkMock.Object,
-            _dispatcherMock.Object,
             _tokenFactoryMock.Object,
             _emailSenderMock.Object,
             _options,
@@ -59,8 +56,6 @@ public class RegisterUserHandlerTests
             .Returns(new PasswordHash("hashed_password"));
         _unitOfWorkMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);
-        _dispatcherMock.Setup(d => d.DispatchAsync(It.IsAny<IReadOnlyList<DomainEvent>>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
 
         // Act
         var result = await _handler.Handle(command);
@@ -74,7 +69,6 @@ public class RegisterUserHandlerTests
             u.EmailVerificationTokenHash == "token-hash" &&
             u.EmailVerificationTokenExpiresAt != null), It.IsAny<CancellationToken>()), Times.Once);
         _unitOfWorkMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
-        _dispatcherMock.Verify(d => d.DispatchAsync(It.IsAny<IReadOnlyList<DomainEvent>>(), It.IsAny<CancellationToken>()), Times.Once);
         _emailSenderMock.Verify(s => s.SendAsync(
             It.Is<EmailMessage>(m => m.To == command.Email && m.TextBody.Contains("plain-token")),
             It.IsAny<CancellationToken>()), Times.Once);
@@ -153,8 +147,6 @@ public class RegisterUserHandlerTests
             .Returns(new PasswordHash("hashed_password"));
         _unitOfWorkMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);
-        _dispatcherMock.Setup(d => d.DispatchAsync(It.IsAny<IReadOnlyList<DomainEvent>>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
         _emailSenderMock.Setup(s => s.SendAsync(It.IsAny<EmailMessage>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Error("Email.SendFailed", "SMTP down"));
 

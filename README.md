@@ -82,8 +82,8 @@ The system follows **Domain‑Driven Design (DDD)**, **CQRS**, and **Event‑Dri
 
 | Service        | Database           | Responsibilities                                                                                     |
 |----------------|--------------------|------------------------------------------------------------------------------------------------------|
-| **Identity**   | `IdentityDb`       | User registration, login, JWT issuance, API key management, role‑based access control                |
-| **Merchant**   | `MerchantDb`       | Merchant onboarding, activation/suspension, webhook & payment method configuration                   |
+| **Identity**   | `IdentityDb`       | User registration, login, JWT issuance, role‑based access control                |
+| **Merchant**   | `MerchantDb`       | Merchant onboarding, activation/suspension, webhook & payment method configuration, API key management |
 | **Payment**    | `PaymentDb`        | Payment intent creation, authorization, capture, void, refund, idempotency, routing (simulated)      |
 | **Ledger**     | `LedgerDb`         | Double‑entry ledger, merchant balances (available/pending/reserved), immutable journal entries       |
 | **Notification**| `NotificationDb`  | Email / SMS / Webhook dispatch with retry & exponential backoff, driven by payment events            |

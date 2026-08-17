@@ -1,5 +1,4 @@
-﻿using BuildingBlocks.Shared.Events;
-using BuildingBlocks.Shared.Results;
+﻿using BuildingBlocks.Shared.Results;
 using FluentValidation;
 using Microsoft.Extensions.Logging;
 using Notification.Application.Interfaces;
@@ -12,20 +11,17 @@ public class CreateNotificationHandler
 {
     private readonly INotificationRepository _repository;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IDomainEventDispatcher _dispatcher;
     private readonly IValidator<CreateNotificationCommand> _validator;
     private readonly ILogger<CreateNotificationHandler> _logger;
 
     public CreateNotificationHandler(
         INotificationRepository repository,
         IUnitOfWork unitOfWork,
-        IDomainEventDispatcher dispatcher,
         IValidator<CreateNotificationCommand> validator,
         ILogger<CreateNotificationHandler> logger)
     {
         _repository = repository;
         _unitOfWork = unitOfWork;
-        _dispatcher = dispatcher;
         _validator = validator;
         _logger = logger;
     }
@@ -51,7 +47,6 @@ public class CreateNotificationHandler
 
         await _repository.AddAsync(notification, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
-        await _dispatcher.DispatchAsync(notification.DomainEvents, cancellationToken);
 
         return notification.Id;
     }

@@ -1,4 +1,3 @@
-using BuildingBlocks.Shared.Events;
 using BuildingBlocks.Shared.Results;
 using FluentValidation;
 using FluentValidation.Results;
@@ -62,7 +61,6 @@ public class ReplayWebhookEventHandlerTests
 {
     private readonly Mock<IWebhookEventRepository> _repoMock = new();
     private readonly Mock<IUnitOfWork> _uowMock = new();
-    private readonly Mock<IDomainEventDispatcher> _dispatcherMock = new();
     private readonly Mock<IValidator<ReplayWebhookEventCommand>> _validatorMock = new();
     private readonly Mock<ILogger<ReplayWebhookEventHandler>> _loggerMock = new();
     private readonly ReplayWebhookEventHandler _handler;
@@ -72,7 +70,6 @@ public class ReplayWebhookEventHandlerTests
         _handler = new ReplayWebhookEventHandler(
             _repoMock.Object,
             _uowMock.Object,
-            _dispatcherMock.Object,
             _validatorMock.Object,
             _loggerMock.Object);
     }

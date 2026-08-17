@@ -1,5 +1,4 @@
-﻿using BuildingBlocks.Shared.Events;
-using BuildingBlocks.Shared.Exceptions;
+﻿using BuildingBlocks.Shared.Exceptions;
 using BuildingBlocks.Shared.Results;
 using FluentValidation;
 using Ledger.Application.Common;
@@ -16,7 +15,6 @@ public class CaptureFundsHandler
 {
     private readonly ILedgerAccountRepository _repository;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IDomainEventDispatcher _dispatcher;
     private readonly IValidator<CaptureFundsCommand> _validator;
     private readonly LedgerOptions _options;
     private readonly ILogger<CaptureFundsHandler> _logger;
@@ -24,14 +22,12 @@ public class CaptureFundsHandler
     public CaptureFundsHandler(
         ILedgerAccountRepository repository,
         IUnitOfWork unitOfWork,
-        IDomainEventDispatcher dispatcher,
         IValidator<CaptureFundsCommand> validator,
         IOptions<LedgerOptions> options,
         ILogger<CaptureFundsHandler> logger)
     {
         _repository = repository;
         _unitOfWork = unitOfWork;
-        _dispatcher = dispatcher;
         _validator = validator;
         _options = options.Value;
         _logger = logger;
@@ -77,8 +73,6 @@ public class CaptureFundsHandler
             await _unitOfWork.RollbackAsync(cancellationToken);
             return LedgerErrors.ConcurrencyConflict;
         }
-
-        await _dispatcher.DispatchAsync(account.DomainEvents, cancellationToken);
 
         return Result.Success();
     }

@@ -18,6 +18,8 @@ public class TokenService : ITokenService
         _jwtSettings = jwtSettings.Value;
     }
 
+    public int AccessTokenExpirationSeconds => _jwtSettings.AccessTokenExpirationMinutes * 60;
+
     public string GenerateAccessToken(User user)
     {
         var claims = new List<Claim>
