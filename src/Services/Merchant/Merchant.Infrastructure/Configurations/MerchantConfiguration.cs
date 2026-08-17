@@ -13,6 +13,7 @@ public class MerchantConfiguration : IEntityTypeConfiguration<MerchantEntity>
         builder.HasKey(m => m.Id);
 
         builder.Property(m => m.OwnerId);
+        builder.HasIndex(m => m.OwnerId);
 
         builder.OwnsOne(m => m.BusinessName, bn =>
         {
@@ -55,6 +56,7 @@ public class MerchantConfiguration : IEntityTypeConfiguration<MerchantEntity>
         builder.OwnsOne(m => m.Status, st =>
         {
             st.Property(s => s.Value).HasColumnName("Status").IsRequired().HasMaxLength(50);
+            st.HasIndex(s => s.Value);
         });
 
         builder.Property(m => m.EnabledPaymentMethods)
