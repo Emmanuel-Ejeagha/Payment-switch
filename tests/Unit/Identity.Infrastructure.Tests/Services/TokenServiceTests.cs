@@ -39,6 +39,31 @@ public class TokenServiceTests
     }
 
     [Fact]
+    public void GenerateAccessToken_ShouldEmitJtiIatAndNbfClaims()
+    {
+        var user = new User(Guid.NewGuid(), new Email("test@test.com"), new PasswordHash("hash"), new FullName("Test User"));
+        var jwt = new JwtSecurityTokenHandler().ReadJwtToken(_tokenService.GenerateAccessToken(user));
+
+        Assert.False(string.IsNullOrEmpty(jwt.Id));
+        Assert.True(jwt.Payload.TryGetValue("iat", out var iat));
+        Assert.True(jwt.Payload.TryGetValue("nbf", out var nbf));
+        Assert.NotNull(iat);
+        Assert.NotNull(nbf);
+    }
+
+    [Fact]
+    public void GenerateAccessToken_ShouldEmitUniqueJtiPerToken()
+    {
+        var user = new User(Guid.NewGuid(), new Email("test@test.com"), new PasswordHash("hash"), new FullName("Test User"));
+        var handler = new JwtSecurityTokenHandler();
+
+        var first = handler.ReadJwtToken(_tokenService.GenerateAccessToken(user)).Id;
+        var second = handler.ReadJwtToken(_tokenService.GenerateAccessToken(user)).Id;
+
+        Assert.NotEqual(first, second);
+    }
+
+    [Fact]
     public void GenerateAccessToken_ConfirmedUser_EmitsEmailVerifiedTrue()
     {
         var user = new User(Guid.NewGuid(), new Email("test@test.com"), new PasswordHash("hash"), new FullName("Test User"));

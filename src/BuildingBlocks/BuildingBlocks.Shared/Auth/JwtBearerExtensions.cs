@@ -54,6 +54,7 @@ public static class JwtBearerExtensions
                     ValidateAudience = true,
                     ValidateLifetime = true,
                     ValidateIssuerSigningKey = true,
+                    ValidAlgorithms = new[] { SecurityAlgorithms.HmacSha256 },
                     ValidIssuer = jwt["Issuer"],
                     ValidAudience = jwt["Audience"],
                     IssuerSigningKeys = signingKeys
