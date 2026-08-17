@@ -21,7 +21,7 @@ public class WebhookEventsController : BaseApiController
         [FromQuery] int skip = 0,
         [FromQuery] int take = 20)
     {
-        var result = await handler.Handle(new ListWebhookEventsQuery(merchantId, skip, take));
+        var result = await handler.Handle(new ListWebhookEventsQuery(merchantId, skip, take, User.ToCallerContext()));
         return result.ToActionResult();
     }
 
@@ -36,7 +36,7 @@ public class WebhookEventsController : BaseApiController
         Guid id,
         [FromServices] ReplayWebhookEventHandler handler)
     {
-        var result = await handler.Handle(new ReplayWebhookEventCommand(merchantId, id));
+        var result = await handler.Handle(new ReplayWebhookEventCommand(merchantId, id, User.ToCallerContext()));
         return result.ToActionResult();
     }
 
@@ -50,7 +50,7 @@ public class WebhookEventsController : BaseApiController
         Guid merchantId,
         [FromServices] SendTestWebhookEventHandler handler)
     {
-        var result = await handler.Handle(new SendTestWebhookEventCommand(merchantId));
+        var result = await handler.Handle(new SendTestWebhookEventCommand(merchantId, "test.event", null, User.ToCallerContext()));
         return result.ToActionResult();
     }
 }

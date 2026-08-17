@@ -52,4 +52,8 @@ message GetMerchantContactRequest {
 message GetMerchantContactResponse {
   string email = 1;
   string business_name = 2;
+  // Identity user id of the merchant owner (TASK-036): lets downstream services
+  // enforce owner-scoped access to merchant-owned resources (e.g. webhook
+  // replay/test). Empty when the merchant has no owner.
+  string owner_id = 3;
 }

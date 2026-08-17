@@ -3,6 +3,7 @@ using FluentValidation;
 using Microsoft.Extensions.Logging;
 using Payment.Application.Features.Queries.ListWebhookEvents;
 using Payment.Application.Interfaces;
+using Payment.Domain;
 using Payment.Domain.Entities;
 using System.Text.Json;
 
@@ -11,17 +12,20 @@ namespace Payment.Application.Features.Command.SendTestWebhookEvent;
 public class SendTestWebhookEventHandler
 {
     private readonly IWebhookEventRepository _repository;
+    private readonly IMerchantService _merchantService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IValidator<SendTestWebhookEventCommand> _validator;
     private readonly ILogger<SendTestWebhookEventHandler> _logger;
 
     public SendTestWebhookEventHandler(
         IWebhookEventRepository repository,
+        IMerchantService merchantService,
         IUnitOfWork unitOfWork,
         IValidator<SendTestWebhookEventCommand> validator,
         ILogger<SendTestWebhookEventHandler> logger)
     {
         _repository = repository;
+        _merchantService = merchantService;
         _unitOfWork = unitOfWork;
         _validator = validator;
         _logger = logger;
@@ -34,6 +38,11 @@ public class SendTestWebhookEventHandler
         var validation = await _validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
             return validation.Errors.Select(e => new Error(e.PropertyName, e.ErrorMessage)).ToList();
+
+        var caller = command.Caller ?? Auth.CallerContext.Anonymous;
+        var ownerResult = await _merchantService.GetMerchantOwnerAsync(command.MerchantId, cancellationToken);
+        if (!ownerResult.IsSuccess || !caller.CanAccess(ownerResult.Value))
+            return PaymentErrors.Unauthorized();
 
         var payload = JsonSerializer.Serialize(new
         {
@@ -52,6 +61,10 @@ public class SendTestWebhookEventHandler
 
         await _repository.AddAsync(webhookEvent, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        _logger.LogWarning(
+            "Test webhook {EventId} for Merchant {MerchantId} sent by {CallerEmail} ({CallerId})",
+            webhookEvent.Id, command.MerchantId, caller.Email, caller.UserId);
 
         var dto = new WebhookEventDto(
             webhookEvent.Id,

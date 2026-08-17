@@ -25,6 +25,9 @@ public static class PaymentErrors
     public static Error ConcurrencyConflict =>
         new("Payment.ConcurrencyConflict", "This payment was modified concurrently. Please retry.");
 
+    public static Error Unauthorized() =>
+        new("Payment.Unauthorized", "You do not have permission to access this merchant.");
+
     public static Error CustomerNotFound(Guid customerId) =>
         new("Payment.CustomerNotFound", $"Customer with Id '{customerId}' not found.");
 

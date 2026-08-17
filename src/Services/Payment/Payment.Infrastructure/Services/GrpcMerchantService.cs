@@ -35,6 +35,16 @@ public class GrpcMerchantService : IMerchantService
                 : DateTimeOffset.FromUnixTimeSeconds(response.WebhookSecretRotatedAt).UtcDateTime));
     }
 
+    public async Task<Result<Guid?>> GetMerchantOwnerAsync(Guid merchantId, CancellationToken cancellationToken = default)
+    {
+        var request = new GetMerchantContactRequest { MerchantId = merchantId.ToString() };
+        var response = await _client.GetMerchantContactAsync(request, cancellationToken: cancellationToken);
+        if (string.IsNullOrEmpty(response.OwnerId))
+            return new Error("Payment.MerchantNotFound", "Merchant not found.");
+
+        return Result<Guid?>.Success(Guid.Parse(response.OwnerId));
+    }
+
     public async Task<Result<MerchantKeyResolution>> ResolveApiKeyAsync(string keyPrefix, string keyValue, CancellationToken cancellationToken = default)
     {
         var request = new ResolveApiKeyRequest { KeyPrefix = keyPrefix, KeyValue = keyValue };
