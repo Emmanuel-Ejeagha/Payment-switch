@@ -17,6 +17,6 @@ public class OutboxMessageConfiguration : IEntityTypeConfiguration<OutboxMessage
         builder.Property(m => m.TraceParent).HasMaxLength(100);
         builder.Property(m => m.LeaseToken);
         builder.Property(m => m.LeaseExpiresAt);
-        builder.HasIndex(m => m.Processed);
+        builder.HasIndex(m => new { m.Processed, m.LeaseExpiresAt });
     }
 }
