@@ -8,6 +8,7 @@ using BuildingBlocks.Shared.Middleware;
 using BuildingBlocks.Shared.RateLimiting;
 using BuildingBlocks.Shared.Versioning;
 using BuildingBlocks.Shared.Caching;
+using BuildingBlocks.Shared.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi;
 using OpenTelemetry.Metrics;
@@ -55,15 +56,7 @@ builder.Services.AddPaymentSwitchJwtBearer(builder.Configuration);
 
 builder.Services.AddAuthorization();
 
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowFrontend", policy =>
-    {
-        policy.WithOrigins("http://localhost:5173", "http://localhost:3000", "http://localhost:3001", "http://localhost:3002")
-              .AllowAnyMethod()
-              .AllowAnyHeader();
-    });
-});
+builder.Services.AddPaymentSwitchCors(builder.Configuration);
 
 builder.Services.AddPaymentApplication();
 builder.Services.AddPaymentInfrastructure(builder.Configuration);
@@ -83,6 +76,7 @@ var app = builder.Build();
 app.MigrateDatabase<AppDbContext>();
 
 app.UsePaymentSwitchSecurityHeaders();
+app.UsePaymentSwitchForwardedHeaders(builder.Configuration);
 app.UseCorrelationId();
 app.UseRequestSizeLimit();
 app.UseMiddleware<ExceptionMiddleware>();

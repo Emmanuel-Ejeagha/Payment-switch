@@ -8,6 +8,7 @@ using BuildingBlocks.Shared.RateLimiting;
 using BuildingBlocks.Shared.Versioning;
 using BuildingBlocks.Shared.Caching;
 using BuildingBlocks.Shared.Auth;
+using BuildingBlocks.Shared.Http;
 using Merchant.API.Middlewares;
 using Merchant.API.Services;
 using Merchant.Application;
@@ -77,15 +78,7 @@ builder.Services.AddAuthorization(options =>
         policy.RequireClaim(ServiceTokenOptions.ClientTypeClaim, ServiceTokenOptions.ClientTypeService));
 });
 
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowFrontend", policy =>
-    {
-        policy.WithOrigins("http://localhost:5173", "http://localhost:3000", "http://localhost:3001", "http://localhost:3002")
-              .AllowAnyMethod()
-              .AllowAnyHeader();
-    });
-});
+builder.Services.AddPaymentSwitchCors(builder.Configuration);
 
 builder.Services.AddMerchantApplication();
 builder.Services.AddMerchantInfrastructure(builder.Configuration);
@@ -110,6 +103,7 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.UsePaymentSwitchSecurityHeaders();
+app.UsePaymentSwitchForwardedHeaders(builder.Configuration);
 app.UseCorrelationId();
 app.UseRequestSizeLimit();
 app.UseMiddleware<ExceptionMiddleware>();

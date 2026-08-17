@@ -28,7 +28,6 @@ public static class DependencyInjection
         services.AddScoped<ChangePasswordHandler>();
         services.AddScoped<AssignRoleHandler>();
         services.AddScoped<GetUserByIdHandler>();
-        services.AddScoped<GetUserByEmailHandler>();
 
         services.AddValidatorsFromAssemblyContaining<RegisterUserCommandValidator>();
 

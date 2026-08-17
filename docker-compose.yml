@@ -101,6 +101,7 @@ services:
       - Jwt__PreviousSecret=${JWT_PREVIOUS_SECRET:-}
       - Jwt__Issuer=IdentityService
       - Jwt__Audience=PaymentSwitch
+      - Cors__AllowedOrigins=${CORS_ALLOWED_ORIGINS:-}
       - RabbitMQ__HostName=rabbitmq
       - RabbitMQ__UserName=${RABBITMQ_DEFAULT_USER:?Set RABBITMQ_DEFAULT_USER in .env}
       - RabbitMQ__Password=${RABBITMQ_DEFAULT_PASS:?Set RABBITMQ_DEFAULT_PASS in .env}
@@ -139,6 +140,7 @@ services:
       - Jwt__PreviousSecret=${JWT_PREVIOUS_SECRET:-}
       - Jwt__Issuer=IdentityService
       - Jwt__Audience=PaymentSwitch
+      - Cors__AllowedOrigins=${CORS_ALLOWED_ORIGINS:-}
       - RabbitMQ__HostName=rabbitmq
       - RabbitMQ__UserName=${RABBITMQ_DEFAULT_USER:?Set RABBITMQ_DEFAULT_USER in .env}
       - RabbitMQ__Password=${RABBITMQ_DEFAULT_PASS:?Set RABBITMQ_DEFAULT_PASS in .env}
@@ -167,6 +169,7 @@ services:
       - Jwt__PreviousSecret=${JWT_PREVIOUS_SECRET:-}
       - Jwt__Issuer=IdentityService
       - Jwt__Audience=PaymentSwitch
+      - Cors__AllowedOrigins=${CORS_ALLOWED_ORIGINS:-}
       - RabbitMQ__HostName=rabbitmq
       - RabbitMQ__UserName=${RABBITMQ_DEFAULT_USER:?Set RABBITMQ_DEFAULT_USER in .env}
       - RabbitMQ__Password=${RABBITMQ_DEFAULT_PASS:?Set RABBITMQ_DEFAULT_PASS in .env}
@@ -194,6 +197,7 @@ services:
       - Jwt__PreviousSecret=${JWT_PREVIOUS_SECRET:-}
       - Jwt__Issuer=IdentityService
       - Jwt__Audience=PaymentSwitch
+      - Cors__AllowedOrigins=${CORS_ALLOWED_ORIGINS:-}
       - RabbitMQ__HostName=rabbitmq
       - RabbitMQ__UserName=${RABBITMQ_DEFAULT_USER:?Set RABBITMQ_DEFAULT_USER in .env}
       - RabbitMQ__Password=${RABBITMQ_DEFAULT_PASS:?Set RABBITMQ_DEFAULT_PASS in .env}
@@ -221,6 +225,7 @@ services:
       - Jwt__PreviousSecret=${JWT_PREVIOUS_SECRET:-}
       - Jwt__Issuer=IdentityService
       - Jwt__Audience=PaymentSwitch
+      - Cors__AllowedOrigins=${CORS_ALLOWED_ORIGINS:-}
       - RabbitMQ__HostName=rabbitmq
       - RabbitMQ__UserName=${RABBITMQ_DEFAULT_USER:?Set RABBITMQ_DEFAULT_USER in .env}
       - RabbitMQ__Password=${RABBITMQ_DEFAULT_PASS:?Set RABBITMQ_DEFAULT_PASS in .env}
@@ -255,6 +260,7 @@ services:
       - Jwt__PreviousSecret=${JWT_PREVIOUS_SECRET:-}
       - Jwt__Issuer=IdentityService
       - Jwt__Audience=PaymentSwitch
+      - Cors__AllowedOrigins=${CORS_ALLOWED_ORIGINS:-}
       - RabbitMQ__HostName=rabbitmq
       - RabbitMQ__UserName=${RABBITMQ_DEFAULT_USER:?Set RABBITMQ_DEFAULT_USER in .env}
       - RabbitMQ__Password=${RABBITMQ_DEFAULT_PASS:?Set RABBITMQ_DEFAULT_PASS in .env}
