@@ -53,9 +53,9 @@ tokens signed with either key validate. This gives a zero-downtime rotation:
 1. **Set new key + old key, redeploy.** `Jwt:Secret` = new secret;
    `Jwt:PreviousSecret` = old secret. Services start signing new tokens with
    the new key while still validating tokens from the old key.
-2. **Wait out the window.** Longer than the maximum token lifetime (see
-   `Jwt:TokenLifetimeMinutes`; default 60 min in Identity) so no issued token
-   is orphaned.
+2. **Wait out the window.** Longer than the maximum access-token lifetime (see
+   `Jwt:AccessTokenExpirationMinutes`; default 60 min in Identity) so no issued
+   token is orphaned.
 3. **Clear the old key, redeploy.** Remove `Jwt:PreviousSecret` (or set it
    empty). Only the new key is accepted from then on.
 
@@ -74,6 +74,32 @@ Use the helper script for each runtime:
 
 For Helm, set `config.jwt.previousSecret` on the first rotation step and clear
 it on the second.
+
+## Access-token `jti` and revocation
+
+Access tokens (Identity `TokenService`) carry a unique `jti` (JWT ID) claim,
+plus `iat`/`nbf`, and are validated with a strict HS256 algorithm binding
+(`ValidAlgorithms`, shared `AddPaymentSwitchJwtBearer` extension). The `jti`
+is the hook for server-side access-token revocation.
+
+Revocation story:
+
+- **Refresh tokens are the revocation channel.** Access tokens are short-lived
+  (`Jwt:AccessTokenExpirationMinutes`, default 60) and are bound to a hashed
+  refresh token; revoking the refresh token (logout / `RevokeRefreshToken`)
+  terminates the session, so a leaked access token is only usable until expiry.
+- **Immediate access-token kill** is a deliberate non-goal. There is no
+  persisted token-version/blacklist table, so a compromised access token cannot
+  be revoked before its natural expiry. If the risk profile demands it later,
+  add a token-version claim (`tv`), bump it on revoke, and have
+  `AddPaymentSwitchJwtBearer` reject tokens whose version is stale (requires
+  a Redis/DB lookup in the JwtBearer events).
+- **`jti` + logging.** Identity and other services can log `jti` (and
+  `NameIdentifier`) at the auth boundary for audit; `jti` can later back a
+  denylist without changing the token shape.
+
+Rotation and revocation both live in the shared extension, so all six services
+stay in lockstep.
 
 ## Postgres password rotation
 

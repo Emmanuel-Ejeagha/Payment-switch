@@ -3,6 +3,10 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 
 namespace BuildingBlocks.Shared.Tests;
 
@@ -93,6 +97,44 @@ public class JwtBearerExtensionsTests
         Assert.True(options.TokenValidationParameters.ValidateIssuer);
         Assert.True(options.TokenValidationParameters.ValidateAudience);
         Assert.True(options.TokenValidationParameters.ValidateLifetime);
+    }
+
+    [Fact]
+    public void AddPaymentSwitchJwtBearer_EnforcesHmacSha256AlgorithmBinding()
+    {
+        var config = BuildConfig(
+            ("Jwt:Secret", CurrentSecret),
+            ("Jwt:Issuer", "IdentityService"),
+            ("Jwt:Audience", "PaymentSwitch"));
+
+        var options = GetOptions(config);
+
+        Assert.Equal(new[] { SecurityAlgorithms.HmacSha256 }, options.TokenValidationParameters.ValidAlgorithms);
+    }
+
+    [Fact]
+    public void AddPaymentSwitchJwtBearer_RejectsTokenSignedWithHmacSha384()
+    {
+        var config = BuildConfig(
+            ("Jwt:Secret", CurrentSecret),
+            ("Jwt:Issuer", "IdentityService"),
+            ("Jwt:Audience", "PaymentSwitch"));
+
+        var options = GetOptions(config);
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(CurrentSecret + "0123456789abcdef"));
+        var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha384);
+
+        var token = new JwtSecurityToken(
+            issuer: "IdentityService",
+            audience: "PaymentSwitch",
+            claims: new[] { new Claim(ClaimTypes.NameIdentifier, "user-1") },
+            expires: DateTime.UtcNow.AddMinutes(5),
+            signingCredentials: credentials);
+        var rawToken = new JwtSecurityTokenHandler().WriteToken(token);
+
+        var handler = new JwtSecurityTokenHandler();
+        Assert.Throws<SecurityTokenSignatureKeyNotFoundException>(() =>
+            handler.ValidateToken(rawToken, options.TokenValidationParameters, out _));
     }
 
     [Fact]
