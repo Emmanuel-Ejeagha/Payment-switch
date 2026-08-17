@@ -39,10 +39,4 @@ public class LedgerAccountRepository : ILedgerAccountRepository
     {
         await _context.LedgerAccounts.AddAsync(account, cancellationToken);
     }
-
-    public Task UpdateAsync(LedgerAccount account, CancellationToken cancellationToken = default)
-    {
-        _context.LedgerAccounts.Update(account);
-        return Task.CompletedTask;
-    }
 }

@@ -27,12 +27,6 @@ public class NotificationRepository : INotificationRepository
         await _context.Notifications.AddAsync(notification, cancellationToken);
     }
 
-    public Task UpdateAsync(NotificationEntity notification, CancellationToken cancellationToken = default)
-    {
-        _context.Notifications.Update(notification);
-        return Task.CompletedTask;
-    }
-
     /// <summary>
     /// Atomically claims up to <paramref name="batchSize"/> due pending
     /// notifications by stamping a per-worker lease token, so concurrent worker
