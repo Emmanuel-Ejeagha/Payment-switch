@@ -28,20 +28,21 @@ namespace Merchant.API.Controllers;
 public class MerchantsController : BaseApiController
 {
     /// <summary>
-    /// Onboard a new merchant (public endpoint – no authentication required).
+    /// Onboard a new merchant (authenticated, verified owner only — TASK-038).
+    /// The owner id is derived from the caller's JWT, not the request body.
     /// </summary>
-    /// <param name="command">Business name and email address.</param>
+    /// <param name="request">Business name and email address.</param>
     /// <param name="handler">Handler injected via DI.</param>
     /// <returns>New merchant ID, or validation/conflict errors.</returns>
     [HttpPost]
-    [AllowAnonymous]
     [ProducesResponseType(typeof(OnboardMerchantResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Onboard(
-        [FromBody] OnboardMerchantCommand command,
+        [FromBody] OnboardMerchantRequest request,
         [FromServices] OnboardMerchantHandler handler)
     {
+        var command = new OnboardMerchantCommand(request.BusinessName, request.Email, User.ToCallerContext());
         var result = await handler.Handle(command);
         return result.ToActionResult();
     }

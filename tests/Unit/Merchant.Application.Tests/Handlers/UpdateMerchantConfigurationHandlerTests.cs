@@ -46,14 +46,28 @@ public class UpdateMerchantConfigurationHandlerTests
         var result = await _handler.Handle(command);
 
         Assert.True(result.IsFailure);
-        Assert.Equal("Merchant.ConfigurationUpdateFailed", result.Errors[0].Code);
+        Assert.Equal("Merchant.NotActive", result.Errors[0].Code);
+    }
+
+    [Fact]
+    public async Task Handle_UnverifiedOwner_ShouldFail()
+    {
+        var merchant = CreateActiveMerchant();
+        var command = new UpdateMerchantConfigurationCommand(merchant.Id, null, null, null, new CallerContext(merchant.OwnerId, "t@t.com", false));
+        SetupValidatorSuccess(command);
+        _repoMock.Setup(r => r.GetByIdAsync(merchant.Id, It.IsAny<CancellationToken>())).ReturnsAsync(merchant);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Merchant.EmailNotVerified", result.Errors[0].Code);
     }
 
     [Fact]
     public async Task Handle_NonOwner_ShouldFail()
     {
         var merchant = CreateActiveMerchant();
-        var command = new UpdateMerchantConfigurationCommand(merchant.Id, null, null, null, new CallerContext(Guid.NewGuid(), null, false));
+        var command = new UpdateMerchantConfigurationCommand(merchant.Id, null, null, null, new CallerContext(Guid.NewGuid(), null, false, EmailVerified: true));
         SetupValidatorSuccess(command);
         _repoMock.Setup(r => r.GetByIdAsync(merchant.Id, It.IsAny<CancellationToken>())).ReturnsAsync(merchant);
 
@@ -63,7 +77,7 @@ public class UpdateMerchantConfigurationHandlerTests
         Assert.Equal("Merchant.Unauthorized", result.Errors[0].Code);
     }
 
-    private CallerContext OwnerCaller(MerchantEntity merchant) => new(merchant.OwnerId, null, false);
+    private CallerContext OwnerCaller(MerchantEntity merchant) => new(merchant.OwnerId, null, false, EmailVerified: true);
 
     private MerchantEntity CreateActiveMerchant()
     {
