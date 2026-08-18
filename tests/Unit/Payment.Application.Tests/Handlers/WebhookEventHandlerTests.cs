@@ -199,11 +199,14 @@ public class ListWebhookEventsHandlerTests
             .ReturnsAsync(Result<Guid?>.Success(merchantId));
         _repoMock.Setup(r => r.ListByMerchantAsync(merchantId, 0, 20, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<WebhookEvent> { webhookEvent });
+        _repoMock.Setup(r => r.CountByMerchantAsync(merchantId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
 
         var result = await _handler.Handle(new ListWebhookEventsQuery(merchantId, 0, 20, new CallerContext(merchantId, "owner@example.com", false)));
 
         Assert.True(result.IsSuccess);
-        var dto = Assert.Single(result.Value!);
+        var dto = Assert.Single(result.Value!.Items);
+        Assert.Equal(1, result.Value.TotalCount);
         Assert.Equal(webhookEvent.Id, dto.Id);
         Assert.Equal(WebhookEvent.StatusSucceeded, dto.Status);
     }

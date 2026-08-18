@@ -9,4 +9,5 @@ public interface ISettlementBatchRepository
     Task<SettlementBatch?> GetByBatchDateAsync(DateTime date, CancellationToken cancellationToken = default);
     Task AddAsync(SettlementBatch batch, CancellationToken cancellationToken = default);
     Task<List<SettlementBatchDto>> ListAsync(DateTime? from, DateTime? to, int skip, int take, CancellationToken cancellationToken = default);
+    Task<int> CountAsync(DateTime? from, DateTime? to, CancellationToken cancellationToken = default);
 }

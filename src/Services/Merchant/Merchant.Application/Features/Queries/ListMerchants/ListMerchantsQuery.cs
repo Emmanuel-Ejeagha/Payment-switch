@@ -1,3 +1,5 @@
-﻿namespace Merchant.Application.Features.Queries.ListMerchants;
+﻿using BuildingBlocks.Shared.Paging;
 
-public record ListMerchantsQuery(int Skip, int Take);
+namespace Merchant.Application.Features.Queries.ListMerchants;
+
+public record ListMerchantsQuery(int Skip = PageBounds.DefaultSkip, int Take = PageBounds.DefaultTake);

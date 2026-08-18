@@ -38,6 +38,12 @@ public class WebhookEventRepository : IWebhookEventRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<int> CountByMerchantAsync(Guid merchantId, CancellationToken cancellationToken = default)
+    {
+        return await _context.WebhookEvents
+            .CountAsync(e => e.MerchantId == merchantId, cancellationToken);
+    }
+
     public async Task AddAsync(WebhookEvent webhookEvent, CancellationToken cancellationToken = default)
     {
         await _context.WebhookEvents.AddAsync(webhookEvent, cancellationToken);

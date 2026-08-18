@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using System.Globalization;
+using BuildingBlocks.Shared.Paging;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Settlement.API.Extensions;
 using Settlement.Application.DTOs;
@@ -48,10 +50,14 @@ public class SettlementController : BaseApiController
         [FromQuery] DateTime? from,
         [FromQuery] DateTime? to,
         [FromServices] ListSettlementBatchesHandler handler,
-        [FromQuery] int skip = 0,
-        [FromQuery] int take = 10)
+        [FromQuery] int skip = PageBounds.DefaultSkip,
+        [FromQuery] int take = PageBounds.DefaultTake)
     {
-        var result = await handler.Handle(new ListSettlementBatchesQuery(from, to, skip, take));
-        return result.ToActionResult();
+        var (normalizedSkip, normalizedTake) = PageBounds.Normalize(skip, take);
+        var result = await handler.Handle(new ListSettlementBatchesQuery(from, to, normalizedSkip, normalizedTake));
+        if (result.IsFailure) return result.ToActionResult();
+
+        Response.Headers["X-Total-Count"] = result.Value!.TotalCount.ToString(CultureInfo.InvariantCulture);
+        return Ok(result.Value.Items);
     }
 }

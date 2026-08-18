@@ -29,6 +29,12 @@ public class SubscriptionRepository : ISubscriptionRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<int> CountByMerchantAsync(Guid merchantId, CancellationToken cancellationToken = default)
+    {
+        return await _context.Subscriptions
+            .CountAsync(s => s.MerchantId == merchantId, cancellationToken);
+    }
+
     public async Task<List<Subscription>> ListByCustomerAsync(Guid customerId, CancellationToken cancellationToken = default)
     {
         return await _context.Subscriptions

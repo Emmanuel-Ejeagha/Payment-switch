@@ -6,5 +6,6 @@ public interface IPaymentLinkRepository
 {
     Task<PaymentLink?> GetByCodeAsync(string code, CancellationToken cancellationToken = default);
     Task<List<PaymentLink>> ListByMerchantAsync(Guid merchantId, int skip, int take, CancellationToken cancellationToken = default);
+    Task<int> CountByMerchantAsync(Guid merchantId, CancellationToken cancellationToken = default);
     Task AddAsync(PaymentLink link, CancellationToken cancellationToken = default);
 }

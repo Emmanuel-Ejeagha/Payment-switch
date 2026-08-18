@@ -38,6 +38,18 @@ public class InvoiceRepository : IInvoiceRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<int> CountBySubscriptionAsync(Guid subscriptionId, Guid merchantId, CancellationToken cancellationToken = default)
+    {
+        return await _context.Invoices
+            .CountAsync(i => i.SubscriptionId == subscriptionId && i.MerchantId == merchantId, cancellationToken);
+    }
+
+    public async Task<int> CountByMerchantAsync(Guid merchantId, CancellationToken cancellationToken = default)
+    {
+        return await _context.Invoices
+            .CountAsync(i => i.MerchantId == merchantId, cancellationToken);
+    }
+
     public async Task<Invoice?> GetBySubscriptionPeriodAsync(Guid subscriptionId, DateTime periodStart, CancellationToken cancellationToken = default)
     {
         return await _context.Invoices

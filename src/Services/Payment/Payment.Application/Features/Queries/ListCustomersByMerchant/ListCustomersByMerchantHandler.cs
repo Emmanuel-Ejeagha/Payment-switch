@@ -1,3 +1,4 @@
+using BuildingBlocks.Shared.Paging;
 using BuildingBlocks.Shared.Results;
 using Payment.Application.DTOs;
 using Payment.Application.Interfaces;
@@ -14,10 +15,11 @@ public class ListCustomersByMerchantHandler
         _repository = repository;
     }
 
-    public async Task<Result<List<CustomerDto>>> Handle(ListCustomersByMerchantQuery query, CancellationToken cancellationToken = default)
+    public async Task<Result<PagedData<CustomerDto>>> Handle(ListCustomersByMerchantQuery query, CancellationToken cancellationToken = default)
     {
         var customers = await _repository.ListByMerchantAsync(query.MerchantId, query.Skip, query.Take, cancellationToken);
+        var total = await _repository.CountByMerchantAsync(query.MerchantId, cancellationToken);
 
-        return Result<List<CustomerDto>>.Success(customers.Select(c => c.ToDto()).ToList());
+        return new PagedData<CustomerDto>(customers.Select(c => c.ToDto()).ToList(), total);
     }
 }

@@ -69,6 +69,11 @@ public class MerchantRepository : IMerchantRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<int> CountAsync(CancellationToken cancellationToken = default)
+    {
+        return await _context.Merchants.CountAsync(cancellationToken);
+    }
+
     public async Task<MerchantEntity?> GetByIdWithApiKeysAsync(Guid id, CancellationToken cancellationToken = default)
     {
         return await _context.Merchants

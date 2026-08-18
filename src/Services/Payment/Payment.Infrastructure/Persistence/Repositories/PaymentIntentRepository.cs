@@ -61,6 +61,12 @@ public class PaymentIntentRepository : IPaymentIntentRepository
         )).ToList();
     }
 
+    public async Task<int> CountByMerchantAsync(Guid merchantId, CancellationToken cancellationToken = default)
+    {
+        return await _context.PaymentIntents
+            .CountAsync(p => p.MerchantId == merchantId, cancellationToken);
+    }
+
     /// <summary>
     /// Returns a bounded batch of in-flight intents (Pending / RequiresAction /
     /// Processing) untouched since <paramref name="olderThanUtc"/>. Ordering by

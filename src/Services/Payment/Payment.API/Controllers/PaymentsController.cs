@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using System.Globalization;
+using BuildingBlocks.Shared.Paging;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
 using Payment.API.Extensions;
@@ -121,10 +123,14 @@ public class PaymentsController : BaseApiController
     public async Task<IActionResult> List(
         [FromQuery] Guid merchantId,
         [FromServices] ListPaymentIntentsByMerchantHandler handler,
-        [FromQuery] int skip = 0,
-        [FromQuery] int take = 10)
+        [FromQuery] int skip = PageBounds.DefaultSkip,
+        [FromQuery] int take = PageBounds.DefaultTake)
     {
-        var result = await handler.Handle(new ListPaymentIntentsByMerchantQuery(merchantId, skip, take));
-        return result.ToActionResult();
+        var (normalizedSkip, normalizedTake) = PageBounds.Normalize(skip, take);
+        var result = await handler.Handle(new ListPaymentIntentsByMerchantQuery(merchantId, normalizedSkip, normalizedTake));
+        if (result.IsFailure) return result.ToActionResult();
+
+        Response.Headers["X-Total-Count"] = result.Value!.TotalCount.ToString(CultureInfo.InvariantCulture);
+        return Ok(result.Value.Items);
     }
 }
