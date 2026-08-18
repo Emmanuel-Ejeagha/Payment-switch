@@ -4,6 +4,7 @@ using FluentValidation;
 using Microsoft.Extensions.Logging;
 using Payment.Application.Interfaces;
 using Payment.Domain;
+using Payment.Domain.Entities;
 using Payment.Domain.Enums;
 using Payment.Domain.ValueObjects;
 
@@ -48,8 +49,18 @@ public class ConfirmPaymentIntentHandler
         if (intent.MerchantId != command.MerchantId)
             return PaymentErrors.PaymentIntentNotFound(command.IntentId);
 
+        var isReplay = intent.Transactions.Any(t =>
+            t.Type == TransactionType.Authorization
+            && string.Equals(t.IdempotencyKey, command.IdempotencyKey, StringComparison.Ordinal));
+
         if (intent.Status != PaymentStatus.RequiresAction)
+        {
+            // A prior confirm already succeeded under this key: return the original
+            // result instead of a transition error, so client retries are safe.
+            if (isReplay)
+                return ToResponse(intent);
             return PaymentErrors.InvalidStatusTransition(intent.Status.Value, "RequiresAction");
+        }
 
         var configResult = await _merchantService.GetMerchantConfigAsync(intent.MerchantId, cancellationToken);
         if (!configResult.IsSuccess)
@@ -91,6 +102,11 @@ public class ConfirmPaymentIntentHandler
             return PaymentErrors.ConcurrencyConflict;
         }
 
+        return ToResponse(intent);
+    }
+
+    private static ConfirmPaymentIntentResponse ToResponse(PaymentIntent intent)
+    {
         string? clientSecret = intent.Transactions.LastOrDefault(t => t.Type == TransactionType.Capture)?.Id.ToString();
         return new ConfirmPaymentIntentResponse(intent.Id, intent.Status.Value, clientSecret);
     }

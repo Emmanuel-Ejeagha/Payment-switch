@@ -79,6 +79,22 @@ public class CreatePaymentIntentCommandValidatorTests
     }
 
     [Fact]
+    public void OverMaxLengthIdempotencyKey_Fails()
+    {
+        var result = _validator.Validate(new CreatePaymentIntentCommand(Guid.NewGuid(), 10000, "USD", "Card", "4242", "Visa", new string('x', 201)));
+
+        Assert.Contains(result.Errors, e => e.PropertyName == "IdempotencyKey");
+    }
+
+    [Fact]
+    public void InvalidIdempotencyKeyCharacters_Fails()
+    {
+        var result = _validator.Validate(new CreatePaymentIntentCommand(Guid.NewGuid(), 10000, "USD", "Card", "4242", "Visa", "key with spaces!"));
+
+        Assert.Contains(result.Errors, e => e.PropertyName == "IdempotencyKey");
+    }
+
+    [Fact]
     public void CardWithoutTokenEmptyCardLastFour_Fails()
     {
         var result = _validator.Validate(new CreatePaymentIntentCommand(Guid.NewGuid(), 10000, "USD", "Card", "", "Visa", "idem-1"));

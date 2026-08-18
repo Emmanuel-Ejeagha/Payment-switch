@@ -10,6 +10,7 @@ using Microsoft.EntityFrameworkCore;
 using NotificationAppDbContext = Notification.Infrastructure.Persistence.AppDbContext;
 using Payment.Application.DTOs;
 using Payment.Application.Features.Command.CapturePayment;
+using Payment.Application.Features.Command.ConfirmPaymentIntent;
 using Settlement.Application.DTOs;
 
 namespace E2E.IntegrationTests;
@@ -145,6 +146,131 @@ public class E2EFlowTests : IClassFixture<E2EFactory>
         Assert.Equal(9850, batch!.TotalAmount);
     }
 
+    [Fact]
+    public async Task PublicPayments_RequiresIdempotencyKey_AndReplaysSafely()
+    {
+        var (_, apiKey) = await ProvisionMerchantAsync();
+
+        // 1. Create without an Idempotency-Key header -> 400.
+        var noKey = PublicClient(apiKey);
+        var missing = await noKey.PostAsJsonAsync("/v1/payments/intents", new
+        {
+            Amount = 10000L,
+            Currency = "USD",
+            PaymentMethod = "Card",
+            CardLastFour = "4242",
+            CardBrand = "Visa"
+        });
+        Assert.Equal(System.Net.HttpStatusCode.BadRequest, missing.StatusCode);
+
+        // 2. Create with a key -> 200; replaying the same key returns the same intent.
+        var key = Guid.NewGuid().ToString("N");
+        var withKey = PublicClient(apiKey, key);
+        var first = await withKey.PostAsJsonAsync("/v1/payments/intents", new
+        {
+            Amount = 10000L,
+            Currency = "USD",
+            PaymentMethod = "Card",
+            CardLastFour = "4242",
+            CardBrand = "Visa"
+        });
+        first.EnsureSuccessStatusCode();
+        var firstIntent = await first.Content.ReadFromJsonAsync<PaymentIntentResponse>();
+
+        var replay = await withKey.PostAsJsonAsync("/v1/payments/intents", new
+        {
+            Amount = 10000L,
+            Currency = "USD",
+            PaymentMethod = "Card",
+            CardLastFour = "4242",
+            CardBrand = "Visa"
+        });
+        replay.EnsureSuccessStatusCode();
+        var replayed = await replay.Content.ReadFromJsonAsync<PaymentIntentResponse>();
+        Assert.Equal(firstIntent.IntentId, replayed!.IntentId);
+
+        // 3. A 3DS card produces RequiresAction; confirm without a key -> 400, with one -> 200.
+        var challengeKey = Guid.NewGuid().ToString("N");
+        var challengeClient = PublicClient(apiKey, challengeKey);
+        var challenge = await challengeClient.PostAsJsonAsync("/v1/payments/intents", new
+        {
+            Amount = 10000L,
+            Currency = "USD",
+            PaymentMethod = "Card",
+            CardLastFour = "3001",
+            CardBrand = "Visa"
+        });
+        challenge.EnsureSuccessStatusCode();
+        var challengeIntent = await challenge.Content.ReadFromJsonAsync<PaymentIntentResponse>();
+        Assert.Equal("RequiresAction", challengeIntent!.Status);
+
+        var confirmNoKey = PublicClient(apiKey);
+        var confirmMissing = await confirmNoKey.PostAsJsonAsync($"/v1/payments/{challengeIntent.IntentId}/confirm", new { });
+        Assert.Equal(System.Net.HttpStatusCode.BadRequest, confirmMissing.StatusCode);
+
+        var confirmKey = Guid.NewGuid().ToString("N");
+        var confirmClient = PublicClient(apiKey, confirmKey);
+        var confirm = await confirmClient.PostAsJsonAsync($"/v1/payments/{challengeIntent.IntentId}/confirm", new { });
+        confirm.EnsureSuccessStatusCode();
+        var confirmed = await confirm.Content.ReadFromJsonAsync<ConfirmPaymentIntentResponse>();
+
+        // 4. Replaying confirm with the SAME key returns the original result, not an error.
+        var confirmReplay = await confirmClient.PostAsJsonAsync($"/v1/payments/{challengeIntent.IntentId}/confirm", new { });
+        confirmReplay.EnsureSuccessStatusCode();
+        var replayedConfirm = await confirmReplay.Content.ReadFromJsonAsync<ConfirmPaymentIntentResponse>();
+        Assert.Equal(confirmed!.Status, replayedConfirm!.Status);
+    }
+
+    private HttpClient PublicClient(string apiKey, string? idempotencyKey = null)
+    {
+        var client = _factory.PaymentHost.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+        if (idempotencyKey is not null)
+            client.DefaultRequestHeaders.Add("Idempotency-Key", idempotencyKey);
+        return client;
+    }
+
+    private async Task<(Guid MerchantId, string ApiKey)> ProvisionMerchantAsync()
+    {
+        var identity = _factory.IdentityHost.CreateClient();
+        var merchantUser = _factory.MerchantHost.CreateClient();
+        var merchantAdmin = _factory.MerchantHost.CreateClient();
+
+        var email = $"e2e-idem-{Guid.NewGuid():N}@example.com";
+        const string password = "E2ePass123!";
+
+        var register = await identity.PostAsJsonAsync("/api/v1/auth/register", new { Email = email, Password = password, FullName = "E2E Idempotency Owner" });
+        register.EnsureSuccessStatusCode();
+
+        var verifyToken = ExtractVerificationToken(email);
+        var verify = await identity.PostAsJsonAsync("/api/v1/auth/verify-email", new { Email = email, Token = verifyToken });
+        verify.EnsureSuccessStatusCode();
+
+        var login = await identity.PostAsJsonAsync("/api/v1/auth/login", new { Email = email, Password = password });
+        login.EnsureSuccessStatusCode();
+        var userToken = (await login.Content.ReadFromJsonAsync<LoginResponse>())!.AccessToken;
+
+        merchantUser.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", userToken);
+
+        var onboard = await merchantUser.PostAsJsonAsync("/api/v1/merchants", new { BusinessName = "E2E Idempotency Merchant", Email = email });
+        onboard.EnsureSuccessStatusCode();
+        var merchantId = (await onboard.Content.ReadFromJsonAsync<OnboardMerchantResponse>())!.MerchantId;
+
+        var adminLogin = await identity.PostAsJsonAsync("/api/v1/auth/login", new { Email = AdminEmail, Password = AdminPassword });
+        adminLogin.EnsureSuccessStatusCode();
+        var adminToken = (await adminLogin.Content.ReadFromJsonAsync<LoginResponse>())!.AccessToken;
+        merchantAdmin.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+
+        (await merchantAdmin.PostAsync($"/api/v1/merchants/{merchantId}/approve", null)).EnsureSuccessStatusCode();
+        (await merchantAdmin.PostAsync($"/api/v1/merchants/{merchantId}/activate", null)).EnsureSuccessStatusCode();
+
+        var keyResponse = await merchantUser.PostAsJsonAsync($"/api/v1/merchants/{merchantId}/apikeys", new { Environment = "test" });
+        keyResponse.EnsureSuccessStatusCode();
+        var apiKey = (await keyResponse.Content.ReadFromJsonAsync<GenerateMerchantApiKeyResponse>())!.PlainTextKey;
+
+        return (merchantId, apiKey);
+    }
+
     private string ExtractVerificationToken(string email)
     {
         var message = _factory.Emails.Sent.Single(m => m.To == email);
@@ -152,9 +278,8 @@ public class E2EFlowTests : IClassFixture<E2EFactory>
         Assert.True(match.Success, $"No verification token in email body: {message.TextBody}");
         return match.Groups[1].Success ? match.Groups[1].Value : match.Groups[2].Value;
     }
-
     private static DbContextOptions<T> DbOptions<T>(string connectionString) where T : DbContext
-        => new DbContextOptionsBuilder<T>().UseNpgsql(connectionString).Options;
+    => new DbContextOptionsBuilder<T>().UseNpgsql(connectionString).Options;
 
     private static async Task WaitUntilAsync(Func<Task<bool>> predicate, string what, TimeSpan? timeout = null)
     {

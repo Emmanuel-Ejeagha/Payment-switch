@@ -37,7 +37,7 @@ public class ConfirmPaymentIntentHandlerTests
     public async Task Handle_RequiresActionIntent_ShouldConfirmAndAuthorize()
     {
         var intent = CreateRequiresActionIntent();
-        var command = new ConfirmPaymentIntentCommand(intent.MerchantId, intent.Id);
+        var command = new ConfirmPaymentIntentCommand(intent.MerchantId, intent.Id, "confirm-key");
         SetupValidatorSuccess(command);
         SetupMerchantConfig(autoCapture: false);
         _repoMock.Setup(r => r.GetByIdAsync(intent.Id, It.IsAny<CancellationToken>())).ReturnsAsync(intent);
@@ -56,7 +56,7 @@ public class ConfirmPaymentIntentHandlerTests
     public async Task Handle_RequiresActionIntent_AutoCapture_ShouldCapture()
     {
         var intent = CreateRequiresActionIntent();
-        var command = new ConfirmPaymentIntentCommand(intent.MerchantId, intent.Id);
+        var command = new ConfirmPaymentIntentCommand(intent.MerchantId, intent.Id, "confirm-key");
         SetupValidatorSuccess(command);
         SetupMerchantConfig(autoCapture: true);
         _repoMock.Setup(r => r.GetByIdAsync(intent.Id, It.IsAny<CancellationToken>())).ReturnsAsync(intent);
@@ -74,7 +74,7 @@ public class ConfirmPaymentIntentHandlerTests
     [Fact]
     public async Task Handle_IntentNotFound_ShouldFail()
     {
-        var command = new ConfirmPaymentIntentCommand(Guid.NewGuid(), Guid.NewGuid());
+        var command = new ConfirmPaymentIntentCommand(Guid.NewGuid(), Guid.NewGuid(), "confirm-key");
         SetupValidatorSuccess(command);
         _repoMock.Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync((PaymentIntent?)null);
 
@@ -88,7 +88,7 @@ public class ConfirmPaymentIntentHandlerTests
     public async Task Handle_IntentOfAnotherMerchant_ShouldFail()
     {
         var intent = CreateRequiresActionIntent();
-        var command = new ConfirmPaymentIntentCommand(Guid.NewGuid(), intent.Id);
+        var command = new ConfirmPaymentIntentCommand(Guid.NewGuid(), intent.Id, "confirm-key");
         SetupValidatorSuccess(command);
         _repoMock.Setup(r => r.GetByIdAsync(intent.Id, It.IsAny<CancellationToken>())).ReturnsAsync(intent);
 
@@ -102,7 +102,7 @@ public class ConfirmPaymentIntentHandlerTests
     public async Task Handle_NotRequiresAction_ShouldFailWithInvalidStatusTransition()
     {
         var intent = new PaymentIntent(Guid.NewGuid(), Guid.NewGuid(), new Money(100, "USD"), new IdempotencyKey("k"), PaymentMethod.Card);
-        var command = new ConfirmPaymentIntentCommand(intent.MerchantId, intent.Id);
+        var command = new ConfirmPaymentIntentCommand(intent.MerchantId, intent.Id, "confirm-key");
         SetupValidatorSuccess(command);
         _repoMock.Setup(r => r.GetByIdAsync(intent.Id, It.IsAny<CancellationToken>())).ReturnsAsync(intent);
 
@@ -116,7 +116,7 @@ public class ConfirmPaymentIntentHandlerTests
     public async Task Handle_GatewayChallengeFails_ShouldFail()
     {
         var intent = CreateRequiresActionIntent();
-        var command = new ConfirmPaymentIntentCommand(intent.MerchantId, intent.Id);
+        var command = new ConfirmPaymentIntentCommand(intent.MerchantId, intent.Id, "confirm-key");
         SetupValidatorSuccess(command);
         SetupMerchantConfig(autoCapture: false);
         _repoMock.Setup(r => r.GetByIdAsync(intent.Id, It.IsAny<CancellationToken>())).ReturnsAsync(intent);
@@ -133,7 +133,7 @@ public class ConfirmPaymentIntentHandlerTests
     public async Task Handle_ConcurrencyConflict_ShouldFail()
     {
         var intent = CreateRequiresActionIntent();
-        var command = new ConfirmPaymentIntentCommand(intent.MerchantId, intent.Id);
+        var command = new ConfirmPaymentIntentCommand(intent.MerchantId, intent.Id, "confirm-key");
         SetupValidatorSuccess(command);
         SetupMerchantConfig(autoCapture: false);
         _repoMock.Setup(r => r.GetByIdAsync(intent.Id, It.IsAny<CancellationToken>())).ReturnsAsync(intent);
@@ -145,6 +145,42 @@ public class ConfirmPaymentIntentHandlerTests
 
         Assert.True(result.IsFailure);
         Assert.Equal("Payment.ConcurrencyConflict", result.Errors[0].Code);
+    }
+
+    [Fact]
+    public async Task Handle_AlreadyConfirmedWithSameKey_ReturnsOriginalResult()
+    {
+        var intent = CreateRequiresActionIntent();
+        intent.ConfirmAction(new AuthorizationCode("AUTH-3DS"), intent.GatewayReference!, "confirm-key");
+        intent.ClearDomainEvents();
+        var command = new ConfirmPaymentIntentCommand(intent.MerchantId, intent.Id, "confirm-key");
+        SetupValidatorSuccess(command);
+        _repoMock.Setup(r => r.GetByIdAsync(intent.Id, It.IsAny<CancellationToken>())).ReturnsAsync(intent);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(intent.Id, result.Value!.IntentId);
+        Assert.Equal("Authorized", result.Value!.Status);
+        _gatewayMock.Verify(
+            g => g.ConfirmChallengeAsync(It.IsAny<Guid>(), It.IsAny<Money>(), It.IsAny<CardDetails?>(), It.IsAny<string>(), It.IsAny<CardSecurityCode?>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_AlreadyConfirmedWithDifferentKey_StillFails()
+    {
+        var intent = CreateRequiresActionIntent();
+        intent.ConfirmAction(new AuthorizationCode("AUTH-3DS"), intent.GatewayReference!, "original-key");
+        intent.ClearDomainEvents();
+        var command = new ConfirmPaymentIntentCommand(intent.MerchantId, intent.Id, "other-key");
+        SetupValidatorSuccess(command);
+        _repoMock.Setup(r => r.GetByIdAsync(intent.Id, It.IsAny<CancellationToken>())).ReturnsAsync(intent);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Payment.InvalidStatusTransition", result.Errors[0].Code);
     }
 
     private PaymentIntent CreateRequiresActionIntent()

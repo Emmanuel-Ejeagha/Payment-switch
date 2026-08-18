@@ -12,7 +12,12 @@ public class CreatePaymentIntentCommandValidator : AbstractValidator<CreatePayme
         RuleFor(x => x.Currency).NotEmpty().Length(3).WithMessage("Currency must be a 3-letter ISO code.");
         RuleFor(x => x.PaymentMethod).NotEmpty().Must(m => m is "Card" or "Bank" or "MobileMoney")
             .WithMessage("Payment method must be Card, Bank, or MobileMoney.");
-        RuleFor(x => x.IdempotencyKey).NotEmpty().WithMessage("Idempotency key is required.");
+        RuleFor(x => x.IdempotencyKey)
+            .NotEmpty().WithMessage("Idempotency key is required.")
+            .MaximumLength(IdempotencyKey.MaxLength)
+            .WithMessage($"Idempotency key must not exceed {IdempotencyKey.MaxLength} characters.")
+            .Must(IdempotencyKey.IsWellFormed)
+            .WithMessage("Idempotency key may contain only letters, digits, hyphens, and underscores.");
         When(x => x.PaymentMethod == "Card", () =>
         {
             When(x => x.CardToken is null, () =>
