@@ -39,7 +39,10 @@ public class PublicPaymentsController : ControllerBase
         if (!_httpContextAccessor.HttpContext!.Items.TryGetValue("MerchantId", out var merchantIdObj) || merchantIdObj is not Guid merchantId)
             return Unauthorized();
 
-        var idempotencyKey = Request.Headers["Idempotency-Key"].FirstOrDefault() ?? Guid.NewGuid().ToString("N");
+        // Idempotency-Key is required (Stripe-style). A missing header flows as an
+        // empty key and is rejected by the command validator with a 400; the key also
+        // scopes replay so a retried create returns the original intent.
+        var idempotencyKey = Request.Headers["Idempotency-Key"].FirstOrDefault() ?? string.Empty;
         var command = new CreatePaymentIntentCommand(
             merchantId,
             request.Amount,
@@ -99,7 +102,9 @@ public class PublicPaymentsController : ControllerBase
         if (!_httpContextAccessor.HttpContext!.Items.TryGetValue("MerchantId", out var merchantIdObj) || merchantIdObj is not Guid merchantId)
             return Unauthorized();
 
-        var idempotencyKey = Request.Headers["Idempotency-Key"].FirstOrDefault();
+        // Idempotency-Key is required on confirm too; a retried confirm with the
+        // same key returns the original result instead of a transition error.
+        var idempotencyKey = Request.Headers["Idempotency-Key"].FirstOrDefault() ?? string.Empty;
         var result = await handler.Handle(new ConfirmPaymentIntentCommand(merchantId, id, idempotencyKey));
 
         return result.ToActionResult();
