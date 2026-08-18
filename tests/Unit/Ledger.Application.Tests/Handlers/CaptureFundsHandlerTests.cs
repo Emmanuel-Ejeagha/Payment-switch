@@ -66,6 +66,9 @@ public class CaptureFundsHandlerTests
         Assert.Equal(2, account.Journal.Count);
         Assert.Contains(account.Journal, j => j.CreditAccount == GlAccountCode.FeesIncome && j.Amount.Amount == 2L);
         Assert.Contains(account.DomainEvents, e => e is FeesChargedEvent);
+        // JournalEntries.CorrelationId is unique; the fee posting must not reuse the
+        // capture's correlation id or the DB backstop rolls the whole capture back.
+        Assert.Equal(2, account.Journal.Select(j => j.CorrelationId.Value).Distinct().Count());
     }
 
     [Fact]
