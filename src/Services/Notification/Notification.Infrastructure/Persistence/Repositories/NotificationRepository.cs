@@ -81,4 +81,18 @@ public class NotificationRepository : INotificationRepository
             n.WebhookUrl, n.Status.Value, n.RetryCount,
             n.NextRetryAt, n.CreatedAt, n.ProcessedAt)).ToList();
     }
+
+    public async Task<int> CountAsync(string? recipient, string? channel, string? status, CancellationToken cancellationToken = default)
+    {
+        var query = _context.Notifications.AsQueryable();
+
+        if (!string.IsNullOrEmpty(recipient))
+            query = query.Where(n => n.Recipient.Contains(recipient));
+        if (!string.IsNullOrEmpty(channel) && channel.ToLowerInvariant() is "email" or "sms" or "webhook")
+            query = query.Where(n => n.Channel == NotificationChannel.FromString(channel));
+        if (!string.IsNullOrEmpty(status) && status.ToLowerInvariant() is "pending" or "sent" or "failed")
+            query = query.Where(n => n.Status == NotificationStatus.FromString(status));
+
+        return await query.CountAsync(cancellationToken);
+    }
 }

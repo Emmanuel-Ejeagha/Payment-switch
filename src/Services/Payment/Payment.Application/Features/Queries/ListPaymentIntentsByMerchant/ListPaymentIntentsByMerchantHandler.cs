@@ -1,4 +1,5 @@
-﻿using BuildingBlocks.Shared.Results;
+﻿using BuildingBlocks.Shared.Paging;
+using BuildingBlocks.Shared.Results;
 using Payment.Application.DTOs;
 using Payment.Application.Interfaces;
 using Microsoft.Extensions.Logging;
@@ -16,10 +17,11 @@ public class ListPaymentIntentsByMerchantHandler
         _logger = logger;
     }
 
-    public async Task<Result<List<PaymentIntentDto>>> Handle(ListPaymentIntentsByMerchantQuery query, CancellationToken cancellationToken = default)
+    public async Task<Result<PagedData<PaymentIntentDto>>> Handle(ListPaymentIntentsByMerchantQuery query, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Handling {CommandName} for Merchant {MerchantId}", nameof(ListPaymentIntentsByMerchantQuery), query.MerchantId);
         var intents = await _repository.ListByMerchantAsync(query.MerchantId, query.Skip, query.Take, cancellationToken);
-        return intents;
+        var total = await _repository.CountByMerchantAsync(query.MerchantId, cancellationToken);
+        return new PagedData<PaymentIntentDto>(intents, total);
     }
 }

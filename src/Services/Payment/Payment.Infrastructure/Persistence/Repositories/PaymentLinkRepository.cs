@@ -28,6 +28,12 @@ public class PaymentLinkRepository : IPaymentLinkRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<int> CountByMerchantAsync(Guid merchantId, CancellationToken cancellationToken = default)
+    {
+        return await _context.PaymentLinks
+            .CountAsync(l => l.MerchantId == merchantId, cancellationToken);
+    }
+
     public async Task AddAsync(PaymentLink link, CancellationToken cancellationToken = default)
     {
         await _context.PaymentLinks.AddAsync(link, cancellationToken);

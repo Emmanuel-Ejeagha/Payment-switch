@@ -9,4 +9,5 @@ public interface INotificationRepository
     Task AddAsync(NotificationEntity notification, CancellationToken cancellationToken = default);
     Task<List<NotificationEntity>> GetPendingForRetryAsync(DateTime now, int batchSize, CancellationToken cancellationToken = default);
     Task<List<NotificationDto>> ListAsync(string? recipient, string? channel, string? status, int skip, int take, CancellationToken cancellationToken = default);
+    Task<int> CountAsync(string? recipient, string? channel, string? status, CancellationToken cancellationToken = default);
 }

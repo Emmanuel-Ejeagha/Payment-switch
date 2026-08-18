@@ -1,3 +1,5 @@
-﻿namespace Payment.Application.Features.Queries.ListPaymentIntentsByMerchant;
+﻿using BuildingBlocks.Shared.Paging;
 
-public record ListPaymentIntentsByMerchantQuery(Guid MerchantId, int Skip, int Take);
+namespace Payment.Application.Features.Queries.ListPaymentIntentsByMerchant;
+
+public record ListPaymentIntentsByMerchantQuery(Guid MerchantId, int Skip = PageBounds.DefaultSkip, int Take = PageBounds.DefaultTake);

@@ -1,3 +1,5 @@
+using System.Globalization;
+using BuildingBlocks.Shared.Paging;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Payment.API.Extensions;
@@ -32,10 +34,14 @@ public class PaymentLinksController : BaseApiController
     public async Task<IActionResult> List(
         [FromQuery] Guid merchantId,
         [FromServices] ListPaymentLinksByMerchantHandler handler,
-        [FromQuery] int skip = 0,
-        [FromQuery] int take = 20)
+        [FromQuery] int skip = PageBounds.DefaultSkip,
+        [FromQuery] int take = PageBounds.DefaultTake)
     {
-        var result = await handler.Handle(new ListPaymentLinksByMerchantQuery(merchantId, skip, take));
-        return result.ToActionResult();
+        var (normalizedSkip, normalizedTake) = PageBounds.Normalize(skip, take);
+        var result = await handler.Handle(new ListPaymentLinksByMerchantQuery(merchantId, normalizedSkip, normalizedTake));
+        if (result.IsFailure) return result.ToActionResult();
+
+        Response.Headers["X-Total-Count"] = result.Value!.TotalCount.ToString(CultureInfo.InvariantCulture);
+        return Ok(result.Value.Items);
     }
 }

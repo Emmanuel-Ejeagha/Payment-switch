@@ -1,3 +1,5 @@
+using BuildingBlocks.Shared.Paging;
+
 namespace Payment.Application.Features.Queries.ListSubscriptionsByMerchant;
 
-public record ListSubscriptionsByMerchantQuery(Guid MerchantId, int Skip = 0, int Take = 50);
+public record ListSubscriptionsByMerchantQuery(Guid MerchantId, int Skip = PageBounds.DefaultSkip, int Take = PageBounds.DefaultTake);

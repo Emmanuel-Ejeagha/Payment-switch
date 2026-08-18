@@ -1,4 +1,6 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using BuildingBlocks.Shared.Paging;
+using BuildingBlocks.Shared.Results;
+using Microsoft.Extensions.Logging;
 
 namespace Merchant.Application.Features.Queries.ListMerchants;
 
@@ -13,11 +15,12 @@ public class ListMerchantsHandler
         _logger = logger;
     }
 
-    public async Task<Result<List<MerchantDto>>> Handle(ListMerchantsQuery query, CancellationToken cancellationToken = default)
+    public async Task<Result<PagedData<MerchantDto>>> Handle(ListMerchantsQuery query, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Handling {QueryName}", nameof(ListMerchantsQuery));
 
         var merchants = await _repository.ListAsync(query.Skip, query.Take, cancellationToken);
-        return merchants;
+        var total = await _repository.CountAsync(cancellationToken);
+        return new PagedData<MerchantDto>(merchants, total);
     }
 }

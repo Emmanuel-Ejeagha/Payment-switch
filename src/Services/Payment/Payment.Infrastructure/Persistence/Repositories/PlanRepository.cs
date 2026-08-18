@@ -28,6 +28,12 @@ public class PlanRepository : IPlanRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<int> CountByMerchantAsync(Guid merchantId, CancellationToken cancellationToken = default)
+    {
+        return await _context.Plans
+            .CountAsync(p => p.MerchantId == merchantId, cancellationToken);
+    }
+
     public async Task AddAsync(Plan plan, CancellationToken cancellationToken = default)
     {
         await _context.Plans.AddAsync(plan, cancellationToken);

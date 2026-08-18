@@ -1,4 +1,5 @@
-﻿using Merchant.API.Contracts;
+﻿using System.Globalization;
+using Merchant.API.Contracts;
 using Merchant.API.Extensions;
 using Merchant.Application.DTOs;
 using Merchant.Application.Features.Commands.ActivateMerchant;
@@ -15,6 +16,7 @@ using Merchant.Application.Features.Commands.UpdateSettlementInfo;
 using Merchant.Application.Features.Queries.GetMerchantByEmail;
 using Merchant.Application.Features.Queries.GetMerchantById;
 using Merchant.Application.Features.Queries.ListMerchants;
+using BuildingBlocks.Shared.Paging;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
@@ -275,17 +277,21 @@ public class MerchantsController : BaseApiController
     /// </summary>
     /// <param name="handler">Handler injected via DI.</param>
     /// <param name="skip">Number of records to skip (default 0).</param>
-    /// <param name="take">Number of records to take (default 10).</param>
+    /// <param name="take">Number of records to take (default 20).</param>
     /// <returns>A list of merchant DTOs.</returns>
     [HttpGet]
     [Authorize(Roles = "Admin")]
     [ProducesResponseType(typeof(List<MerchantDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> List(
         [FromServices] ListMerchantsHandler handler,
-        [FromQuery] int skip = 0,
-        [FromQuery] int take = 10)
+        [FromQuery] int skip = PageBounds.DefaultSkip,
+        [FromQuery] int take = PageBounds.DefaultTake)
     {
-        var result = await handler.Handle(new ListMerchantsQuery(skip, take));
-        return result.ToActionResult();
+        var (normalizedSkip, normalizedTake) = PageBounds.Normalize(skip, take);
+        var result = await handler.Handle(new ListMerchantsQuery(normalizedSkip, normalizedTake));
+        if (result.IsFailure) return result.ToActionResult();
+
+        Response.Headers["X-Total-Count"] = result.Value!.TotalCount.ToString(CultureInfo.InvariantCulture);
+        return Ok(result.Value.Items);
     }
 }

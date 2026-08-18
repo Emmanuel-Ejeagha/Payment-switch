@@ -1,3 +1,4 @@
+using BuildingBlocks.Shared.Paging;
 using BuildingBlocks.Shared.Results;
 using Microsoft.Extensions.Logging;
 using Payment.Application.Interfaces;
@@ -21,7 +22,7 @@ public class ListWebhookEventsHandler
         _logger = logger;
     }
 
-    public async Task<Result<List<WebhookEventDto>>> Handle(ListWebhookEventsQuery query, CancellationToken cancellationToken = default)
+    public async Task<Result<PagedData<WebhookEventDto>>> Handle(ListWebhookEventsQuery query, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Handling {QueryName} for Merchant {MerchantId}", nameof(ListWebhookEventsQuery), query.MerchantId);
 
@@ -31,6 +32,7 @@ public class ListWebhookEventsHandler
             return PaymentErrors.Unauthorized();
 
         var events = await _repository.ListByMerchantAsync(query.MerchantId, query.Skip, query.Take, cancellationToken);
+        var total = await _repository.CountByMerchantAsync(query.MerchantId, cancellationToken);
         var dtos = events.Select(e => new WebhookEventDto(
             e.Id,
             e.EventType,
@@ -41,6 +43,6 @@ public class ListWebhookEventsHandler
             e.LastError,
             e.CorrelationId)).ToList();
 
-        return Result<List<WebhookEventDto>>.Success(dtos);
+        return new PagedData<WebhookEventDto>(dtos, total);
     }
 }

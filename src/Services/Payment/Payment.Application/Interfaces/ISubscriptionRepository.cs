@@ -6,6 +6,7 @@ public interface ISubscriptionRepository
 {
     Task<Subscription?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<List<Subscription>> ListByMerchantAsync(Guid merchantId, int skip, int take, CancellationToken cancellationToken = default);
+    Task<int> CountByMerchantAsync(Guid merchantId, CancellationToken cancellationToken = default);
     Task<List<Subscription>> ListByCustomerAsync(Guid customerId, CancellationToken cancellationToken = default);
 
     /// <summary>

@@ -36,18 +36,7 @@ public class SettlementBatchRepository : ISettlementBatchRepository
 
     public async Task<List<SettlementBatchDto>> ListAsync(DateTime? from, DateTime? to, int skip, int take, CancellationToken cancellationToken = default)
     {
-        var query = _context.SettlementBatches.AsQueryable();
-
-        if (from.HasValue)
-        {
-            var fromDate = from.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(from.Value, DateTimeKind.Utc) : from.Value;
-            query = query.Where(b => b.BatchDate >= fromDate.Date);
-        }
-        if (to.HasValue)
-        {
-            var toDate = to.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(to.Value, DateTimeKind.Utc) : to.Value;
-            query = query.Where(b => b.BatchDate <= toDate.Date);
-        }
+        var query = ApplyDateFilter(_context.SettlementBatches.AsQueryable(), from, to);
 
         var batches = await query
             .OrderByDescending(b => b.BatchDate)
@@ -68,5 +57,26 @@ public class SettlementBatchRepository : ISettlementBatchRepository
                 p.Currency
             )).ToList()
         )).ToList();
+    }
+
+    public async Task<int> CountAsync(DateTime? from, DateTime? to, CancellationToken cancellationToken = default)
+    {
+        var query = ApplyDateFilter(_context.SettlementBatches.AsQueryable(), from, to);
+        return await query.CountAsync(cancellationToken);
+    }
+
+    private static IQueryable<SettlementBatch> ApplyDateFilter(IQueryable<SettlementBatch> query, DateTime? from, DateTime? to)
+    {
+        if (from.HasValue)
+        {
+            var fromDate = from.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(from.Value, DateTimeKind.Utc) : from.Value;
+            query = query.Where(b => b.BatchDate >= fromDate.Date);
+        }
+        if (to.HasValue)
+        {
+            var toDate = to.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(to.Value, DateTimeKind.Utc) : to.Value;
+            query = query.Where(b => b.BatchDate <= toDate.Date);
+        }
+        return query;
     }
 }
