@@ -54,7 +54,10 @@ public class CaptureFundsHandler
             if (fee > 0)
             {
                 _logger.LogInformation("Charging {Fee} processing fee for Merchant {MerchantId}", fee, command.MerchantId);
-                account.ChargeFees(new Money(fee, command.Currency), new CorrelationId(command.CorrelationId));
+                // JournalEntries.CorrelationId is unique (idempotency backstop), so
+                // the fee posting must carry a distinct correlation id or the second
+                // insert violates the index and the whole capture is rolled back.
+                account.ChargeFees(new Money(fee, command.Currency), new CorrelationId($"{command.CorrelationId}:fee"));
             }
         }
         catch (InvalidOperationException ex)

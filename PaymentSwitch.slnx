@@ -48,6 +48,7 @@
     <Project Path="tests/Integration/Ledger.API.IntegrationTests/Ledger.API.IntegrationTests.csproj" />
     <Project Path="tests/Integration/Notification.API.IntegrationTests/Notification.API.IntegrationTests.csproj" />
     <Project Path="tests/Integration/Settlement.API.IntegrationTests/Settlement.API.IntegrationTests.csproj" />
+    <Project Path="tests/Integration/E2E.IntegrationTests/E2E.IntegrationTests.csproj" />
   </Folder>
   <Folder Name="/tests/Unit/">
     <Project Path="tests/Unit/BuildingBlocks.Shared.Tests/BuildingBlocks.Shared.Tests.csproj" />

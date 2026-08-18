@@ -270,12 +270,26 @@ public class MerchantEventConsumerService : BackgroundService
         await base.StopAsync(cancellationToken);
         if (_channel is not null)
         {
-            await _channel.CloseAsync(CancellationToken.None);
+            try
+            {
+                await _channel.CloseAsync(CancellationToken.None);
+            }
+            catch (Exception ex) when (ex is ObjectDisposedException or RabbitMQ.Client.Exceptions.AlreadyClosedException)
+            {
+                // The client library already closed the channel (e.g. the
+                // connection dropped mid-run); teardown must not fail the shutdown.
+            }
             await _channel.DisposeAsync();
         }
         if (_connection is not null)
         {
-            await _connection.CloseAsync(CancellationToken.None);
+            try
+            {
+                await _connection.CloseAsync(CancellationToken.None);
+            }
+            catch (Exception ex) when (ex is ObjectDisposedException or RabbitMQ.Client.Exceptions.AlreadyClosedException)
+            {
+            }
             await _connection.DisposeAsync();
         }
     }
