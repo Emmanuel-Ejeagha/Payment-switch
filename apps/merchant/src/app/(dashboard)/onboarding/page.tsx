@@ -2,8 +2,36 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Store, ArrowRight, CheckCircle } from "lucide-react"
+import { ArrowRight, CheckCircle2, CreditCard, KeyRound, Rocket, Store } from "lucide-react"
 import type { UserDto } from "@paymentswitch/shared"
+import { BrandMark } from "@/components/landing/brand-mark"
+import {
+  Alert,
+  Button,
+  Card,
+  CardBody,
+  Field,
+  Input,
+  Skeleton,
+} from "@/components/ui"
+
+const NEXT_STEPS = [
+  {
+    icon: CheckCircle2,
+    title: "Approval review",
+    body: "Your profile starts in Pending. An administrator approves and activates it, usually within a business day.",
+  },
+  {
+    icon: KeyRound,
+    title: "Generate a test key",
+    body: "Test keys work immediately, so you can integrate against the sandbox while approval is pending.",
+  },
+  {
+    icon: CreditCard,
+    title: "Take your first payment",
+    body: "Create a payment link and share it — no integration code required to get started.",
+  },
+]
 
 export default function OnboardingPage() {
   const router = useRouter()
@@ -74,73 +102,135 @@ export default function OnboardingPage() {
   }
 
   if (loading) {
-    return <div className="h-64 animate-pulse rounded-xl bg-muted" />
+    return (
+      <div className="mx-auto max-w-2xl space-y-6">
+        <Skeleton className="h-10 w-56" />
+        <Skeleton className="h-64" />
+      </div>
+    )
   }
 
+  const nameTooShort = businessName.trim().length < 2
+
   return (
-    <div className="mx-auto max-w-lg space-y-6">
-      <div className="flex items-center gap-3">
-        <div className="rounded-lg bg-primary/10 p-2">
-          <Store className="h-5 w-5 text-primary" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-semibold">Finish setting up</h1>
-          <p className="text-sm text-muted-foreground">
-            Your account exists but has no merchant profile yet.
-          </p>
+    <div className="mx-auto max-w-2xl space-y-8">
+      {/* Soft brand wash behind the header — decorative only, no network request. */}
+      <div className="relative overflow-hidden rounded-2xl border bg-card p-6 shadow-subtle sm:p-8">
+        <div
+          className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-primary/10 blur-3xl"
+          aria-hidden="true"
+        />
+        <div className="relative flex flex-wrap items-center gap-4">
+          <BrandMark className="h-10 w-10" />
+          <div className="min-w-0">
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Step 2 of 2
+            </p>
+            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Finish setting up</h1>
+            <p className="mt-1 max-w-lg text-sm leading-relaxed text-muted-foreground">
+              Your sign-in account exists. One more detail — the business name customers will see on
+              receipts and checkout pages.
+            </p>
+          </div>
         </div>
       </div>
 
-      {error && <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
+      {error && (
+        <Alert variant="error" title="We could not create your profile">
+          {error}
+        </Alert>
+      )}
 
       {done ? (
-        <div className="flex items-center gap-3 rounded-xl border bg-card p-6">
-          <CheckCircle className="h-5 w-5 text-emerald-500" />
-          <div>
-            <p className="font-medium">Merchant profile created</p>
-            <p className="text-sm text-muted-foreground">
-              Your account is pending activation. Taking you to the dashboard.
-            </p>
-          </div>
-        </div>
+        <Card className="border-emerald-500/40 bg-emerald-500/5">
+          <CardBody className="flex items-start gap-4">
+            <span
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+              aria-hidden="true"
+            >
+              <Rocket className="h-5 w-5" />
+            </span>
+            <div role="status">
+              <p className="font-medium">Merchant profile created</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Your account is pending activation. Taking you to the dashboard…
+              </p>
+            </div>
+          </CardBody>
+        </Card>
       ) : (
-        <div className="space-y-4 rounded-xl border bg-card p-6">
-          <div>
-            <label htmlFor="businessName" className="mb-1 block text-sm font-medium">
-              Business name <span className="text-destructive">*</span>
-            </label>
-            <input
-              id="businessName"
-              type="text"
-              value={businessName}
-              onChange={(e) => setBusinessName(e.target.value)}
-              placeholder="Your Business Ltd."
-              className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium">Email</label>
-            <input
-              type="email"
-              value={user?.email ?? ""}
-              disabled
-              className="w-full rounded-lg border bg-muted px-3 py-2 text-sm text-muted-foreground"
-            />
-            <p className="mt-1 text-xs text-muted-foreground">
-              Taken from your sign-in account and cannot be changed here.
-            </p>
-          </div>
-          <button
-            onClick={onboard}
-            disabled={submitting || businessName.trim().length < 2}
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
-          >
-            {submitting ? "Creating..." : (
-              <>Create merchant profile <ArrowRight className="h-4 w-4" /></>
-            )}
-          </button>
-        </div>
+        <Card>
+          <CardBody className="space-y-5">
+            <Field
+              label="Business name"
+              htmlFor="businessName"
+              required
+              hint="Shown to customers on checkout pages and receipts. You can ask support to change it later."
+            >
+              <Input
+                id="businessName"
+                type="text"
+                value={businessName}
+                onChange={(e) => setBusinessName(e.target.value)}
+                placeholder="Your Business Ltd."
+                autoComplete="organization"
+                autoFocus
+              />
+            </Field>
+
+            <Field
+              label="Email"
+              htmlFor="onboarding-email"
+              hint="Taken from your sign-in account and cannot be changed here."
+            >
+              <Input
+                id="onboarding-email"
+                type="email"
+                value={user?.email ?? ""}
+                disabled
+                readOnly
+              />
+            </Field>
+
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+              <p className="text-xs text-muted-foreground">
+                <Store className="mr-1.5 inline h-3.5 w-3.5 align-[-2px]" aria-hidden="true" />
+                Takes a second — nothing else is required to start.
+              </p>
+              <Button
+                variant="primary"
+                size="lg"
+                onClick={onboard}
+                pending={submitting}
+                disabled={nameTooShort}
+              >
+                {submitting ? "Creating…" : "Create merchant profile"}
+                {!submitting && <ArrowRight className="h-4 w-4" aria-hidden="true" />}
+              </Button>
+            </div>
+          </CardBody>
+        </Card>
       )}
+
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          What happens next
+        </p>
+        <ul className="mt-3 grid gap-3 sm:grid-cols-3">
+          {NEXT_STEPS.map(({ icon: Icon, title, body }) => (
+            <li key={title} className="rounded-xl border bg-card p-4 shadow-subtle">
+              <span
+                className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary"
+                aria-hidden="true"
+              >
+                <Icon className="h-4 w-4" />
+              </span>
+              <p className="mt-3 text-sm font-medium">{title}</p>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{body}</p>
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   )
 }

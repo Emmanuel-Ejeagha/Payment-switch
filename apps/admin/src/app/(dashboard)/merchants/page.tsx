@@ -73,7 +73,7 @@ export default function MerchantsPage() {
         </div>
 
         <div className="flex gap-2">
-          {["All", "Active", "Pending", "Suspended"].map((s) => (
+          {["All", "Active", "Pending", "Approved", "Rejected", "Suspended"].map((s) => (
             <button
               key={s}
               onClick={() => { setStatusFilter(s); setSkip(0) }}

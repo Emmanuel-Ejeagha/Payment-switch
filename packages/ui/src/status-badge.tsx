@@ -3,6 +3,8 @@ import { cn } from "@paymentswitch/shared"
 const colors: Record<string, string> = {
   Active: "bg-emerald-500/10 text-emerald-600",
   Pending: "bg-amber-500/10 text-amber-600",
+  Approved: "bg-sky-500/10 text-sky-600",
+  Rejected: "bg-red-500/10 text-red-600",
   Suspended: "bg-red-500/10 text-red-600",
 }
 

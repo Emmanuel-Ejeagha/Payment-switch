@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
-import { ArrowLeft, Store, Check, X } from "lucide-react"
+import { ArrowLeft, Store, Check, X, ThumbsUp, ThumbsDown, RotateCcw } from "lucide-react"
 import Link from "next/link"
 import type { MerchantDto } from "@paymentswitch/shared"
 import { StatusBadge } from "@paymentswitch/ui"
@@ -22,6 +22,11 @@ export default function MerchantDetailPage() {
   const [autoCapture, setAutoCapture] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
+
+  const [rejecting, setRejecting] = useState(false)
+  const [rejectReason, setRejectReason] = useState("")
+  const [rejectSaving, setRejectSaving] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -78,22 +83,39 @@ export default function MerchantDetailPage() {
     }
   }
 
-  const handleActivate = async () => {
-    const res = await fetch(`/api/proxy/merchant/api/v1/merchants/${id}/activate`, {
-      method: "POST",
-    })
-    if (res.ok) {
-      setMerchant((prev) => prev ? { ...prev, status: "Active" as const } : null)
+  const runAction = async (action: string, body?: unknown) => {
+    setActionError(null)
+    try {
+      const res = await fetch(`/api/proxy/merchant/api/v1/merchants/${id}/${action}`, {
+        method: "POST",
+        headers: body ? { "Content-Type": "application/json" } : undefined,
+        body: body ? JSON.stringify(body) : undefined,
+      })
+      if (!res.ok) {
+        const text = await res.text()
+        setActionError(text || `Request failed (${res.status})`)
+        return
+      }
+      const fresh = await fetch(`/api/proxy/merchant/api/v1/merchants/${id}`)
+      if (fresh.ok) {
+        const data: MerchantDto = await fresh.json()
+        setMerchant(data)
+      }
+      setRejecting(false)
+      setRejectReason("")
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Request failed")
     }
   }
 
-  const handleSuspend = async () => {
-    const res = await fetch(`/api/proxy/merchant/api/v1/merchants/${id}/suspend`, {
-      method: "POST",
-    })
-    if (res.ok) {
-      setMerchant((prev) => prev ? { ...prev, status: "Suspended" as const } : null)
-    }
+  const handleApprove = () => runAction("approve")
+  const handleActivate = () => runAction("activate")
+  const handleSuspend = () => runAction("suspend")
+  const handleReactivate = () => runAction("reactivate")
+  const handleReject = () => {
+    if (!rejectReason.trim()) return
+    setRejectSaving(true)
+    void runAction("reject", { reason: rejectReason.trim() }).finally(() => setRejectSaving(false))
   }
 
   if (loading) {
@@ -136,7 +158,26 @@ export default function MerchantDetailPage() {
         </div>
         <div className="flex items-center gap-3">
           <StatusBadge status={merchant.status} />
+          {actionError && (
+            <p className="max-w-xs text-xs text-destructive">{actionError}</p>
+          )}
           {merchant.status === "Pending" && (
+            <>
+              <button
+                onClick={handleApprove}
+                className="inline-flex items-center gap-1 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-700"
+              >
+                <ThumbsUp className="h-3.5 w-3.5" /> Approve
+              </button>
+              <button
+                onClick={() => setRejecting(true)}
+                className="inline-flex items-center gap-1 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700"
+              >
+                <ThumbsDown className="h-3.5 w-3.5" /> Reject
+              </button>
+            </>
+          )}
+          {merchant.status === "Approved" && (
             <button
               onClick={handleActivate}
               className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700"
@@ -152,8 +193,56 @@ export default function MerchantDetailPage() {
               <X className="h-3.5 w-3.5" /> Suspend
             </button>
           )}
+          {merchant.status === "Suspended" && (
+            <button
+              onClick={handleReactivate}
+              className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700"
+            >
+              <RotateCcw className="h-3.5 w-3.5" /> Reactivate
+            </button>
+          )}
         </div>
       </div>
+
+      {merchant.status === "Rejected" && merchant.rejectionReason && (
+        <div className="rounded-xl border border-destructive/50 bg-destructive/10 p-4 text-sm">
+          <p className="font-medium text-destructive">Rejected</p>
+          <p className="mt-1 text-muted-foreground">{merchant.rejectionReason}</p>
+        </div>
+      )}
+
+      {rejecting && (
+        <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-4">
+          <p className="text-sm font-medium text-destructive">Reject this merchant</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            The reason is shown to the merchant so they know what to fix.
+          </p>
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+            <textarea
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              rows={2}
+              placeholder="e.g. Business verification documents are missing"
+              className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            />
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                onClick={handleReject}
+                disabled={!rejectReason.trim() || rejectSaving}
+                className="inline-flex h-10 items-center justify-center rounded-lg bg-red-600 px-4 text-sm font-medium text-white hover:bg-red-700 disabled:pointer-events-none disabled:opacity-50"
+              >
+                {rejectSaving ? "Rejecting…" : "Reject"}
+              </button>
+              <button
+                onClick={() => { setRejecting(false); setRejectReason("") }}
+                className="inline-flex h-10 items-center justify-center rounded-lg border px-4 text-sm font-medium hover:bg-accent"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-6 md:grid-cols-2">
         <div className="rounded-xl border p-6">
@@ -271,6 +360,49 @@ export default function MerchantDetailPage() {
             <div className="flex justify-between">
               <dt className="text-muted-foreground">Auto-capture</dt>
               <dd className="font-medium">{merchant.autoCapture !== false ? "Enabled" : "Disabled"}</dd>
+            </div>
+          </dl>
+
+          <h3 className="mt-6 mb-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            Settlement
+          </h3>
+          <dl className="space-y-3 text-sm">
+            <div className="flex justify-between">
+              <dt className="text-muted-foreground">Bank account</dt>
+              <dd className="font-medium">
+                {merchant.settlementBankAccountName
+                  ? `${merchant.settlementBankAccountName} · ${merchant.settlementBankAccountNumber}`
+                  : "—"}
+              </dd>
+            </div>
+            <div className="flex justify-between">
+              <dt className="text-muted-foreground">Bank</dt>
+              <dd className="font-medium">{merchant.settlementBankName || "—"}</dd>
+            </div>
+            <div className="flex justify-between">
+              <dt className="text-muted-foreground">Currency / schedule</dt>
+              <dd className="font-medium">
+                {merchant.settlementCurrency || "—"}
+                {merchant.settlementSchedule ? ` · ${merchant.settlementSchedule}` : ""}
+              </dd>
+            </div>
+          </dl>
+
+          <h3 className="mt-6 mb-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            Contact
+          </h3>
+          <dl className="space-y-3 text-sm">
+            <div className="flex justify-between">
+              <dt className="text-muted-foreground">Phone</dt>
+              <dd className="font-medium">{merchant.contactPhone || "—"}</dd>
+            </div>
+            <div className="flex justify-between">
+              <dt className="text-muted-foreground">Address</dt>
+              <dd className="font-medium text-right">{merchant.contactAddress || "—"}</dd>
+            </div>
+            <div className="flex justify-between">
+              <dt className="text-muted-foreground">Contact person</dt>
+              <dd className="font-medium">{merchant.contactPerson || "—"}</dd>
             </div>
           </dl>
         </div>
