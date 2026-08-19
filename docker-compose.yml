@@ -1,9 +1,13 @@
 services:
+  # Only nginx (:80/:443) is the public ingress. Every other published port is
+# bound to loopback (127.0.0.1) so it is reachable only from the host, not the
+# internet — Swagger/metrics/Hangfire and infra UIs stay out of reach
+# (TASK-046, docs/prod-exposure.md). Open only 80/443 in the EC2 security group.
   postgres:
     image: postgres:16-alpine
     restart: always
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     environment:
       POSTGRES_USER: paymentswitch
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
@@ -31,9 +35,9 @@ services:
     image: rabbitmq:3-management-alpine
     restart: always
     ports:
-      - "5672:5672"
-      - "15672:15672"
-      - "15692:15692"
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
+      - "127.0.0.1:15692:15692"
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:?Set RABBITMQ_DEFAULT_USER in .env}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:?Set RABBITMQ_DEFAULT_PASS in .env}
@@ -91,9 +95,9 @@ services:
       dockerfile: src/Services/Identity/Identity.API/Dockerfile
     restart: always
     ports:
-      - "5146:8080"
+      - "127.0.0.1:5146:8080"
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development}
       - ASPNETCORE_URLS=http://0.0.0.0:8080
       - RunMigrations=true
       - ConnectionStrings__IdentityDb=Host=postgres;Database=IdentityDb;Username=paymentswitch;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
@@ -130,9 +134,9 @@ services:
       dockerfile: src/Services/Merchant/Merchant.API/Dockerfile
     restart: always
     ports:
-      - "5237:8080"
+      - "127.0.0.1:5237:8080"
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development}
       - ASPNETCORE_URLS=http://0.0.0.0:8080
       - RunMigrations=true
       - ConnectionStrings__MerchantDb=Host=postgres;Database=MerchantDb;Username=paymentswitch;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
@@ -159,9 +163,9 @@ services:
       dockerfile: src/Services/Payment/Payment.API/Dockerfile
     restart: always
     ports:
-      - "5118:8080"
+      - "127.0.0.1:5118:8080"
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development}
       - ASPNETCORE_URLS=http://0.0.0.0:8080
       - RunMigrations=true
       - ConnectionStrings__PaymentDb=Host=postgres;Database=PaymentDb;Username=paymentswitch;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
@@ -187,9 +191,9 @@ services:
       dockerfile: src/Services/Ledger/Ledger.API/Dockerfile
     restart: always
     ports:
-      - "5320:8080"
+      - "127.0.0.1:5320:8080"
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development}
       - ASPNETCORE_URLS=http://0.0.0.0:8080
       - RunMigrations=true
       - ConnectionStrings__LedgerDb=Host=postgres;Database=LedgerDb;Username=paymentswitch;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
@@ -215,9 +219,9 @@ services:
       dockerfile: src/Services/Notification/Notification.API/Dockerfile
     restart: always
     ports:
-      - "5281:8080"
+      - "127.0.0.1:5281:8080"
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development}
       - ASPNETCORE_URLS=http://0.0.0.0:8080
       - RunMigrations=true
       - ConnectionStrings__NotificationDb=Host=postgres;Database=NotificationDb;Username=paymentswitch;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
@@ -250,9 +254,9 @@ services:
       dockerfile: src/Services/Settlement/Settlement.API/Dockerfile
     restart: always
     ports:
-      - "5392:8080"
+      - "127.0.0.1:5392:8080"
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development}
       - ASPNETCORE_URLS=http://0.0.0.0:8080
       - RunMigrations=true
       - ConnectionStrings__SettlementDb=Host=postgres;Database=SettlementDb;Username=paymentswitch;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
