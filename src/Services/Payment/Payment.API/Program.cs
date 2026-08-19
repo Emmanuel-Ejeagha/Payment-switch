@@ -31,26 +31,32 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddHttpContextAccessor();
 
-builder.Services.AddSwaggerGen(c =>
+// TASK-046: Swagger/OpenAPI docs are dev/test-only. In Production the API
+// surface is nginx-only and discovery endpoints must not be exposed (see
+// docs/prod-exposure.md).
+if (!builder.Environment.IsProduction())
 {
-    var xmlFilename = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
-    c.AddServer(new OpenApiServer { Url = "/payment" });
-    c.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, xmlFilename));
-    c.SwaggerDoc("v1", new OpenApiInfo { Title = "Payment API", Version = "v1" });
-    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    builder.Services.AddSwaggerGen(c =>
     {
-        Name = "Authorization",
-        Type = SecuritySchemeType.ApiKey,
-        Scheme = "Bearer",
-        BearerFormat = "JWT",
-        In = ParameterLocation.Header,
-        Description = "Enter 'Bearer' [space] and then your token"
+        var xmlFilename = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+        c.AddServer(new OpenApiServer { Url = "/payment" });
+        c.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, xmlFilename));
+        c.SwaggerDoc("v1", new OpenApiInfo { Title = "Payment API", Version = "v1" });
+        c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+        {
+            Name = "Authorization",
+            Type = SecuritySchemeType.ApiKey,
+            Scheme = "Bearer",
+            BearerFormat = "JWT",
+            In = ParameterLocation.Header,
+            Description = "Enter 'Bearer' [space] and then your token"
+        });
+        c.AddSecurityRequirement(document => new OpenApiSecurityRequirement
+        {
+            [new OpenApiSecuritySchemeReference("Bearer", document)] = []
+        });
     });
-    c.AddSecurityRequirement(document => new OpenApiSecurityRequirement
-    {
-        [new OpenApiSecuritySchemeReference("Bearer", document)] = []
-    });
-});
+}
 
 builder.Services.AddPaymentSwitchJwtBearer(builder.Configuration);
 
@@ -82,17 +88,20 @@ app.UseRequestSizeLimit();
 app.UseMiddleware<ExceptionMiddleware>();
 app.UseSerilogRequestLogging();
 
-app.UseSwagger(c => c.RouteTemplate = "{documentName}/swagger.json");
-app.UseSwaggerUI(options =>
+if (!app.Environment.IsProduction())
 {
-    options.RoutePrefix = "swagger";
-    var provider = app.Services.GetRequiredService<IApiVersionDescriptionProvider>();
-    foreach (var description in provider.ApiVersionDescriptions)
+    app.UseSwagger(c => c.RouteTemplate = "{documentName}/swagger.json");
+    app.UseSwaggerUI(options =>
     {
-        options.SwaggerEndpoint($"../{description.GroupName}/swagger.json",
-            description.GroupName.ToUpperInvariant());
-    }
-});
+        options.RoutePrefix = "swagger";
+        var provider = app.Services.GetRequiredService<IApiVersionDescriptionProvider>();
+        foreach (var description in provider.ApiVersionDescriptions)
+        {
+            options.SwaggerEndpoint($"../{description.GroupName}/swagger.json",
+                description.GroupName.ToUpperInvariant());
+        }
+    });
+}
 
 app.UseCors("AllowFrontend");
 app.UseRateLimiter();

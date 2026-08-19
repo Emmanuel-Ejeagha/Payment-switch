@@ -123,6 +123,11 @@ docker run --rm -v paymentswitch_prometheus_data:/data -v /var/backups:/backup \
 - **Logs:** `docker compose logs -f <service>` (structured JSON via Serilog).
   For a tail of everything: `docker compose logs -f --tail=200`.
 
+Public exposure of these surfaces (Swagger/metrics/Hangfire and the infra UIs)
+is deliberately limited — see `docs/prod-exposure.md` (only nginx :80/:443 is
+public; Swagger is disabled in Production; Grafana/Jaeger/Prometheus are
+internal-only).
+
 ## 5. Common incidents
 
 ### A service keeps restarting
