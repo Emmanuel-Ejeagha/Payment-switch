@@ -1,6 +1,7 @@
 ﻿using BuildingBlocks.Shared.Auth;
 using BuildingBlocks.Shared.Configuration;
 using BuildingBlocks.Shared.Resilience;
+using BuildingBlocks.Shared.Retention;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,6 +11,7 @@ using Payment.Infrastructure.Messaging;
 using Payment.Infrastructure.Outbox;
 using Payment.Infrastructure.Persistence;
 using Payment.Infrastructure.Persistence.Repositories;
+using Payment.Infrastructure.Retention;
 using Payment.Infrastructure.Services;
 using Payment.Infrastructure.Services.Gateways;
 using PaymentSwitch.Protos.Merchant;
@@ -61,11 +63,14 @@ public static class DependencyInjection
             "RabbitMQ HostName is required");
         services.AddOptions<PaymentExpiryOptions>()
             .Bind(configuration.GetSection(PaymentExpiryOptions.SectionName));
+        services.AddOptions<PaymentRetentionOptions>()
+            .Bind(configuration.GetSection(PaymentRetentionOptions.SectionName));
         services.AddSingleton<IEventBus, RabbitMQEventBus>();
         services.AddHostedService<OutboxPublisherService>();
         services.AddHostedService<WebhookDispatchWorker>();
         services.AddHostedService<SubscriptionBillingWorker>();
         services.AddHostedService<PaymentExpiryWorker>();
+        services.AddHostedService<PaymentRetentionService>();
 
         // The merchant gRPC channel is a documented in-network exception
         // (TASK-004): port 5001 is never published and the endpoint is gated by

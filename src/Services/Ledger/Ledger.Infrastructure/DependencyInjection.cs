@@ -1,14 +1,15 @@
 ﻿using BuildingBlocks.Shared.Configuration;
+using BuildingBlocks.Shared.Retention;
 using Ledger.Application.Interfaces;
 using Ledger.Application.Options;
 using Ledger.Infrastructure.DeadLetter;
-using Ledger.Infrastructure.Inbox;
 using Ledger.Infrastructure.Messaging;
 using Ledger.Infrastructure.Outbox;
 using Ledger.Infrastructure.Persistence;
 using Ledger.Infrastructure.Persistence.Repositories;
 using Ledger.Infrastructure.Queries;
 using Ledger.Infrastructure.Reconciliation;
+using Ledger.Infrastructure.Retention;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -43,11 +44,13 @@ public static class DependencyInjection
         services.AddValidatedOptions<ReconciliationOptions>(configuration, "Reconciliation",
             o => o.IntervalMinutes >= 1,
             "Reconciliation IntervalMinutes must be >= 1");
+        services.AddOptions<LedgerRetentionOptions>()
+            .Bind(configuration.GetSection(LedgerRetentionOptions.SectionName));
         services.AddSingleton<IEventBus, RabbitMQEventBus>();
         services.AddHostedService<OutboxPublisherService>();
         services.AddHostedService<RabbitMQConsumerService>();
         services.AddHostedService<MerchantEventConsumerService>();
-        services.AddHostedService<InboxCleanupService>();
+        services.AddHostedService<LedgerRetentionService>();
         services.AddHostedService<ReconciliationBackgroundService>();
         services.AddHostedService<DeadLetterConsumerService>();
 

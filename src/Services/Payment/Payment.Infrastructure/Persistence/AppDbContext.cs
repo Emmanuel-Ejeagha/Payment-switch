@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using BuildingBlocks.Shared.Retention;
+using Microsoft.EntityFrameworkCore;
 using Payment.Domain.Entities;
 using Payment.Infrastructure.Outbox;
 
@@ -17,9 +18,11 @@ public class AppDbContext : DbContext
     public DbSet<Invoice> Invoices { get; set; }
     public DbSet<WebhookEvent> WebhookEvents { get; set; }
     public DbSet<OutboxMessage> OutboxMessages { get; set; }
+    public DbSet<ArchivedRecord> ArchivedRecords { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
+        RetentionModelConfiguration.ConfigureArchivedRecord(modelBuilder);
     }
 }

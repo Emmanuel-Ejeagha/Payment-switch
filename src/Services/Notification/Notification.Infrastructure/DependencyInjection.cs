@@ -1,14 +1,15 @@
 ﻿using BuildingBlocks.Shared.Auth;
 using BuildingBlocks.Shared.Configuration;
 using BuildingBlocks.Shared.Resilience;
+using BuildingBlocks.Shared.Retention;
 using Notification.Application.Interfaces;
 using Notification.Infrastructure.DeadLetter;
-using Notification.Infrastructure.Inbox;
 using Notification.Infrastructure.Outbox;
 using Notification.Infrastructure.Persistence;
 using Notification.Infrastructure.Persistence.Repositories;
 using Notification.Infrastructure.Senders;
 using Notification.Infrastructure.Messaging;
+using Notification.Infrastructure.Retention;
 using Notification.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -45,12 +46,14 @@ public static class DependencyInjection
         services.AddHostedService<NotificationSenderBackgroundService>();
         services.AddHostedService<RabbitMQConsumerService>();
         services.AddHostedService<OutboxPublisherService>();
-        services.AddHostedService<InboxCleanupService>();
+        services.AddHostedService<NotificationRetentionService>();
         services.AddHostedService<DeadLetterConsumerService>();
 
         services.AddValidatedOptions<RabbitMQSettings>(configuration, "RabbitMQ",
             s => !string.IsNullOrEmpty(s.HostName),
             "RabbitMQ HostName is required");
+        services.AddOptions<NotificationRetentionOptions>()
+            .Bind(configuration.GetSection(NotificationRetentionOptions.SectionName));
         services.AddSingleton<IEventBus, RabbitMQEventBus>();
         services.AddScoped<HttpClient>(_ => new HttpClient());
 
