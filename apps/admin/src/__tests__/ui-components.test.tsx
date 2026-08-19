@@ -19,4 +19,11 @@ describe("StatusBadge", () => {
 
     expect(screen.getByText("Active")).toBeInTheDocument()
   })
+
+  it.each(["Approved", "Rejected", "Suspended"])("renders the %s merchant state", (status) => {
+    render(<StatusBadge status={status} />)
+
+    expect(screen.getByText(status)).toBeInTheDocument()
+    expect(screen.getByText(status).className).toMatch(/bg-(sky|red)-500\/10/)
+  })
 })

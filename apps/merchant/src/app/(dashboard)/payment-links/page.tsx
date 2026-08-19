@@ -1,9 +1,33 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
-import { Link2, Copy, Plus, X } from "lucide-react"
+import { ExternalLink, Link2, Plus } from "lucide-react"
 import { useMerchant } from "@/hooks/use-merchant"
 import type { PaymentLinkDto } from "@paymentswitch/shared"
+import {
+  Alert,
+  AmountInput,
+  Badge,
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  CopyButton,
+  EmptyState,
+  Field,
+  IdCell,
+  Input,
+  PageHeader,
+  Select,
+  TableSkeleton,
+  TableWrap,
+  TBody,
+  TD,
+  TH,
+  THead,
+  TR,
+} from "@/components/ui"
+import { formatAmount, formatDate } from "@/lib/format"
 
 const SUPPORTED_CURRENCIES = ["USD", "EUR", "GBP", "NGN"]
 
@@ -13,13 +37,20 @@ export default function PaymentLinksPage() {
   const [dataReady, setDataReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
-  const [copied, setCopied] = useState<string | null>(null)
   const loading = merchantLoading || (merchantId !== null && !dataReady)
 
   const [showForm, setShowForm] = useState(false)
   const [amount, setAmount] = useState("")
   const [currency, setCurrency] = useState("USD")
   const [description, setDescription] = useState("")
+
+  // The checkout URL is built from the browser's own origin. Reading it during
+  // render keeps the first server-rendered pass and the hydrated pass identical;
+  // the browser-only origin is resolved with a render-time state adjustment.
+  const [origin, setOrigin] = useState("")
+  if (origin === "" && typeof window !== "undefined") {
+    setOrigin(window.location.origin)
+  }
 
   const loadLinks = useCallback(async (merchantId: string) => {
     const res = await fetch(`/api/proxy/payment/api/v1/payment-links?merchantId=${merchantId}&skip=0&take=50`)
@@ -71,134 +102,142 @@ export default function PaymentLinksPage() {
     }
   }
 
-  const copyLink = async (code: string) => {
-    const url = `${window.location.origin}/checkout/${code}`
-    await navigator.clipboard.writeText(url)
-    setCopied(code)
-    setTimeout(() => setCopied(null), 1500)
-  }
-
-  if (loading) {
-    return <div className="h-64 animate-pulse rounded-xl bg-muted" />
-  }
+  const checkoutUrl = (code: string) => `${origin}/checkout/${code}`
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-semibold">Payment links</h1>
-          <p className="text-sm text-muted-foreground">Create shareable checkout links for your customers.</p>
-        </div>
-        <button
-          onClick={() => setShowForm((v) => !v)}
-          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
-        >
-          {showForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-          {showForm ? "Cancel" : "New link"}
-        </button>
-      </div>
+    <div className="space-y-8">
+      <PageHeader
+        title="Payment links"
+        description="Shareable checkout pages. Send a link by email, chat, or invoice and the customer pays without you writing any integration code."
+        actions={
+          <Button
+            variant={showForm ? "secondary" : "primary"}
+            icon={showForm ? undefined : Plus}
+            onClick={() => setShowForm((v) => !v)}
+            disabled={!merchantId}
+          >
+            {showForm ? "Cancel" : "New link"}
+          </Button>
+        }
+      />
 
-      {(error || merchantError) && <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error || merchantError}</div>}
-
-      {showForm && (
-        <div className="rounded-xl border bg-card p-6">
-          <div className="grid gap-4 md:grid-cols-3">
-            <div>
-              <label className="mb-1 block text-sm font-medium">Amount</label>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="100.00"
-                className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium">Currency</label>
-              <select
-                value={currency}
-                onChange={(e) => setCurrency(e.target.value)}
-                className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
-              >
-                {SUPPORTED_CURRENCIES.map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium">Description</label>
-              <input
-                type="text"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Pro plan subscription"
-                className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
-              />
-            </div>
-          </div>
-          <div className="mt-4">
-            <button
-              onClick={createLink}
-              disabled={creating || !amount}
-              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
-            >
-              <Link2 className="h-4 w-4" />
-              {creating ? "Creating..." : "Create link"}
-            </button>
-          </div>
-        </div>
+      {(error || merchantError) && (
+        <Alert variant="error" title="Something went wrong">
+          {error || merchantError}
+        </Alert>
       )}
 
-      <div className="rounded-xl border bg-card">
-        <div className="border-b px-6 py-4">
-          <h2 className="font-semibold">Your links</h2>
-        </div>
-        {links.length === 0 ? (
-          <div className="flex flex-col items-center gap-2 py-12 text-muted-foreground">
-            <Link2 className="h-8 w-8" />
-            <p className="text-sm">No payment links yet</p>
-          </div>
+      {showForm && (
+        <Card>
+          <CardHeader title="New payment link" description="The amount and currency are fixed once the link is created." />
+          <CardBody className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <Field label="Amount" htmlFor="link-amount" required>
+                <AmountInput
+                  id="link-amount"
+                  currency={currency}
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="100.00"
+                />
+              </Field>
+              <Field label="Currency" htmlFor="link-currency">
+                <Select id="link-currency" value={currency} onChange={(e) => setCurrency(e.target.value)}>
+                  {SUPPORTED_CURRENCIES.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </Select>
+              </Field>
+              <Field
+                label="Description"
+                htmlFor="link-description"
+                hint="Shown to the customer on the checkout page."
+              >
+                <Input
+                  id="link-description"
+                  type="text"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Pro plan subscription"
+                />
+              </Field>
+            </div>
+            <div className="flex justify-end">
+              <Button variant="primary" icon={Link2} onClick={createLink} pending={creating} disabled={!amount}>
+                {creating ? "Creating…" : "Create link"}
+              </Button>
+            </div>
+          </CardBody>
+        </Card>
+      )}
+
+      <Card className="overflow-hidden">
+        <CardHeader
+          title="Your links"
+          description={loading ? "Loading…" : `${links.length} total`}
+          icon={Link2}
+        />
+        {loading ? (
+          <TableSkeleton rows={5} columns={5} />
+        ) : links.length === 0 ? (
+          <EmptyState
+            icon={Link2}
+            title="No payment links yet"
+            description="A payment link is the fastest way to take a payment — no integration, just a URL you can share anywhere."
+            action={
+              <Button variant="primary" icon={Plus} onClick={() => setShowForm(true)} disabled={!merchantId}>
+                Create your first link
+              </Button>
+            }
+          />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-muted-foreground">
-                  <th className="px-6 py-3 text-left font-medium">Code</th>
-                  <th className="px-6 py-3 text-left font-medium">Amount</th>
-                  <th className="px-6 py-3 text-left font-medium">Description</th>
-                  <th className="px-6 py-3 text-left font-medium">Status</th>
-                  <th className="px-6 py-3 text-left font-medium">Checkout URL</th>
-                </tr>
-              </thead>
-              <tbody>
-                {links.map((link) => (
-                  <tr key={link.id} className="border-b last:border-0 hover:bg-muted/50">
-                    <td className="px-6 py-3 font-mono text-xs">{link.code}</td>
-                    <td className="px-6 py-3">{(link.amount / 100).toFixed(2)} {link.currency}</td>
-                    <td className="px-6 py-3">{link.description || "—"}</td>
-                    <td className="px-6 py-3">
-                      <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${link.active ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
-                        {link.active ? "Active" : "Inactive"}
-                      </span>
-                    </td>
-                    <td className="px-6 py-3">
-                      <button
-                        onClick={() => copyLink(link.code)}
-                        className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs text-muted-foreground hover:bg-accent"
+          <TableWrap>
+            <THead>
+              <TH>Code</TH>
+              <TH align="right">Amount</TH>
+              <TH>Description</TH>
+              <TH>Status</TH>
+              <TH>Created</TH>
+              <TH align="right">Checkout link</TH>
+            </THead>
+            <TBody>
+              {links.map((link) => (
+                <TR key={link.id}>
+                  <TD>
+                    <IdCell>{link.code}</IdCell>
+                  </TD>
+                  <TD align="right" className="tabular whitespace-nowrap font-medium">
+                    {formatAmount(link.amount, link.currency)}
+                  </TD>
+                  <TD className="max-w-[16rem] truncate">{link.description || "—"}</TD>
+                  <TD>
+                    <Badge tone={link.active ? "success" : "neutral"} dot>
+                      {link.active ? "Active" : "Inactive"}
+                    </Badge>
+                  </TD>
+                  <TD className="whitespace-nowrap text-xs text-muted-foreground">
+                    {formatDate(link.createdAt)}
+                  </TD>
+                  <TD align="right">
+                    <div className="flex items-center justify-end gap-1.5">
+                      <CopyButton value={checkoutUrl(link.code)} label="Copy" />
+                      <a
+                        href={checkoutUrl(link.code)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                       >
-                        <Copy className="h-3 w-3" />
-                        {copied === link.code ? "Copied!" : "Copy"}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                        <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                        <span className="sr-only">Open checkout for {link.code}</span>
+                      </a>
+                    </div>
+                  </TD>
+                </TR>
+              ))}
+            </TBody>
+          </TableWrap>
         )}
-      </div>
+      </Card>
     </div>
   )
 }

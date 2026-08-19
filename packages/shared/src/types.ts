@@ -2,11 +2,29 @@ export interface MerchantDto {
   id: string
   businessName: string
   email: string
-  status: "Active" | "Pending" | "Suspended"
+  status: "Active" | "Pending" | "Approved" | "Rejected" | "Suspended"
   webhookUrl?: string | null
   enabledPaymentMethods?: string[]
   autoCapture?: boolean
+  rejectionReason?: string | null
+  settlementBankAccountName?: string | null
+  settlementBankAccountNumber?: string | null
+  settlementBankName?: string | null
+  settlementCurrency?: string | null
+  settlementSchedule?: string | null
+  contactPhone?: string | null
+  contactAddress?: string | null
+  contactPerson?: string | null
   createdAt?: string
+  updatedAt?: string
+}
+
+export interface NotificationPreferenceDto {
+  id: string
+  recipient: string
+  channel: string
+  eventType: string
+  enabled: boolean
 }
 
 export interface PaymentIntentDto {
