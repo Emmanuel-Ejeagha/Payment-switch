@@ -1,10 +1,33 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Plus, CreditCard } from "lucide-react"
+import Link from "next/link"
+import { CreditCard, Plus } from "lucide-react"
 import { useMerchant } from "@/hooks/use-merchant"
 import type { PaymentIntentDto } from "@paymentswitch/shared"
 import { useToast } from "@/components/toast"
+import {
+  Alert,
+  AmountInput,
+  Button,
+  Card,
+  CardHeader,
+  EmptyState,
+  Field,
+  Input,
+  Modal,
+  PageHeader,
+  Select,
+  StatusPill,
+  TableSkeleton,
+  TableWrap,
+  TBody,
+  TD,
+  TH,
+  THead,
+  TR,
+} from "@/components/ui"
+import { formatDateTime, formatFigure, shortId } from "@/lib/format"
 
 export default function PaymentsPage() {
   const { showToast } = useToast()
@@ -36,62 +59,81 @@ export default function PaymentsPage() {
   }, [merchantLoading, merchant])
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-semibold">Payments</h1>
-          <p className="text-sm text-muted-foreground">View and manage payment intents</p>
-        </div>
-        <button
-          onClick={() => setShowCreate(true)}
-          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-        >
-          <Plus className="h-4 w-4" />
-          Create payment
-        </button>
-      </div>
+    <div className="space-y-8">
+      <PageHeader
+        title="Payments"
+        description="Every payment intent on your account, newest first. Open one to authorize, capture, void, or refund it."
+        actions={
+          <Button variant="primary" icon={Plus} onClick={() => setShowCreate(true)} disabled={!merchant}>
+            Create payment
+          </Button>
+        }
+      />
 
-      {loading ? (
-        <div className="space-y-3">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="h-14 animate-pulse rounded-lg bg-muted" />
-          ))}
-        </div>
-      ) : payments.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-xl border py-16 text-muted-foreground">
-          <CreditCard className="h-8 w-8" />
-          <p className="text-sm">No payments found</p>
-        </div>
-      ) : (
-        <div className="overflow-x-auto rounded-xl border">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-muted/50 text-muted-foreground">
-                <th className="px-6 py-3 text-left font-medium">Intent ID</th>
-                <th className="px-6 py-3 text-left font-medium">Amount</th>
-                <th className="px-6 py-3 text-left font-medium">Currency</th>
-                <th className="px-6 py-3 text-left font-medium">Status</th>
-                <th className="px-6 py-3 text-left font-medium">Transactions</th>
-              </tr>
-            </thead>
-            <tbody>
+      <Card className="overflow-hidden">
+        <CardHeader
+          title="Payment intents"
+          description={loading ? "Loading…" : `${payments.length} shown`}
+          icon={CreditCard}
+        />
+        {loading ? (
+          <TableSkeleton rows={6} columns={6} />
+        ) : payments.length === 0 ? (
+          <EmptyState
+            icon={CreditCard}
+            title="No payments yet"
+            description="Create a payment intent to start moving money. You can authorize and capture it in two steps, or capture straight away."
+            action={
+              <Button variant="primary" icon={Plus} onClick={() => setShowCreate(true)} disabled={!merchant}>
+                Create payment
+              </Button>
+            }
+          />
+        ) : (
+          <TableWrap>
+            <THead>
+              <TH>Intent</TH>
+              <TH align="right">Amount</TH>
+              <TH>Currency</TH>
+              <TH>Status</TH>
+              <TH align="right">Transactions</TH>
+              <TH>Created</TH>
+            </THead>
+            <TBody>
               {payments.map((p) => (
-                <tr key={p.intentId} className="border-b last:border-0 hover:bg-muted/50">
-                  <td className="px-6 py-3 font-mono text-xs">{p.intentId.slice(0, 12)}...</td>
-                  <td className="px-6 py-3">{(p.amount / 100).toFixed(2)}</td>
-                  <td className="px-6 py-3">{p.currency}</td>
-                  <td className="px-6 py-3">
-                    <span className="inline-flex rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
-                      {p.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-3">{p.transactions?.length ?? 0}</td>
-                </tr>
+                <TR key={p.intentId}>
+                  <TD>
+                    <Link
+                      href={`/payments/${p.intentId}`}
+                      className="font-mono text-xs text-primary transition-colors hover:underline"
+                    >
+                      {shortId(p.intentId)}
+                    </Link>
+                    {p.cardBrand && p.cardLastFour && (
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">
+                        {p.cardBrand} •••• {p.cardLastFour}
+                      </p>
+                    )}
+                  </TD>
+                  <TD align="right" className="tabular font-medium">
+                    {formatFigure(p.amount)}
+                  </TD>
+                  <TD className="text-muted-foreground">{p.currency}</TD>
+                  <TD>
+                    <StatusPill status={p.status} />
+                  </TD>
+                  <TD align="right" className="tabular text-muted-foreground">
+                    {p.transactions?.length ?? 0}
+                  </TD>
+                  <TD className="whitespace-nowrap text-xs text-muted-foreground">
+                    {formatDateTime(p.createdAt)}
+                  </TD>
+                </TR>
               ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+            </TBody>
+          </TableWrap>
+        )}
+      </Card>
 
       {showCreate && merchant && (
         <CreatePaymentModal
@@ -164,97 +206,79 @@ function CreatePaymentModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
-      <div className="w-full max-w-md rounded-xl bg-card p-6 shadow-lg" onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-lg font-semibold mb-4">Create payment</h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Amount</label>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              placeholder="0.00"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              required
-              className="flex h-11 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Currency</label>
-            <select
-              value={currency}
-              onChange={(e) => setCurrency(e.target.value)}
-              className="flex h-11 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
-            >
+    <Modal
+      title="Create payment"
+      description="Creates a payment intent you can authorize and capture."
+      onClose={onClose}
+      footer={
+        <>
+          <Button onClick={onClose}>Cancel</Button>
+          <Button type="submit" form="create-payment" variant="primary" pending={submitting}>
+            {submitting ? "Creating…" : "Create payment"}
+          </Button>
+        </>
+      }
+    >
+      <form id="create-payment" onSubmit={handleSubmit} className="space-y-4">
+        <Field label="Amount" htmlFor="amount" required hint="Charged in the currency selected below.">
+          <AmountInput
+            id="amount"
+            currency={currency}
+            placeholder="0.00"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            required
+          />
+        </Field>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Currency" htmlFor="currency">
+            <Select id="currency" value={currency} onChange={(e) => setCurrency(e.target.value)}>
               <option value="USD">USD</option>
               <option value="EUR">EUR</option>
               <option value="GBP">GBP</option>
               <option value="NGN">NGN</option>
-            </select>
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Payment Method</label>
-            <select
-              value={paymentMethod}
-              onChange={(e) => setPaymentMethod(e.target.value)}
-              className="flex h-11 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
-            >
+            </Select>
+          </Field>
+
+          <Field label="Payment method" htmlFor="method">
+            <Select id="method" value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
               <option value="Card">Card</option>
-              <option value="Bank">Bank Transfer</option>
-              <option value="MobileMoney">Mobile Money</option>
-            </select>
+              <option value="Bank">Bank transfer</option>
+              <option value="MobileMoney">Mobile money</option>
+            </Select>
+          </Field>
+        </div>
+
+        {paymentMethod === "Card" && (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Card (last 4)" htmlFor="last4" required>
+              <Input
+                id="last4"
+                inputMode="numeric"
+                maxLength={4}
+                pattern="[0-9]{4}"
+                placeholder="1234"
+                value={cardLastFour}
+                onChange={(e) => setCardLastFour(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                required
+                className="tabular"
+              />
+            </Field>
+
+            <Field label="Card brand" htmlFor="brand">
+              <Select id="brand" value={cardBrand} onChange={(e) => setCardBrand(e.target.value)}>
+                <option value="">Select</option>
+                <option value="Visa">Visa</option>
+                <option value="Mastercard">Mastercard</option>
+                <option value="Amex">Amex</option>
+              </Select>
+            </Field>
           </div>
-          {paymentMethod === "Card" && (
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Card (last 4)</label>
-                <input
-                  type="text"
-                  maxLength={4}
-                  pattern="[0-9]{4}"
-                  placeholder="1234"
-                  value={cardLastFour}
-                  onChange={(e) => setCardLastFour(e.target.value.replace(/\D/g, "").slice(0, 4))}
-                  required
-                  className="flex h-11 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Card Brand</label>
-                <select
-                  value={cardBrand}
-                  onChange={(e) => setCardBrand(e.target.value)}
-                  className="flex h-11 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
-                >
-                  <option value="">Select</option>
-                  <option value="Visa">Visa</option>
-                  <option value="Mastercard">Mastercard</option>
-                  <option value="Amex">Amex</option>
-                </select>
-              </div>
-            </div>
-          )}
-          {error && <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 rounded-lg border border-input px-4 py-2 text-sm font-medium hover:bg-accent"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="flex-1 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-            >
-              {submitting ? "Creating..." : "Create"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        )}
+
+        {error && <Alert variant="error">{error}</Alert>}
+      </form>
+    </Modal>
   )
 }

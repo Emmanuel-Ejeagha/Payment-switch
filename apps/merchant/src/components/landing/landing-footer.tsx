@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { Store } from "lucide-react"
+import { BrandMark } from "@/components/landing/brand-mark"
 
 const columns = [
   {
@@ -7,14 +7,23 @@ const columns = [
     links: [
       { label: "Features", href: "#features" },
       { label: "How it works", href: "#how-it-works" },
+      { label: "Customers", href: "#customers" },
       { label: "Pricing", href: "#pricing" },
-      { label: "Payment links", href: "/register" },
     ],
   },
   {
-    title: "Company",
+    title: "Platform",
     links: [
-      { label: "Login", href: "/login" },
+      { label: "Hosted checkout", href: "/register" },
+      { label: "Payment links", href: "/register" },
+      { label: "Subscriptions", href: "/register" },
+      { label: "Webhooks", href: "/register" },
+    ],
+  },
+  {
+    title: "Account",
+    links: [
+      { label: "Sign in", href: "/login" },
       { label: "Create account", href: "/register" },
     ],
   },
@@ -23,28 +32,39 @@ const columns = [
 export function LandingFooter() {
   return (
     <footer className="border-t bg-muted/30">
-      <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
-        <div className="grid gap-8 md:grid-cols-4">
+      <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6">
+        <div className="grid gap-10 md:grid-cols-5">
           <div className="md:col-span-2">
-            <Link href="/" className="flex items-center gap-2">
-              <span className="rounded-lg bg-primary/10 p-1.5">
-                <Store className="h-5 w-5 text-primary" />
+            <Link
+              href="/"
+              className="flex items-center gap-2.5"
+              aria-label="PaymentSwitch home"
+            >
+              <BrandMark />
+              <span className="text-[15px] font-semibold tracking-tight">
+                PaymentSwitch
               </span>
-              <span className="text-lg font-semibold">PaymentSwitch</span>
             </Link>
-            <p className="mt-3 max-w-sm text-sm text-muted-foreground">
-              The payment switch that powers modern commerce — real-time payments,
-              subscriptions, hosted checkout, and settlements on a distributed,
+            <p className="mt-4 max-w-sm text-sm leading-relaxed text-muted-foreground">
+              The payment switch behind modern commerce — real-time payments,
+              subscriptions, hosted checkout, and settlement on a distributed,
               event-driven core.
+            </p>
+            <p className="mt-4 inline-flex items-center gap-2 rounded-full border bg-card px-3 py-1 text-xs text-muted-foreground">
+              <span className="relative flex h-1.5 w-1.5" aria-hidden="true">
+                <span className="absolute inline-flex h-full w-full animate-pulse-ring rounded-full bg-success" />
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-success" />
+              </span>
+              All systems operational
             </p>
           </div>
 
           {columns.map((col) => (
             <div key={col.title}>
-              <h3 className="text-sm font-semibold">{col.title}</h3>
-              <ul className="mt-3 space-y-2">
+              <h3 className="text-sm font-semibold tracking-tight">{col.title}</h3>
+              <ul className="mt-4 space-y-2.5">
                 {col.links.map((l) => (
-                  <li key={l.label}>
+                  <li key={`${col.title}-${l.label}`}>
                     <Link
                       href={l.href}
                       className="text-sm text-muted-foreground transition-colors hover:text-foreground"
@@ -58,7 +78,7 @@ export function LandingFooter() {
           ))}
         </div>
 
-        <div className="mt-10 flex flex-col items-center justify-between gap-3 border-t pt-6 text-xs text-muted-foreground sm:flex-row">
+        <div className="mt-12 flex flex-col items-center justify-between gap-3 border-t pt-6 text-xs text-muted-foreground sm:flex-row">
           <p>&copy; {new Date().getFullYear()} PaymentSwitch. All rights reserved.</p>
           <p>Built on .NET microservices, RabbitMQ, and Kubernetes.</p>
         </div>

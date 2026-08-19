@@ -22,6 +22,19 @@
     --input: 214.3 31.8% 91.4%;
     --ring: 221.2 83.2% 53.3%;
     --radius: 0.5rem;
+
+    /* Marketing + auth accents. Additive, so dashboard screens are unaffected. */
+    --brand-start: 221.2 83.2% 53.3%;
+    --brand-mid: 258 90% 66%;
+    --brand-end: 190 95% 42%;
+    --success: 160 84% 39%;
+    --success-foreground: 150 80% 96%;
+
+    /* Dashboard canvas. `--card` and `--background` are the same lightness in
+       this theme, so a card sitting on the page had nothing but a 1px border to
+       separate it. This gives the scrolling content area its own slightly
+       recessed surface and leaves every existing token alone. */
+    --surface: 210 40% 98%;
   }
 
   .dark {
@@ -42,6 +55,16 @@
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 224.3 76.3% 48%;
+
+    --brand-start: 217.2 91.2% 59.8%;
+    --brand-mid: 258 90% 72%;
+    --brand-end: 190 95% 50%;
+    --success: 158 70% 45%;
+    --success-foreground: 150 60% 12%;
+
+    /* Slightly *lighter* than `--background` in dark mode: recessing a surface
+       by going darker reads as a hole, so the canvas lifts instead. */
+    --surface: 222 47% 7%;
   }
 }
 
@@ -49,7 +72,105 @@
   * {
     @apply border-border;
   }
+
+  html {
+    /* Anchor links land below the sticky header instead of behind it. */
+    scroll-behavior: smooth;
+    scroll-padding-top: 5.5rem;
+    -webkit-tap-highlight-color: transparent;
+  }
+
   body {
     @apply bg-background text-foreground;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background-color: hsl(var(--primary) / 0.22);
+  }
+
+  /* One consistent focus treatment for every interactive element. */
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+}
+
+@layer utilities {
+  .text-gradient-brand {
+    background-image: linear-gradient(
+      100deg,
+      hsl(var(--brand-start)),
+      hsl(var(--brand-mid)) 48%,
+      hsl(var(--brand-end))
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    /* Descenders get clipped without a little breathing room. */
+    padding-bottom: 0.08em;
+  }
+
+  .bg-brand-gradient {
+    background-image: linear-gradient(
+      100deg,
+      hsl(var(--brand-start)),
+      hsl(var(--brand-mid)) 48%,
+      hsl(var(--brand-end))
+    );
+  }
+
+  /* Blueprint grid used behind the hero and CTA bands. */
+  .bg-grid {
+    background-image:
+      linear-gradient(to right, hsl(var(--border) / 0.7) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--border) / 0.7) 1px, transparent 1px);
+    background-size: 56px 56px;
+  }
+
+  .mask-fade-b {
+    -webkit-mask-image: linear-gradient(to bottom, black 30%, transparent 100%);
+    mask-image: linear-gradient(to bottom, black 30%, transparent 100%);
+  }
+
+  .mask-fade-x {
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent,
+      black 12%,
+      black 88%,
+      transparent
+    );
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      black 12%,
+      black 88%,
+      transparent
+    );
+  }
+
+  /* Aligns figures in tables and metric readouts. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    /* Staggered entrances use fill-mode `both`, so the delay must go too —
+       otherwise the element stays at opacity 0 for the length of the delay. */
+    animation-delay: 0ms !important;
+    transition-duration: 0.01ms !important;
   }
 }

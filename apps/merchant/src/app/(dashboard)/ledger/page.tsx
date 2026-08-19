@@ -1,15 +1,39 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { BookOpen, ChevronLeft, ChevronRight, Wallet, Clock, Lock } from "lucide-react"
+import { BookOpen, ChevronLeft, ChevronRight, Clock, Lock, Wallet } from "lucide-react"
 import { useMerchant } from "@/hooks/use-merchant"
 import type { BalanceDto, LedgerTransactionDto } from "@paymentswitch/shared"
+import {
+  Badge,
+  Button,
+  Card,
+  CardFooter,
+  CardHeader,
+  EmptyState,
+  ErrorPanel,
+  PageHeader,
+  SectionLabel,
+  StatSkeleton,
+  StatTile,
+  TableSkeleton,
+  TableWrap,
+  TBody,
+  TD,
+  TH,
+  THead,
+  TR,
+  type Tone,
+} from "@/components/ui"
+import { formatFigure, formatDate, humanize } from "@/lib/format"
 
-const txTypeColors: Record<string, string> = {
-  Credit: "bg-emerald-500/10 text-emerald-600",
-  Debit: "bg-red-500/10 text-red-600",
-  Reserve: "bg-amber-500/10 text-amber-600",
-  Release: "bg-blue-500/10 text-blue-600",
+// Ledger movements read as four distinct things, so they get four distinct tones
+// rather than a single neutral pill: money in, money out, money held, money freed.
+const TX_TONES: Record<string, Tone> = {
+  Credit: "success",
+  Debit: "danger",
+  Reserve: "warning",
+  Release: "info",
 }
 
 export default function MerchantLedgerPage() {
@@ -17,6 +41,7 @@ export default function MerchantLedgerPage() {
   const [balances, setBalances] = useState<BalanceDto[]>([])
   const [transactions, setTransactions] = useState<LedgerTransactionDto[]>([])
   const [dataReady, setDataReady] = useState(false)
+  const [fetching, setFetching] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [skip, setSkip] = useState(0)
   const take = 10
@@ -28,6 +53,7 @@ export default function MerchantLedgerPage() {
     const m = merchant
     let cancelled = false
     async function load() {
+      setFetching(true)
       try {
         const [balRes, txRes] = await Promise.all([
           fetch(`/api/proxy/ledger/api/v1/ledger/balances?merchantId=${m.id}`),
@@ -39,7 +65,10 @@ export default function MerchantLedgerPage() {
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load ledger")
       } finally {
-        if (!cancelled) setDataReady(true)
+        if (!cancelled) {
+          setDataReady(true)
+          setFetching(false)
+        }
       }
     }
     load()
@@ -50,146 +79,167 @@ export default function MerchantLedgerPage() {
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <h1 className="text-3xl font-semibold">Ledger</h1>
-        <div className="grid gap-4 md:grid-cols-3">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="h-28 animate-pulse rounded-xl bg-muted" />
-          ))}
-        </div>
-        <div className="h-64 animate-pulse rounded-xl bg-muted" />
+      <div className="space-y-8">
+        <PageHeader title="Ledger" description="Balance and transactions" />
+        <StatSkeleton count={3} />
+        <Card className="overflow-hidden">
+          <CardHeader title="Transaction history" icon={BookOpen} />
+          <TableSkeleton rows={5} columns={4} />
+        </Card>
       </div>
     )
   }
 
   if (error || merchantError) {
     return (
-      <div className="space-y-6">
-        <h1 className="text-3xl font-semibold">Ledger</h1>
-        <div className="rounded-xl border border-destructive/50 bg-destructive/10 p-6 text-destructive">
-          <p className="font-medium">Failed to load ledger</p>
-          <p className="mt-1 text-sm">{error || merchantError}</p>
-        </div>
+      <div className="space-y-8">
+        <PageHeader title="Ledger" description="Balance and transactions" />
+        <ErrorPanel title="Failed to load ledger" message={error || merchantError} />
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-semibold">Ledger</h1>
-        <p className="text-sm text-muted-foreground">
-          {merchant ? `${merchant.businessName} — balance and transactions` : "Balance and transactions"}
-        </p>
-      </div>
+    <div className="space-y-8">
+      <PageHeader
+        title="Ledger"
+        description={
+          merchant
+            ? `Every movement of money for ${merchant.businessName}, split by currency. Available funds are yours to pay out; pending and reserved are held until settlement clears.`
+            : "Every movement of money, split by currency."
+        }
+      />
 
-      {balances.length > 0 && (
+      {balances.length === 0 ? (
+        <Card>
+          <EmptyState
+            icon={Wallet}
+            title="No balances yet"
+            description="Balances appear here once your first payment is captured. Nothing has settled into your ledger so far."
+          />
+        </Card>
+      ) : (
         <div className="space-y-6">
           {balances.map((b) => (
-            <div key={b.currency}>
-              <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{b.currency}</p>
-              <div className="grid gap-4 md:grid-cols-3">
-                <div className="rounded-xl border p-6">
-                  <div className="mb-3 flex items-center gap-3">
-                    <div className="rounded-lg bg-emerald-500/10 p-2">
-                      <Wallet className="h-5 w-5 text-emerald-600" />
-                    </div>
-                    <p className="text-sm text-muted-foreground">Available</p>
-                  </div>
-                  <p className="text-2xl font-semibold">{(b.available / 100).toFixed(2)} {b.currency}</p>
-                </div>
-                <div className="rounded-xl border p-6">
-                  <div className="mb-3 flex items-center gap-3">
-                    <div className="rounded-lg bg-amber-500/10 p-2">
-                      <Clock className="h-5 w-5 text-amber-600" />
-                    </div>
-                    <p className="text-sm text-muted-foreground">Pending</p>
-                  </div>
-                  <p className="text-2xl font-semibold">{(b.pending / 100).toFixed(2)} {b.currency}</p>
-                </div>
-                <div className="rounded-xl border p-6">
-                  <div className="mb-3 flex items-center gap-3">
-                    <div className="rounded-lg bg-blue-500/10 p-2">
-                      <Lock className="h-5 w-5 text-blue-600" />
-                    </div>
-                    <p className="text-sm text-muted-foreground">Reserved</p>
-                  </div>
-                  <p className="text-2xl font-semibold">{(b.reserved / 100).toFixed(2)} {b.currency}</p>
-                </div>
+            <section key={b.currency} className="space-y-3">
+              <SectionLabel>{b.currency}</SectionLabel>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <StatTile
+                  label="Available"
+                  value={formatFigure(b.available)}
+                  unit={b.currency}
+                  icon={Wallet}
+                  tone="success"
+                  hint="Clear to pay out"
+                />
+                <StatTile
+                  label="Pending"
+                  value={formatFigure(b.pending)}
+                  unit={b.currency}
+                  icon={Clock}
+                  tone="warning"
+                  hint="Captured, awaiting settlement"
+                />
+                <StatTile
+                  label="Reserved"
+                  value={formatFigure(b.reserved)}
+                  unit={b.currency}
+                  icon={Lock}
+                  tone="info"
+                  hint="Held against risk or disputes"
+                />
               </div>
-            </div>
+            </section>
           ))}
         </div>
       )}
 
-      <div className="rounded-xl border">
-        <div className="flex items-center gap-2 border-b px-6 py-4">
-          <BookOpen className="h-5 w-5 text-muted-foreground" />
-          <h2 className="font-semibold">Transaction History</h2>
-        </div>
+      <Card className="overflow-hidden">
+        <CardHeader
+          title="Transaction history"
+          description={
+            transactions.length === 0
+              ? "Nothing on this page"
+              : `Showing ${skip + 1}–${skip + transactions.length}`
+          }
+          icon={BookOpen}
+        />
         {transactions.length === 0 ? (
-          <div className="flex flex-col items-center py-12 text-center">
-            <BookOpen className="mb-2 h-6 w-6 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">No transactions found</p>
-          </div>
+          <EmptyState
+            icon={BookOpen}
+            title={skip === 0 ? "No transactions yet" : "Nothing on this page"}
+            description={
+              skip === 0
+                ? "Credits, debits, reserves, and releases all land here as soon as money starts moving."
+                : "You have paged past the end of your history."
+            }
+            action={
+              skip > 0 ? (
+                <Button icon={ChevronLeft} onClick={() => setSkip(Math.max(0, skip - take))}>
+                  Back a page
+                </Button>
+              ) : undefined
+            }
+          />
         ) : (
           <>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b bg-muted/50 text-left text-sm text-muted-foreground">
-                    <th className="px-6 py-3 font-medium">Type</th>
-                    <th className="px-6 py-3 font-medium">Amount</th>
-                    <th className="px-6 py-3 font-medium">Description</th>
-                    <th className="px-6 py-3 font-medium">Date</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {transactions.map((t) => (
-                    <tr key={t.id} className="text-sm hover:bg-muted/30">
-                      <td className="px-6 py-4">
-                        <span
-                          className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${txTypeColors[t.type] || "bg-muted text-muted-foreground"}`}
-                        >
-                          {t.type}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 font-medium">
-                        {(t.amount / 100).toFixed(2)} {t.currency}
-                      </td>
-                      <td className="max-w-xs truncate px-6 py-4 text-muted-foreground">
-                        {t.description || "—"}
-                      </td>
-                      <td className="px-6 py-4 text-muted-foreground">
-                        {new Date(t.timestamp).toLocaleDateString()}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="flex items-center justify-between px-6 py-3 text-sm text-muted-foreground">
-              <p>Showing {skip + 1}–{skip + transactions.length}</p>
+            <TableWrap>
+              <THead>
+                <TH>Type</TH>
+                <TH align="right">Amount</TH>
+                <TH>Description</TH>
+                <TH>Date</TH>
+              </THead>
+              <TBody>
+                {transactions.map((t) => (
+                  <TR key={t.id}>
+                    <TD>
+                      <Badge tone={TX_TONES[t.type] ?? "neutral"} dot>
+                        {humanize(t.type)}
+                      </Badge>
+                    </TD>
+                    <TD align="right" className="tabular whitespace-nowrap font-medium">
+                      {formatFigure(t.amount)}
+                      <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                        {t.currency}
+                      </span>
+                    </TD>
+                    <TD className="max-w-[20rem] truncate text-muted-foreground">
+                      {t.description || "—"}
+                    </TD>
+                    <TD className="whitespace-nowrap text-xs text-muted-foreground">
+                      {formatDate(t.timestamp)}
+                    </TD>
+                  </TR>
+                ))}
+              </TBody>
+            </TableWrap>
+            <CardFooter>
+              <p className="text-xs text-muted-foreground">
+                Showing {skip + 1}–{skip + transactions.length}
+              </p>
               <div className="flex items-center gap-2">
-                <button
+                <Button
+                  size="sm"
+                  icon={ChevronLeft}
                   onClick={() => setSkip(Math.max(0, skip - take))}
-                  disabled={skip === 0}
-                  className="inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-sm font-medium hover:bg-accent disabled:opacity-50"
+                  disabled={skip === 0 || fetching}
                 >
-                  <ChevronLeft className="h-4 w-4" /> Previous
-                </button>
-                <button
+                  Previous
+                </Button>
+                <Button
+                  size="sm"
                   onClick={() => setSkip(skip + take)}
-                  disabled={transactions.length < take}
-                  className="inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-sm font-medium hover:bg-accent disabled:opacity-50"
+                  disabled={transactions.length < take || fetching}
                 >
-                  Next <ChevronRight className="h-4 w-4" />
-                </button>
+                  Next
+                  <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                </Button>
               </div>
-            </div>
+            </CardFooter>
           </>
         )}
-      </div>
+      </Card>
     </div>
   )
 }

@@ -1,15 +1,40 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
-import { Plus, X, Archive, Package } from "lucide-react"
+import { Archive, Package, Plus } from "lucide-react"
 import { useMerchant } from "@/hooks/use-merchant"
 import type { PlanDto } from "@paymentswitch/shared"
+import {
+  Alert,
+  AmountInput,
+  Badge,
+  Button,
+  Card,
+  CardHeader,
+  EmptyState,
+  Field,
+  IdCell,
+  Input,
+  Modal,
+  PageHeader,
+  Select,
+  TableSkeleton,
+  TableWrap,
+  TBody,
+  TD,
+  TH,
+  THead,
+  TR,
+  useConfirm,
+} from "@/components/ui"
+import { formatAmount, formatDate, formatInterval } from "@/lib/format"
 
 const SUPPORTED_CURRENCIES = ["USD", "EUR", "GBP", "NGN"]
 const INTERVAL_UNITS = ["Day", "Week", "Month", "Year"]
 
 export default function PlansPage() {
   const { merchantId, loading: merchantLoading, error: merchantError } = useMerchant()
+  const { confirm, dialog } = useConfirm()
   const [plans, setPlans] = useState<PlanDto[]>([])
   const [dataReady, setDataReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -79,12 +104,24 @@ export default function PlansPage() {
     }
   }
 
-  const archivePlan = async (id: string) => {
-    if (!merchantId || !confirm("Archive this plan? Existing subscriptions keep billing.")) return
+  const archivePlan = async (plan: PlanDto) => {
+    if (!merchantId) return
+    const confirmed = await confirm({
+      title: "Archive plan",
+      message: (
+        <>
+          <strong className="font-medium text-foreground">{plan.name}</strong> will stop accepting new
+          subscribers. Existing subscriptions keep billing on their current schedule.
+        </>
+      ),
+      confirmLabel: "Archive plan",
+    })
+    if (!confirmed) return
+
     setWorking(true)
     setError(null)
     try {
-      const res = await fetch(`/api/proxy/payment/api/v1/plans/${id}/archive`, { method: "POST" })
+      const res = await fetch(`/api/proxy/payment/api/v1/plans/${plan.id}/archive`, { method: "POST" })
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
         setError(body.message ?? body.detail ?? "Failed to archive plan")
@@ -96,166 +133,196 @@ export default function PlansPage() {
     }
   }
 
-  if (loading) {
-    return <div className="h-64 animate-pulse rounded-xl bg-muted" />
-  }
+  const activeCount = plans.filter((p) => p.active).length
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-semibold">Plans</h1>
-          <p className="text-sm text-muted-foreground">Recurring billing plans customers can subscribe to.</p>
-        </div>
-        <button
-          onClick={() => setShowForm((v) => !v)}
-          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
-        >
-          {showForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-          {showForm ? "Cancel" : "New plan"}
-        </button>
-      </div>
+    <div className="space-y-8">
+      <PageHeader
+        title="Plans"
+        description="Recurring billing templates. A plan sets the amount and cadence; subscriptions attach a customer to one."
+        actions={
+          <Button variant="primary" icon={Plus} onClick={() => setShowForm(true)} disabled={!merchantId}>
+            New plan
+          </Button>
+        }
+      />
 
-      {(error || merchantError) && <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error || merchantError}</div>}
+      {(error || merchantError) && (
+        <Alert variant="error" title="Something went wrong">
+          {error || merchantError}
+        </Alert>
+      )}
+
+      <Card className="overflow-hidden">
+        <CardHeader
+          title="Your plans"
+          description={loading ? "Loading…" : `${activeCount} active of ${plans.length}`}
+          icon={Package}
+        />
+        {loading ? (
+          <TableSkeleton rows={5} columns={6} />
+        ) : plans.length === 0 ? (
+          <EmptyState
+            icon={Package}
+            title="No plans yet"
+            description="Create a plan to bill customers on a repeating schedule — monthly, yearly, or any interval you choose."
+            action={
+              <Button variant="primary" icon={Plus} onClick={() => setShowForm(true)} disabled={!merchantId}>
+                Create your first plan
+              </Button>
+            }
+          />
+        ) : (
+          <TableWrap>
+            <THead>
+              <TH>Code</TH>
+              <TH>Plan</TH>
+              <TH align="right">Amount</TH>
+              <TH>Billing</TH>
+              <TH>Status</TH>
+              <TH>Created</TH>
+              <TH align="right">Actions</TH>
+            </THead>
+            <TBody>
+              {plans.map((p) => (
+                <TR key={p.id}>
+                  <TD>
+                    <IdCell>{p.code}</IdCell>
+                  </TD>
+                  <TD>
+                    <p className="font-medium">{p.name}</p>
+                    {p.description && (
+                      <p className="max-w-[18rem] truncate text-xs text-muted-foreground">
+                        {p.description}
+                      </p>
+                    )}
+                  </TD>
+                  <TD align="right" className="tabular whitespace-nowrap font-medium">
+                    {formatAmount(p.amount, p.currency)}
+                  </TD>
+                  <TD className="whitespace-nowrap text-muted-foreground">
+                    {formatInterval(p.intervalCount, p.intervalUnit)}
+                  </TD>
+                  <TD>
+                    <Badge tone={p.active ? "success" : "neutral"} dot>
+                      {p.active ? "Active" : "Archived"}
+                    </Badge>
+                  </TD>
+                  <TD className="whitespace-nowrap text-xs text-muted-foreground">
+                    {formatDate(p.createdAt)}
+                  </TD>
+                  <TD align="right">
+                    {p.active ? (
+                      <Button
+                        size="sm"
+                        icon={Archive}
+                        disabled={working}
+                        onClick={() => archivePlan(p)}
+                      >
+                        Archive
+                      </Button>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </TD>
+                </TR>
+              ))}
+            </TBody>
+          </TableWrap>
+        )}
+      </Card>
 
       {showForm && (
-        <div className="rounded-xl border bg-card p-6">
-          <div className="grid gap-4 md:grid-cols-3">
-            <div>
-              <label className="mb-1 block text-sm font-medium">Name <span className="text-destructive">*</span></label>
-              <input
+        <Modal
+          title="New plan"
+          description="Amount and interval are fixed once subscribers are attached."
+          onClose={() => setShowForm(false)}
+          size="lg"
+          footer={
+            <>
+              <Button onClick={() => setShowForm(false)}>Cancel</Button>
+              <Button
+                variant="primary"
+                icon={Package}
+                onClick={createPlan}
+                pending={working}
+                disabled={!name || !amount}
+              >
+                {working ? "Creating…" : "Create plan"}
+              </Button>
+            </>
+          }
+        >
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Name" htmlFor="plan-name" required className="sm:col-span-2">
+              <Input
+                id="plan-name"
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Pro monthly"
-                className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
               />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium">Amount <span className="text-destructive">*</span></label>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
+            </Field>
+            <Field label="Amount" htmlFor="plan-amount" required>
+              <AmountInput
+                id="plan-amount"
+                currency={currency}
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="29.99"
-                className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
               />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium">Currency</label>
-              <select
-                value={currency}
-                onChange={(e) => setCurrency(e.target.value)}
-                className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
-              >
+            </Field>
+            <Field label="Currency" htmlFor="plan-currency">
+              <Select id="plan-currency" value={currency} onChange={(e) => setCurrency(e.target.value)}>
                 {SUPPORTED_CURRENCIES.map((c) => (
                   <option key={c} value={c}>{c}</option>
                 ))}
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium">Bills every</label>
-              <input
+              </Select>
+            </Field>
+            <Field
+              label="Bills every"
+              htmlFor="plan-interval-count"
+              hint={`Currently: ${formatInterval(parseInt(intervalCount, 10) || 1, intervalUnit)}`}
+            >
+              <Input
+                id="plan-interval-count"
                 type="number"
                 min="1"
                 value={intervalCount}
                 onChange={(e) => setIntervalCount(e.target.value)}
-                className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+                className="tabular"
               />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium">Interval</label>
-              <select
+            </Field>
+            <Field label="Interval" htmlFor="plan-interval-unit">
+              <Select
+                id="plan-interval-unit"
                 value={intervalUnit}
                 onChange={(e) => setIntervalUnit(e.target.value)}
-                className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
               >
                 {INTERVAL_UNITS.map((u) => (
                   <option key={u} value={u}>{u}</option>
                 ))}
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium">Description</label>
-              <input
+              </Select>
+            </Field>
+            <Field
+              label="Description"
+              htmlFor="plan-description"
+              hint="Optional. Helps you tell similar plans apart."
+              className="sm:col-span-2"
+            >
+              <Input
+                id="plan-description"
                 type="text"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Full access"
-                className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+                placeholder="Full access, unlimited seats"
               />
-            </div>
+            </Field>
           </div>
-          <div className="mt-4">
-            <button
-              onClick={createPlan}
-              disabled={working || !name || !amount}
-              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
-            >
-              <Package className="h-4 w-4" />
-              {working ? "Creating..." : "Create plan"}
-            </button>
-          </div>
-        </div>
+        </Modal>
       )}
 
-      <div className="rounded-xl border bg-card">
-        <div className="border-b px-6 py-4">
-          <h2 className="font-semibold">Your plans</h2>
-        </div>
-        {plans.length === 0 ? (
-          <div className="flex flex-col items-center gap-2 py-12 text-muted-foreground">
-            <Package className="h-8 w-8" />
-            <p className="text-sm">No plans yet</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-muted-foreground">
-                  <th className="px-6 py-3 text-left font-medium">Code</th>
-                  <th className="px-6 py-3 text-left font-medium">Name</th>
-                  <th className="px-6 py-3 text-left font-medium">Amount</th>
-                  <th className="px-6 py-3 text-left font-medium">Interval</th>
-                  <th className="px-6 py-3 text-left font-medium">Status</th>
-                  <th className="px-6 py-3 text-left font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {plans.map((p) => (
-                  <tr key={p.id} className="border-b last:border-0 hover:bg-muted/50">
-                    <td className="px-6 py-3 font-mono text-xs">{p.code}</td>
-                    <td className="px-6 py-3">{p.name}</td>
-                    <td className="px-6 py-3">{(p.amount / 100).toFixed(2)} {p.currency}</td>
-                    <td className="px-6 py-3">
-                      Every {p.intervalCount} {p.intervalUnit.toLowerCase()}{p.intervalCount > 1 ? "s" : ""}
-                    </td>
-                    <td className="px-6 py-3">
-                      <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${p.active ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
-                        {p.active ? "Active" : "Archived"}
-                      </span>
-                    </td>
-                    <td className="px-6 py-3">
-                      {p.active && (
-                        <button
-                          onClick={() => archivePlan(p.id)}
-                          disabled={working}
-                          className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs text-muted-foreground hover:bg-accent disabled:opacity-50"
-                        >
-                          <Archive className="h-3 w-3" />
-                          Archive
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      {dialog}
     </div>
   )
 }
