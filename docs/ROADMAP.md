@@ -77,7 +77,7 @@ Phase A → B → C are the non-negotiable foundation (each item is independentl
 ## Phase H — Launch readiness
 
 - [ ] **H45. Production ingress** — TLS, network policies, secret rotation runbook.
-- [ ] **H46. Load/stress test** + capacity plan, documented SLOs and runbooks.
+- [x] **H46. Load/stress test** + capacity plan, documented SLOs and runbooks.
 
 ---
 
