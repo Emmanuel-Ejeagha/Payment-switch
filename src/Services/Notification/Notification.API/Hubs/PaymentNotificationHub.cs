@@ -1,7 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using Notification.API.Services;
-using System.Security.Claims;
 
 namespace Notification.API.Hubs;
 
@@ -17,28 +16,16 @@ public class PaymentNotificationHub : Hub
 
     public override async Task OnConnectedAsync()
     {
-        var user = Context.User;
-        if (user?.Identity?.IsAuthenticated == true)
+        var accessToken = Context.GetHttpContext()?.Request.Query["access_token"];
+        var groups = await HubGroupMembership.ResolveAsync(
+            Context.User,
+            accessToken,
+            _merchantGroupResolver,
+            Context.ConnectionAborted);
+
+        foreach (var group in groups)
         {
-            if (user.IsInRole("Admin"))
-            {
-                await Groups.AddToGroupAsync(Context.ConnectionId, "admin");
-            }
-
-            var email = user.FindFirstValue(ClaimTypes.Email);
-            var accessToken = Context.GetHttpContext()?.Request.Query["access_token"];
-            if (!string.IsNullOrEmpty(email) && !string.IsNullOrEmpty(accessToken))
-            {
-                var merchantId = await _merchantGroupResolver.ResolveMerchantIdAsync(
-                    email,
-                    accessToken.ToString()!,
-                    Context.ConnectionAborted);
-
-                if (merchantId.HasValue)
-                {
-                    await Groups.AddToGroupAsync(Context.ConnectionId, $"merchant-{merchantId}");
-                }
-            }
+            await Groups.AddToGroupAsync(Context.ConnectionId, group);
         }
 
         await base.OnConnectedAsync();

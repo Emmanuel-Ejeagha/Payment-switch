@@ -10,10 +10,12 @@ using BuildingBlocks.Shared.Versioning;
 using BuildingBlocks.Shared.Caching;
 using BuildingBlocks.Shared.Http;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi;
 using Notification.API.Hubs;
 using Notification.API.Middlewares;
+using Notification.API.RateLimiting;
 using Notification.API.Services;
 using Notification.Application;
 using Notification.Application.Interfaces;
@@ -82,7 +84,20 @@ builder.Services.AddPaymentSwitchJwtBearer(builder.Configuration, options =>
 builder.Services.AddAuthorization();
 
 builder.Services.AddPaymentSwitchCors(builder.Configuration);
-builder.Services.AddSignalR();
+builder.Services.Configure<RateLimitOptions>(builder.Configuration.GetSection(RateLimitOptions.SectionName));
+builder.Services.AddSingleton<RateLimitHubFilter>();
+builder.Services.AddSignalR(options =>
+{
+    // TASK-047: harden against abusive connections — cap inbound frame size,
+    // bound parallel client invocations, and never leak exception details.
+    options.MaximumReceiveMessageSize = 32 * 1024;
+    options.MaximumParallelInvocationsPerClient = 4;
+    options.EnableDetailedErrors = false;
+})
+.AddHubOptions<PaymentNotificationHub>(options =>
+{
+    options.AddFilter<RateLimitHubFilter>();
+});
 
 builder.Services.AddHttpClient<IMerchantGroupResolver, MerchantGroupResolver>(client =>
 {
