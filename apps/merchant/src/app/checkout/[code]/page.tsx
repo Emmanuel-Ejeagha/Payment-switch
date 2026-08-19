@@ -3,11 +3,72 @@
 import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
 import Link from "next/link"
-import { Store, CreditCard, CheckCircle, XCircle } from "lucide-react"
+import { CheckCircle2, CreditCard, Lock, ShieldCheck, XCircle } from "lucide-react"
+import { BrandMark } from "@/components/landing/brand-mark"
+import { Alert, Button, CopyButton, Field, Input, Skeleton } from "@/components/ui"
+import { formatFigure } from "@/lib/format"
+
+interface CheckoutLink {
+  amount: number
+  currency: string
+  description?: string
+  active: boolean
+}
+
+/** Groups digits in fours so a long PAN stays readable while it is typed. */
+function formatCardNumber(value: string) {
+  const digits = value.replace(/\D/g, "").slice(0, 19)
+  return digits.replace(/(.{4})/g, "$1 ").trim()
+}
+
+/** Accepts MM/YY and MM/YYYY — the submit handler resolves the century either way. */
+function formatExpiry(value: string) {
+  const digits = value.replace(/\D/g, "").slice(0, 6)
+  if (digits.length <= 2) return digits
+  return `${digits.slice(0, 2)}/${digits.slice(2)}`
+}
+
+/** Display-only brand hint from the IIN range. The acquirer decides the real one. */
+function brandOf(value: string) {
+  const d = value.replace(/\D/g, "")
+  if (!d) return null
+  if (/^4/.test(d)) return "Visa"
+  if (/^(5[1-5]|2[2-7])/.test(d)) return "Mastercard"
+  if (/^3[47]/.test(d)) return "Amex"
+  if (/^(6011|65)/.test(d)) return "Discover"
+  if (/^(5061|5078|6500)/.test(d)) return "Verve"
+  return null
+}
+
+function CheckoutShell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-surface px-4 py-10">
+      {/* Decorative wash. Pure CSS, so the page never waits on an image. */}
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-gradient-to-b from-primary/10 to-transparent"
+        aria-hidden="true"
+      />
+      <div className="relative w-full max-w-md space-y-5">
+        <Link
+          href="/"
+          className="flex items-center justify-center gap-2.5 transition-opacity hover:opacity-80"
+        >
+          <BrandMark className="h-8 w-8" />
+          <span className="text-lg font-semibold tracking-tight">PaymentSwitch</span>
+        </Link>
+        {children}
+        <p className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+          <Lock className="h-3 w-3" aria-hidden="true" />
+          Secure checkout powered by PaymentSwitch
+        </p>
+      </div>
+    </div>
+  )
+}
 
 export default function HostedCheckoutPage() {
   const { code } = useParams<{ code: string }>()
-  const [link, setLink] = useState<{ amount: number; currency: string; description?: string; active: boolean } | null>(null)
+  const [link, setLink] = useState<CheckoutLink | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -94,101 +155,198 @@ export default function HostedCheckoutPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
-        <div className="h-96 w-full max-w-md animate-pulse rounded-2xl bg-muted" />
-      </div>
+      <CheckoutShell>
+        <div className="space-y-4 rounded-2xl border bg-card p-6 shadow-card">
+          <Skeleton className="h-4 w-28" />
+          <Skeleton className="h-10 w-44" />
+          <div className="space-y-3 pt-2">
+            <Skeleton className="h-10" />
+            <div className="grid grid-cols-2 gap-3">
+              <Skeleton className="h-10" />
+              <Skeleton className="h-10" />
+            </div>
+            <Skeleton className="h-11" />
+          </div>
+        </div>
+      </CheckoutShell>
     )
   }
 
   if (error && !link) {
     return (
-      <div className="flex min-h-screen items-center justify-center p-4">
-        <div className="w-full max-w-md rounded-2xl border border-destructive/50 bg-destructive/10 p-6 text-center">
-          <XCircle className="mx-auto h-10 w-10 text-destructive" />
-          <p className="mt-3 font-medium text-destructive">{error}</p>
+      <CheckoutShell>
+        <div
+          role="alert"
+          className="rounded-2xl border bg-card p-8 text-center shadow-card"
+        >
+          <span
+            className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-destructive/10 text-destructive"
+            aria-hidden="true"
+          >
+            <XCircle className="h-6 w-6" />
+          </span>
+          <h1 className="mt-4 text-lg font-semibold">This link cannot be opened</h1>
+          <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{error}</p>
+          <p className="mt-4 text-xs text-muted-foreground">
+            Check the address with whoever sent it to you.
+          </p>
         </div>
-      </div>
+      </CheckoutShell>
     )
   }
 
   if (!link) return null
 
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
-      <div className="w-full max-w-md space-y-4">
-        <Link href="/" className="flex items-center justify-center gap-2 pt-4 text-muted-foreground">
-          <div className="rounded-lg bg-primary p-2 text-primary-foreground">
-            <Store className="h-5 w-5" />
-          </div>
-          <span className="font-semibold text-foreground">PaymentSwitch</span>
-        </Link>
-
-        {result ? (
-          <div className="rounded-2xl border bg-card p-8 text-center shadow-sm">
-            <CheckCircle className="mx-auto h-12 w-12 text-green-500" />
-            <h1 className="mt-4 text-2xl font-semibold">Payment {result.status.toLowerCase()}</h1>
-            <p className="mt-2 font-mono text-xs text-muted-foreground">{result.intentId}</p>
-          </div>
-        ) : (
-          <div className="rounded-2xl border bg-card p-8 shadow-sm">
-            <h1 className="text-xl font-semibold">{link.description || "Payment"}</h1>
-            <p className="mt-2 text-4xl font-bold">
-              {(link.amount / 100).toFixed(2)} <span className="text-xl font-medium text-muted-foreground">{link.currency}</span>
-            </p>
-
-            {error && <div className="mt-4 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
-
-            <div className="mt-6 space-y-4">
-              <div>
-                <label className="mb-1 block text-sm font-medium">Card number</label>
-                <div className="relative">
-                  <CreditCard className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <input
-                    value={cardNumber}
-                    onChange={(e) => setCardNumber(e.target.value)}
-                    placeholder="4242 4242 4242 4242"
-                    inputMode="numeric"
-                    className="w-full rounded-lg border bg-background py-2 pl-10 pr-3 text-sm outline-none focus:ring-2 focus:ring-primary"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="mb-1 block text-sm font-medium">Expiry</label>
-                  <input
-                    value={expiry}
-                    onChange={(e) => setExpiry(e.target.value)}
-                    placeholder="MM/YY"
-                    inputMode="numeric"
-                    className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium">CVC</label>
-                  <input
-                    value={cvc}
-                    onChange={(e) => setCvc(e.target.value)}
-                    placeholder="123"
-                    inputMode="numeric"
-                    className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
-                  />
-                </div>
-              </div>
-              <button
-                onClick={pay}
-                disabled={submitting || !cardNumber || !expiry || !cvc}
-                className="w-full rounded-lg bg-primary py-3 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
-              >
-                {submitting ? "Processing..." : `Pay ${(link.amount / 100).toFixed(2)} ${link.currency}`}
-              </button>
+  if (result) {
+    const settled = /succe|captur|author|paid/i.test(result.status)
+    return (
+      <CheckoutShell>
+        <div className="rounded-2xl border bg-card p-8 text-center shadow-card">
+          <span
+            className={`mx-auto flex h-14 w-14 items-center justify-center rounded-2xl ${
+              settled
+                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+            }`}
+            aria-hidden="true"
+          >
+            <CheckCircle2 className="h-7 w-7" />
+          </span>
+          <h1 className="mt-5 text-2xl font-semibold tracking-tight" role="status">
+            Payment {result.status.toLowerCase()}
+          </h1>
+          <p className="tabular mt-1 text-sm text-muted-foreground">
+            {formatFigure(link.amount)} {link.currency}
+            {link.description ? ` · ${link.description}` : ""}
+          </p>
+          <div className="mt-6 rounded-xl border bg-muted/30 p-4 text-left">
+            <p className="text-xs font-medium text-muted-foreground">Reference</p>
+            <div className="mt-1.5 flex items-center gap-2">
+              <code className="min-w-0 flex-1 break-all font-mono text-xs">{result.intentId}</code>
+              <CopyButton value={result.intentId} label="Copy" />
             </div>
           </div>
-        )}
+          <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
+            Keep this reference — it identifies your payment if you need to contact the merchant.
+          </p>
+        </div>
+      </CheckoutShell>
+    )
+  }
 
-        <p className="pb-6 text-center text-xs text-muted-foreground">
-          Secure checkout powered by PaymentSwitch
-        </p>
+  if (link.active === false) {
+    return (
+      <CheckoutShell>
+        <div role="alert" className="rounded-2xl border bg-card p-8 text-center shadow-card">
+          <span
+            className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-muted text-muted-foreground"
+            aria-hidden="true"
+          >
+            <XCircle className="h-6 w-6" />
+          </span>
+          <h1 className="mt-4 text-lg font-semibold">This payment link is closed</h1>
+          <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+            The merchant has deactivated it, so no further payments can be taken. Ask them for a new
+            link.
+          </p>
+        </div>
+      </CheckoutShell>
+    )
+  }
+
+  const brand = brandOf(cardNumber)
+  const canPay = !submitting && Boolean(cardNumber && expiry && cvc)
+
+  return (
+    <CheckoutShell>
+      <div className="overflow-hidden rounded-2xl border bg-card shadow-card">
+        <div className="border-b bg-muted/30 px-6 py-5 sm:px-7">
+          <p className="text-sm text-muted-foreground">{link.description || "Payment"}</p>
+          <p className="tabular mt-1 text-3xl font-semibold tracking-tight sm:text-4xl">
+            {formatFigure(link.amount)}
+            <span className="ml-2 text-base font-medium text-muted-foreground">{link.currency}</span>
+          </p>
+        </div>
+
+        <form
+          className="space-y-4 px-6 py-6 sm:px-7"
+          onSubmit={(e) => {
+            e.preventDefault()
+            pay()
+          }}
+        >
+          {error && <Alert variant="error">{error}</Alert>}
+
+          <Field label="Card number" htmlFor="cc-number" required>
+            <div className="relative">
+              <CreditCard
+                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                aria-hidden="true"
+              />
+              <Input
+                id="cc-number"
+                value={cardNumber}
+                onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
+                placeholder="4242 4242 4242 4242"
+                inputMode="numeric"
+                autoComplete="cc-number"
+                autoCorrect="off"
+                spellCheck={false}
+                className={`tabular pl-9 ${brand ? "pr-20" : ""}`}
+              />
+              {brand && (
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground">
+                  {brand}
+                </span>
+              )}
+            </div>
+          </Field>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Expiry" htmlFor="cc-exp" required>
+              <Input
+                id="cc-exp"
+                value={expiry}
+                onChange={(e) => setExpiry(formatExpiry(e.target.value))}
+                placeholder="MM/YY"
+                inputMode="numeric"
+                autoComplete="cc-exp"
+                className="tabular"
+              />
+            </Field>
+            <Field label="Security code" htmlFor="cc-csc" required>
+              <Input
+                id="cc-csc"
+                value={cvc}
+                onChange={(e) => setCvc(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                placeholder="123"
+                inputMode="numeric"
+                autoComplete="cc-csc"
+                className="tabular"
+              />
+            </Field>
+          </div>
+
+          <Button
+            type="submit"
+            variant="primary"
+            size="lg"
+            className="w-full"
+            pending={submitting}
+            disabled={!canPay}
+          >
+            {submitting
+              ? "Processing…"
+              : `Pay ${formatFigure(link.amount)} ${link.currency}`}
+          </Button>
+
+          <p className="flex items-start gap-2 pt-1 text-xs leading-relaxed text-muted-foreground">
+            <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            Card details go straight to a PCI-scoped vault. The merchant receives a token, never your
+            full card number.
+          </p>
+        </form>
       </div>
-    </div>
+    </CheckoutShell>
   )
 }

@@ -1,11 +1,12 @@
 "use client"
 
-import { Component } from "react"
-import { AlertTriangle, RefreshCw } from "lucide-react"
+import { Component, type ErrorInfo, type ReactNode } from "react"
+import { RefreshCw, RotateCcw } from "lucide-react"
+import { Button, ErrorPanel } from "@/components/ui"
 
 interface Props {
-  children: React.ReactNode
-  fallback?: React.ReactNode
+  children: ReactNode
+  fallback?: ReactNode
 }
 
 interface State {
@@ -23,25 +24,33 @@ export class ErrorBoundary extends Component<Props, State> {
     return { hasError: true, error }
   }
 
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error("Dashboard render failed:", error, info.componentStack)
+  }
+
+  // Clearing the captured error re-renders the subtree. A transient failure
+  // (a dropped fetch, a bad websocket frame) recovers without dropping the
+  // rest of the app state the way a full reload would.
+  reset = () => this.setState({ hasError: false, error: undefined })
+
   render() {
     if (this.state.hasError) {
       return (
         this.props.fallback || (
-          <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-destructive/50 bg-destructive/10 p-12 text-center">
-            <AlertTriangle className="h-10 w-10 text-destructive" />
-            <div>
-              <h2 className="text-lg font-semibold text-destructive">Something went wrong</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {this.state.error?.message || "An unexpected error occurred"}
-              </p>
-            </div>
-            <button
-              onClick={() => window.location.reload()}
-              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-            >
-              <RefreshCw className="h-4 w-4" /> Reload page
-            </button>
-          </div>
+          <ErrorPanel
+            title="Something went wrong"
+            message={this.state.error?.message || "An unexpected error occurred while rendering this view."}
+            action={
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <Button variant="primary" icon={RotateCcw} onClick={this.reset}>
+                  Try again
+                </Button>
+                <Button icon={RefreshCw} onClick={() => window.location.reload()}>
+                  Reload page
+                </Button>
+              </div>
+            }
+          />
         )
       )
     }

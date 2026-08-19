@@ -10,7 +10,11 @@ import { Card, CardBody, CardHeader, PageHeader } from "@/components/ui"
 const changePasswordSchema = z
   .object({
     currentPassword: z.string().min(1, "Current password is required"),
-    newPassword: z.string().min(8, "Password must be at least 8 characters"),
+    newPassword: z
+      .string()
+      .min(10, "Password must be at least 10 characters")
+      .regex(/[A-Za-z]/, "Password must contain at least one letter")
+      .regex(/[0-9]/, "Password must contain at least one digit"),
     confirmPassword: z.string(),
   })
   .refine((d) => d.newPassword === d.confirmPassword, {

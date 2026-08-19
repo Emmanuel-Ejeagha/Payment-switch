@@ -1,13 +1,35 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { useParams, useRouter } from "next/navigation"
-import { ArrowLeft, CheckCircle, XCircle, Ban, RotateCcw } from "lucide-react"
+import { useParams } from "next/navigation"
+import { Ban, CheckCircle, CreditCard, Receipt, RotateCcw } from "lucide-react"
 import type { PaymentIntentDto, TransactionDto } from "@paymentswitch/shared"
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  CopyButton,
+  EmptyState,
+  ErrorPanel,
+  PageHeader,
+  Skeleton,
+  StatusPill,
+  TableSkeleton,
+  TableWrap,
+  TBody,
+  TD,
+  TH,
+  THead,
+  TR,
+  toneForStatus,
+} from "@/components/ui"
+import { formatAmount, formatDateTime, formatFigure, humanize } from "@/lib/format"
 
 export default function PaymentDetailPage() {
   const { id } = useParams<{ id: string }>()
-  const router = useRouter()
   const [payment, setPayment] = useState<PaymentIntentDto | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -64,17 +86,32 @@ export default function PaymentDetailPage() {
 
   if (loading) {
     return (
-      <div className="space-y-4">
-        <div className="h-8 w-48 animate-pulse rounded bg-muted" />
-        <div className="h-64 animate-pulse rounded-xl bg-muted" />
+      <div className="space-y-8">
+        <div className="space-y-3">
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-9 w-64" />
+        </div>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Skeleton className="h-24" />
+          <Skeleton className="h-24" />
+          <Skeleton className="h-24" />
+        </div>
+        <Card className="overflow-hidden">
+          <CardHeader title="Transaction history" icon={Receipt} />
+          <TableSkeleton rows={3} columns={4} />
+        </Card>
       </div>
     )
   }
 
   if (error && !payment) {
     return (
-      <div className="rounded-xl border border-destructive/50 bg-destructive/10 p-6 text-destructive">
-        <p className="font-medium">{error}</p>
+      <div className="space-y-8">
+        <PageHeader title="Payment" backHref="/payments" backLabel="Back to payments" />
+        <ErrorPanel
+          title={error}
+          message="The intent may have been removed, or the id in the address bar is not one of yours."
+        />
       </div>
     )
   }
@@ -85,140 +122,161 @@ export default function PaymentDetailPage() {
   const canCapture = payment.status === "Authorized"
   const canVoid = payment.status === "Authorized"
   const canRefund = payment.status === "Captured" || payment.status === "Settled"
+  const busy = pendingAction !== null
+  const hasActions = canAuthorize || canCapture || canVoid || canRefund
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <button onClick={() => router.push("/payments")} className="rounded-lg p-1 hover:bg-accent">
-          <ArrowLeft className="h-5 w-5" />
-        </button>
-        <div>
-          <h1 className="text-3xl font-semibold">Payment detail</h1>
-          <p className="font-mono text-sm text-muted-foreground">{payment.intentId}</p>
-        </div>
+    <div className="space-y-8">
+      <PageHeader
+        eyebrow="Payment intent"
+        title={formatAmount(payment.amount, payment.currency)}
+        backHref="/payments"
+        backLabel="Back to payments"
+        actions={<StatusPill status={payment.status} className="text-sm" />}
+        description={
+          <span className="flex flex-wrap items-center gap-2">
+            <code className="break-all rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
+              {payment.intentId}
+            </code>
+            <CopyButton value={payment.intentId} label="Copy id" iconOnly />
+          </span>
+        }
+      />
+
+      {error && <Alert variant="error" title="Action failed">{error}</Alert>}
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Card className="p-5">
+          <p className="text-sm font-medium text-muted-foreground">Amount</p>
+          <p className="tabular mt-2 text-2xl font-semibold tracking-tight">
+            {formatFigure(payment.amount)}
+            <span className="ml-1.5 text-sm font-medium text-muted-foreground">
+              {payment.currency}
+            </span>
+          </p>
+        </Card>
+        <Card className="p-5">
+          <p className="text-sm font-medium text-muted-foreground">Status</p>
+          <div className="mt-2">
+            <Badge tone={toneForStatus(payment.status)} dot className="text-sm">
+              {humanize(payment.status)}
+            </Badge>
+          </div>
+        </Card>
+        <Card className="p-5">
+          <p className="text-sm font-medium text-muted-foreground">Payment method</p>
+          <p className="mt-2 flex items-center gap-2 text-sm font-medium">
+            <CreditCard className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            {payment.cardBrand || payment.cardLastFour
+              ? `${payment.cardBrand ?? "Card"} •••• ${payment.cardLastFour ?? "----"}`
+              : "Not recorded"}
+          </p>
+        </Card>
+        <Card className="p-5">
+          <p className="text-sm font-medium text-muted-foreground">Created</p>
+          <p className="mt-2 text-sm font-medium">{formatDateTime(payment.createdAt)}</p>
+        </Card>
       </div>
 
-      {error && (
-        <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</div>
+      {hasActions && (
+        <Card>
+          <CardHeader
+            title="Actions"
+            description="Each action is sent with an idempotency key, so a repeat never moves money twice."
+          />
+          <CardBody className="flex flex-wrap gap-2">
+            {canAuthorize && (
+              <Button
+                variant="primary"
+                icon={CheckCircle}
+                pending={pendingAction === "authorize"}
+                disabled={busy}
+                onClick={() =>
+                  doAction("authorize", {
+                    cardLastFour: payment.cardLastFour,
+                    cardBrand: payment.cardBrand,
+                  })
+                }
+              >
+                Authorize
+              </Button>
+            )}
+            {canCapture && (
+              <Button
+                variant="primary"
+                icon={CheckCircle}
+                pending={pendingAction === "capture"}
+                disabled={busy}
+                onClick={() => doAction("capture", { amount: payment.amount })}
+              >
+                Capture
+              </Button>
+            )}
+            {canVoid && (
+              <Button
+                variant="dangerGhost"
+                icon={Ban}
+                pending={pendingAction === "void"}
+                disabled={busy}
+                onClick={() => doAction("void")}
+              >
+                Void
+              </Button>
+            )}
+            {canRefund && (
+              <Button
+                variant="dangerGhost"
+                icon={RotateCcw}
+                pending={pendingAction === "refund"}
+                disabled={busy}
+                onClick={() => doAction("refund", { amount: payment.amount })}
+              >
+                Refund
+              </Button>
+            )}
+          </CardBody>
+        </Card>
       )}
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-xl border bg-card p-6">
-          <p className="text-sm text-muted-foreground">Amount</p>
-          <p className="text-2xl font-semibold">{(payment.amount / 100).toFixed(2)} {payment.currency}</p>
-        </div>
-        <div className="rounded-xl border bg-card p-6">
-          <p className="text-sm text-muted-foreground">Status</p>
-          <span className="inline-flex rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary">
-            {payment.status}
-          </span>
-        </div>
-        <div className="rounded-xl border bg-card p-6">
-          <p className="text-sm text-muted-foreground">Transactions</p>
-          <p className="text-2xl font-semibold">{payment.transactions?.length ?? 0}</p>
-        </div>
-      </div>
-
-      <div className="flex flex-wrap gap-3">
-        {canAuthorize && (
-          <ActionButton
-            icon={CheckCircle}
-            label="Authorize"
-            pending={pendingAction === "authorize"}
-            disabled={pendingAction !== null}
-            onClick={() => doAction("authorize", { cardLastFour: payment.cardLastFour, cardBrand: payment.cardBrand })}
+      <Card className="overflow-hidden">
+        <CardHeader
+          title="Transaction history"
+          description={`${payment.transactions?.length ?? 0} recorded`}
+          icon={Receipt}
+        />
+        {!payment.transactions || payment.transactions.length === 0 ? (
+          <EmptyState
+            icon={Receipt}
+            title="No transactions yet"
+            description="Authorizing, capturing, voiding, or refunding this intent each records a transaction here."
           />
-        )}
-        {canCapture && (
-          <ActionButton
-            icon={CheckCircle}
-            label="Capture"
-            pending={pendingAction === "capture"}
-            disabled={pendingAction !== null}
-            onClick={() => doAction("capture", { amount: payment.amount })}
-          />
-        )}
-        {canVoid && (
-          <ActionButton
-            icon={Ban}
-            label="Void"
-            variant="destructive"
-            pending={pendingAction === "void"}
-            disabled={pendingAction !== null}
-            onClick={() => doAction("void")}
-          />
-        )}
-        {canRefund && (
-          <ActionButton
-            icon={RotateCcw}
-            label="Refund"
-            variant="destructive"
-            pending={pendingAction === "refund"}
-            disabled={pendingAction !== null}
-            onClick={() => doAction("refund", { amount: payment.amount })}
-          />
-        )}
-      </div>
-
-      <div className="rounded-xl border bg-card">
-        <h2 className="border-b px-6 py-4 font-semibold">Transaction history</h2>
-        {(!payment.transactions || payment.transactions.length === 0) ? (
-          <p className="px-6 py-8 text-sm text-muted-foreground">No transactions yet</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-muted-foreground">
-                  <th className="px-6 py-3 text-left font-medium">Type</th>
-                  <th className="px-6 py-3 text-left font-medium">Amount</th>
-                  <th className="px-6 py-3 text-left font-medium">Currency</th>
-                  <th className="px-6 py-3 text-left font-medium">Timestamp</th>
-                </tr>
-              </thead>
-              <tbody>
-                {payment.transactions.map((t: TransactionDto) => (
-                  <tr key={t.id} className="border-b last:border-0 hover:bg-muted/50">
-                    <td className="px-6 py-3">{t.type}</td>
-                    <td className="px-6 py-3">{(t.amount / 100).toFixed(2)}</td>
-                    <td className="px-6 py-3">{t.currency}</td>
-                    <td className="px-6 py-3">{new Date(t.timestamp).toLocaleString()}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <TableWrap>
+            <THead>
+              <TH>Type</TH>
+              <TH align="right">Amount</TH>
+              <TH>Currency</TH>
+              <TH>Timestamp</TH>
+            </THead>
+            <TBody>
+              {payment.transactions.map((t: TransactionDto) => (
+                <TR key={t.id}>
+                  <TD>
+                    <Badge tone={toneForStatus(t.type)}>{humanize(t.type)}</Badge>
+                  </TD>
+                  <TD align="right" className="tabular font-medium">
+                    {formatFigure(t.amount)}
+                  </TD>
+                  <TD className="text-muted-foreground">{t.currency}</TD>
+                  <TD className="whitespace-nowrap text-xs text-muted-foreground">
+                    {formatDateTime(t.timestamp)}
+                  </TD>
+                </TR>
+              ))}
+            </TBody>
+          </TableWrap>
         )}
-      </div>
+      </Card>
     </div>
-  )
-}
-
-function ActionButton({
-  icon: Icon,
-  label,
-  variant,
-  pending,
-  disabled,
-  onClick,
-}: {
-  icon: React.ComponentType<{ className?: string }>
-  label: string
-  variant?: "destructive"
-  pending?: boolean
-  disabled?: boolean
-  onClick: () => void
-}) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      aria-busy={pending}
-      className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent ${
-        variant === "destructive" ? "border-destructive/50 text-destructive hover:bg-destructive/10" : ""
-      }`}
-    >
-      <Icon className={`h-4 w-4 ${pending ? "animate-spin" : ""}`} />
-      {pending ? `${label}...` : label}
-    </button>
   )
 }

@@ -1,9 +1,33 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
-import { RefreshCw, X, Ban, Repeat } from "lucide-react"
+import Link from "next/link"
+import { Ban, CalendarClock, Plus, RefreshCw, Repeat } from "lucide-react"
 import { useMerchant } from "@/hooks/use-merchant"
 import type { SubscriptionDto, CustomerDto, PlanDto } from "@paymentswitch/shared"
+import {
+  Alert,
+  Button,
+  Card,
+  CardHeader,
+  EmptyState,
+  Field,
+  IdCell,
+  Input,
+  Modal,
+  PageHeader,
+  Select,
+  StatusPill,
+  TableSkeleton,
+  TableWrap,
+  TBody,
+  TD,
+  TH,
+  THead,
+  TR,
+  useConfirm,
+} from "@/components/ui"
+import { formatAmount, formatDate, shortId } from "@/lib/format"
 
 function extractError(body: unknown): string {
   if (!body || typeof body !== "object") return "Request failed"
@@ -22,6 +46,7 @@ function extractError(body: unknown): string {
 
 export default function SubscriptionsPage() {
   const { merchantId, loading: merchantLoading, error: merchantError } = useMerchant()
+  const { confirm, dialog } = useConfirm()
   const [subscriptions, setSubscriptions] = useState<SubscriptionDto[]>([])
   const [customers, setCustomers] = useState<CustomerDto[]>([])
   const [plans, setPlans] = useState<PlanDto[]>([])
@@ -92,12 +117,31 @@ export default function SubscriptionsPage() {
     }
   }
 
-  const cancelSubscription = async (id: string, atPeriodEnd: boolean) => {
-    if (!merchantId || !confirm(atPeriodEnd ? "Cancel at period end?" : "Cancel immediately?")) return
+  const cancelSubscription = async (subscription: SubscriptionDto, atPeriodEnd: boolean) => {
+    if (!merchantId) return
+    const confirmed = await confirm({
+      title: atPeriodEnd ? "Cancel at period end" : "Cancel immediately",
+      message: atPeriodEnd ? (
+        <>
+          <strong className="font-medium text-foreground">{subscription.code}</strong> keeps its access
+          until {formatDate(subscription.currentPeriodEnd)} and is not billed again after that.
+        </>
+      ) : (
+        <>
+          <strong className="font-medium text-foreground">{subscription.code}</strong> ends right now.
+          The current period is not refunded automatically.
+        </>
+      ),
+      confirmLabel: atPeriodEnd ? "Cancel at period end" : "Cancel now",
+      cancelLabel: "Keep subscription",
+      destructive: !atPeriodEnd,
+    })
+    if (!confirmed) return
+
     setWorking(true)
     setError(null)
     try {
-      const res = await fetch(`/api/proxy/payment/api/v1/subscriptions/${id}/cancel?atPeriodEnd=${atPeriodEnd}`, { method: "POST" })
+      const res = await fetch(`/api/proxy/payment/api/v1/subscriptions/${subscription.id}/cancel?atPeriodEnd=${atPeriodEnd}`, { method: "POST" })
       if (!res.ok) {
         const body = await res.json().catch(() => undefined)
         setError(extractError(body))
@@ -126,166 +170,260 @@ export default function SubscriptionsPage() {
     }
   }
 
-  if (loading) {
-    return <div className="h-64 animate-pulse rounded-xl bg-muted" />
-  }
+  const blocked = customers.length === 0 || plans.length === 0
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-semibold">Subscriptions</h1>
-          <p className="text-sm text-muted-foreground">Recurring billing subscriptions for your customers.</p>
-        </div>
-        <button
-          onClick={() => setShowForm((v) => !v)}
-          disabled={!merchantId}
-          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
-        >
-          {showForm ? <X className="h-4 w-4" /> : <RefreshCw className="h-4 w-4" />}
-          {showForm ? "Cancel" : "New subscription"}
-        </button>
-      </div>
+    <div className="space-y-8">
+      <PageHeader
+        title="Subscriptions"
+        description="Recurring billing for your customers. Each subscription pairs a customer with a plan and bills on that plan's schedule."
+        actions={
+          <Button
+            variant="primary"
+            icon={Plus}
+            onClick={() => setShowForm(true)}
+            disabled={!merchantId}
+          >
+            New subscription
+          </Button>
+        }
+      />
 
-      {(error || merchantError) && <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error || merchantError}</div>}
+      {(error || merchantError) && (
+        <Alert variant="error" title="Something went wrong">
+          {error || merchantError}
+        </Alert>
+      )}
+
+      {!loading && blocked && (
+        <Alert variant="info" title="Two things are needed first">
+          A subscription needs a customer and an active plan.{" "}
+          {customers.length === 0 && (
+            <>
+              You have no customers —{" "}
+              <Link href="/customers" className="font-medium text-primary underline">
+                add one
+              </Link>
+              .{" "}
+            </>
+          )}
+          {plans.length === 0 && (
+            <>
+              You have no active plans —{" "}
+              <Link href="/plans" className="font-medium text-primary underline">
+                create one
+              </Link>
+              .
+            </>
+          )}
+        </Alert>
+      )}
+
+      <Card className="overflow-hidden">
+        <CardHeader
+          title="All subscriptions"
+          description={loading ? "Loading…" : `${subscriptions.length} total`}
+          icon={RefreshCw}
+        />
+        {loading ? (
+          <TableSkeleton rows={5} columns={7} />
+        ) : subscriptions.length === 0 ? (
+          <EmptyState
+            icon={RefreshCw}
+            title="No subscriptions yet"
+            description="Attach a customer to a plan and PaymentSwitch bills them automatically on every cycle."
+            action={
+              <Button
+                variant="primary"
+                icon={Plus}
+                onClick={() => setShowForm(true)}
+                disabled={!merchantId}
+              >
+                Create a subscription
+              </Button>
+            }
+          />
+        ) : (
+          <TableWrap>
+            <THead>
+              <TH>Code</TH>
+              <TH>Status</TH>
+              <TH>Customer</TH>
+              <TH>Plan</TH>
+              <TH>Current period</TH>
+              <TH>Next billing</TH>
+              <TH align="right">Actions</TH>
+            </THead>
+            <TBody>
+              {subscriptions.map((s) => {
+                const customer = customers.find((c) => c.id === s.customerId)
+                const plan = plans.find((p) => p.id === s.planId)
+                const canAct = s.status === "Active" && !s.cancelAtPeriodEnd
+                return (
+                  <TR key={s.id}>
+                    <TD>
+                      <IdCell>{s.code}</IdCell>
+                    </TD>
+                    <TD>
+                      <StatusPill status={s.status} />
+                      {s.cancelAtPeriodEnd && (
+                        <p className="mt-1 text-[11px] text-muted-foreground">Ends at period end</p>
+                      )}
+                    </TD>
+                    <TD>{customer?.email ?? <IdCell>{shortId(s.customerId)}</IdCell>}</TD>
+                    <TD>
+                      {plan ? (
+                        <>
+                          <p className="font-medium">{plan.name}</p>
+                          <p className="tabular text-xs text-muted-foreground">
+                            {formatAmount(plan.amount, plan.currency)}
+                          </p>
+                        </>
+                      ) : (
+                        <IdCell>{shortId(s.planId)}</IdCell>
+                      )}
+                    </TD>
+                    <TD className="whitespace-nowrap text-xs text-muted-foreground">
+                      {formatDate(s.currentPeriodStart)} → {formatDate(s.currentPeriodEnd)}
+                    </TD>
+                    <TD className="whitespace-nowrap text-xs text-muted-foreground">
+                      {formatDate(s.nextBillingAt)}
+                    </TD>
+                    <TD align="right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        {canAct ? (
+                          <>
+                            <Button
+                              size="sm"
+                              icon={Repeat}
+                              iconOnly
+                              disabled={working}
+                              onClick={() => collectNow(s.id)}
+                            >
+                              Collect {s.code} now
+                            </Button>
+                            <Button
+                              size="sm"
+                              icon={CalendarClock}
+                              iconOnly
+                              disabled={working}
+                              onClick={() => cancelSubscription(s, true)}
+                            >
+                              Cancel {s.code} at period end
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="dangerGhost"
+                              icon={Ban}
+                              iconOnly
+                              disabled={working}
+                              onClick={() => cancelSubscription(s, false)}
+                            >
+                              Cancel {s.code} immediately
+                            </Button>
+                          </>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </div>
+                    </TD>
+                  </TR>
+                )
+              })}
+            </TBody>
+          </TableWrap>
+        )}
+      </Card>
 
       {showForm && (
-        <div className="rounded-xl border bg-card p-6">
-          <div className="grid gap-4 md:grid-cols-3">
-            <div>
-              <label className="mb-1 block text-sm font-medium">Customer <span className="text-destructive">*</span></label>
+        <Modal
+          title="New subscription"
+          description="Billing starts immediately and repeats on the plan's schedule."
+          onClose={() => setShowForm(false)}
+          size="lg"
+          footer={
+            <>
+              <Button onClick={() => setShowForm(false)}>Cancel</Button>
+              <Button
+                variant="primary"
+                onClick={createSubscription}
+                pending={working}
+                disabled={!customerId || !planId || !cardToken}
+              >
+                {working ? "Creating…" : "Create subscription"}
+              </Button>
+            </>
+          }
+        >
+          <div className="space-y-4">
+            <Field label="Customer" htmlFor="sub-customer" required>
               {customers.length === 0 ? (
-                <div className="rounded-lg border border-dashed bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+                <div className="rounded-lg border border-dashed bg-muted/40 px-3 py-2.5 text-xs text-muted-foreground">
                   No customers yet.{" "}
-                  <a href="/customers" className="font-medium text-primary underline">Create one</a> before adding a subscription.
+                  <Link href="/customers" className="font-medium text-primary underline">
+                    Create one
+                  </Link>{" "}
+                  before adding a subscription.
                 </div>
               ) : (
-                <select
+                <Select
+                  id="sub-customer"
                   value={customerId}
                   onChange={(e) => setCustomerId(e.target.value)}
-                  className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
                 >
                   <option value="">Select customer</option>
                   {customers.map((c) => (
-                    <option key={c.id} value={c.id}>{c.email} ({c.code})</option>
+                    <option key={c.id} value={c.id}>
+                      {c.email} ({c.code})
+                    </option>
                   ))}
-                </select>
+                </Select>
               )}
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium">Plan <span className="text-destructive">*</span></label>
+            </Field>
+
+            <Field label="Plan" htmlFor="sub-plan" required>
               {plans.length === 0 ? (
-                <div className="rounded-lg border border-dashed bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+                <div className="rounded-lg border border-dashed bg-muted/40 px-3 py-2.5 text-xs text-muted-foreground">
                   No active plans yet.{" "}
-                  <a href="/plans" className="font-medium text-primary underline">Create one</a> before adding a subscription.
+                  <Link href="/plans" className="font-medium text-primary underline">
+                    Create one
+                  </Link>{" "}
+                  before adding a subscription.
                 </div>
               ) : (
-                <select
-                  value={planId}
-                  onChange={(e) => setPlanId(e.target.value)}
-                  className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
-                >
+                <Select id="sub-plan" value={planId} onChange={(e) => setPlanId(e.target.value)}>
                   <option value="">Select plan</option>
                   {plans.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name} — {(p.amount / 100).toFixed(2)} {p.currency}</option>
+                    <option key={p.id} value={p.id}>
+                      {p.name} — {formatAmount(p.amount, p.currency)}
+                    </option>
                   ))}
-                </select>
+                </Select>
               )}
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium">Card token <span className="text-destructive">*</span></label>
-              <input
+            </Field>
+
+            <Field
+              label="Card token"
+              htmlFor="sub-token"
+              required
+              hint="A vault token from the tokenize endpoint. Raw card numbers never pass through this form."
+            >
+              <Input
+                id="sub-token"
                 type="text"
                 value={cardToken}
                 onChange={(e) => setCardToken(e.target.value)}
-                placeholder="tok_..."
-                className="w-full rounded-lg border bg-background px-3 py-2 text-sm font-mono outline-none focus:ring-2 focus:ring-primary"
+                placeholder="tok_…"
+                autoComplete="off"
+                spellCheck={false}
+                className="font-mono"
               />
-            </div>
+            </Field>
           </div>
-          <div className="mt-4">
-            <button
-              onClick={createSubscription}
-              disabled={working || !customerId || !planId || !cardToken}
-              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
-            >
-              {working ? "Creating..." : "Create subscription"}
-            </button>
-          </div>
-        </div>
+        </Modal>
       )}
 
-      <div className="rounded-xl border bg-card">
-        <div className="border-b px-6 py-4">
-          <h2 className="font-semibold">All subscriptions</h2>
-        </div>
-        {subscriptions.length === 0 ? (
-          <div className="flex flex-col items-center gap-2 py-12 text-muted-foreground">
-            <RefreshCw className="h-8 w-8" />
-            <p className="text-sm">No subscriptions yet</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-muted-foreground">
-                  <th className="px-6 py-3 text-left font-medium">Code</th>
-                  <th className="px-6 py-3 text-left font-medium">Status</th>
-                  <th className="px-6 py-3 text-left font-medium">Customer</th>
-                  <th className="px-6 py-3 text-left font-medium">Plan</th>
-                  <th className="px-6 py-3 text-left font-medium">Current period</th>
-                  <th className="px-6 py-3 text-left font-medium">Next billing</th>
-                  <th className="px-6 py-3 text-left font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {subscriptions.map((s) => {
-                  const customer = customers.find((c) => c.id === s.customerId)
-                  const plan = plans.find((p) => p.id === s.planId)
-                  return (
-                    <tr key={s.id} className="border-b last:border-0 hover:bg-muted/50">
-                      <td className="px-6 py-3 font-mono text-xs">{s.code}</td>
-                      <td className="px-6 py-3">
-                        <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${s.status === "Active" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
-                          {s.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-3">{customer?.email || "—"}</td>
-                      <td className="px-6 py-3">{plan?.name || "—"}</td>
-                      <td className="px-6 py-3">{new Date(s.currentPeriodStart).toLocaleDateString()} — {new Date(s.currentPeriodEnd).toLocaleDateString()}</td>
-                      <td className="px-6 py-3">{s.nextBillingAt ? new Date(s.nextBillingAt).toLocaleDateString() : "—"}</td>
-                      <td className="px-6 py-3">
-                        <div className="flex items-center gap-2">
-                          {s.status === "Active" && !s.cancelAtPeriodEnd && (
-                            <>
-                              <button
-                                onClick={() => collectNow(s.id)}
-                                disabled={working}
-                                className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-accent disabled:opacity-50"
-                                title="Collect now"
-                              >
-                                <Repeat className="h-3 w-3" />
-                              </button>
-                              <button
-                                onClick={() => cancelSubscription(s.id, false)}
-                                disabled={working}
-                                className="inline-flex items-center gap-1 rounded-md border border-destructive/50 px-2 py-1 text-xs text-destructive hover:bg-destructive/10 disabled:opacity-50"
-                                title="Cancel now"
-                              >
-                                <Ban className="h-3 w-3" />
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      {dialog}
     </div>
   )
 }
