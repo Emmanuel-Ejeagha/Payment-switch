@@ -35,10 +35,7 @@ export function LandingHero() {
             Real-time switching on a distributed, event-driven core
           </span>
 
-          <h1
-            className="animate-fade-up mt-6 text-4xl font-semibold leading-[1.08] tracking-tight sm:text-5xl md:text-6xl"
-            style={{ animationDelay: "60ms" }}
-          >
+          <h1 className="mt-6 text-4xl font-semibold leading-[1.08] tracking-tight sm:text-5xl md:text-6xl">
             Accept payments anywhere,
             <br className="hidden sm:block" />{" "}
             <span className="text-gradient-brand">built like a bank</span>
