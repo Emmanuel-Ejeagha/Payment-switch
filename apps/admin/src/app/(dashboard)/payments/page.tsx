@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, CreditCard } from "lucide-react"
 import Link from "next/link"
 import type { MerchantDto, PaymentIntentDto } from "@paymentswitch/shared"
 import { StatusBadge } from "@paymentswitch/ui"
+import { apiUrl } from "@/lib/api"
 
 const statusColors: Record<string, string> = {
   Pending: "bg-slate-500/10 text-slate-600",
@@ -49,7 +50,7 @@ export default function PaymentsPage() {
   useEffect(() => {
     async function loadMerchants() {
       try {
-        const res = await fetch("/api/proxy/merchant/api/v1/merchants?skip=0&take=100")
+        const res = await fetch(apiUrl("/api/proxy/merchant/api/v1/merchants?skip=0&take=100"))
         if (res.status === 403) {
           setError("Admin access required. Log out and sign back in.")
           setLoading(false)
@@ -86,7 +87,7 @@ export default function PaymentsPage() {
           take: String(take),
         })
 
-        const res = await fetch(`/api/proxy/payment/api/v1/payments?${params}`)
+        const res = await fetch(apiUrl(`/api/proxy/payment/api/v1/payments?${params}`))
 
         if (res.status === 403) {
           setError("You need admin access to view payments.")

@@ -5,6 +5,7 @@ import { Store, CreditCard, BookOpen, Banknote } from "lucide-react"
 import { StatsCard } from "@paymentswitch/ui"
 import { RecentMerchants } from "@paymentswitch/ui"
 import type { MerchantDto, UserDto } from "@paymentswitch/shared"
+import { apiUrl } from "@/lib/api"
 
 interface Stats {
   total: number
@@ -24,8 +25,8 @@ export default function DashboardPage() {
     async function load() {
       try {
         const [userRes, merchantsRes] = await Promise.all([
-          fetch("/api/proxy/identity/api/v1/users/me"),
-          fetch("/api/proxy/merchant/api/v1/merchants?skip=0&take=5"),
+          fetch(apiUrl("/api/proxy/identity/api/v1/users/me")),
+          fetch(apiUrl("/api/proxy/merchant/api/v1/merchants?skip=0&take=5")),
         ])
 
         if (userRes.ok) {

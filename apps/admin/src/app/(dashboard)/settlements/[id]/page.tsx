@@ -6,6 +6,7 @@ import { ArrowLeft, Calendar, Building2, DollarSign, Receipt } from "lucide-reac
 import Link from "next/link"
 import type { SettlementBatchDto, MerchantDto } from "@paymentswitch/shared"
 import { StatusBadge } from "@paymentswitch/ui"
+import { apiUrl } from "@/lib/api"
 
 function format(amount: number, currency = "USD") {
   return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(amount / 100)
@@ -19,7 +20,7 @@ export default function SettlementDetailPage() {
 
   useEffect(() => {
     async function load() {
-      const res = await fetch(`/api/proxy/settlement/api/v1/settlement/${id}`)
+      const res = await fetch(apiUrl(`/api/proxy/settlement/api/v1/settlement/${id}`))
       if (res.ok) setBatch(await res.json())
       setLoading(false)
     }
@@ -28,7 +29,7 @@ export default function SettlementDetailPage() {
 
   useEffect(() => {
     async function loadMerchants() {
-      const res = await fetch("/api/proxy/merchant/api/v1/merchants?skip=0&take=100")
+      const res = await fetch(apiUrl("/api/proxy/merchant/api/v1/merchants?skip=0&take=100"))
       if (res.ok) {
         const list: MerchantDto[] = await res.json()
         const map: Record<string, string> = {}

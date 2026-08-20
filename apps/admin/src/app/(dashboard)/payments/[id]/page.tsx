@@ -5,6 +5,7 @@ import { useParams } from "next/navigation"
 import { ArrowLeft, CreditCard, Check, X, RefreshCw, Ban } from "lucide-react"
 import Link from "next/link"
 import type { PaymentIntentDto, TransactionDto } from "@paymentswitch/shared"
+import { apiUrl } from "@/lib/api"
 
 const statusColors: Record<string, string> = {
   Pending: "bg-slate-500/10 text-slate-600",
@@ -53,7 +54,7 @@ export default function PaymentDetailPage() {
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch(`/api/proxy/payment/api/v1/payments/${id}`)
+        const res = await fetch(apiUrl(`/api/proxy/payment/api/v1/payments/${id}`))
         if (!res.ok) {
           setError(`Request failed (${res.status})`)
           return

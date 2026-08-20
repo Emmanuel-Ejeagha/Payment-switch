@@ -5,6 +5,7 @@ import { Banknote, ChevronLeft, ChevronRight, Play, Calendar } from "lucide-reac
 import Link from "next/link"
 import type { SettlementBatchDto } from "@paymentswitch/shared"
 import { StatusBadge } from "@paymentswitch/ui"
+import { apiUrl } from "@/lib/api"
 
 function formatAmount(amount: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(amount / 100)
@@ -21,7 +22,7 @@ export default function SettlementsPage() {
   useEffect(() => {
     async function load() {
       const params = new URLSearchParams({ skip: String(skip), take: String(take) })
-      const res = await fetch(`/api/proxy/settlement/api/v1/settlement?${params}`)
+      const res = await fetch(apiUrl(`/api/proxy/settlement/api/v1/settlement?${params}`))
       if (res.ok) setBatches(await res.json())
       setLoading(false)
     }
@@ -32,7 +33,7 @@ export default function SettlementsPage() {
     setTriggering(true)
     setTriggerResult(null)
     try {
-      const res = await fetch("/api/proxy/settlement/api/v1/settlement/trigger", {
+      const res = await fetch(apiUrl("/api/proxy/settlement/api/v1/settlement/trigger"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ batchDate: new Date().toISOString().split("T")[0] }),

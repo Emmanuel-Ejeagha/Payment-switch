@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { Bell, ChevronLeft, ChevronRight, Mail, Globe, Clock, RefreshCw, CheckCircle2 } from "lucide-react"
 import type { NotificationDto } from "@paymentswitch/shared"
+import { apiUrl } from "@/lib/api"
 
 const channelIcons: Record<string, typeof Mail> = {
   Email: Mail,
@@ -30,7 +31,7 @@ export default function NotificationsPage() {
       const params = new URLSearchParams({ skip: String(skip), take: String(take) })
       if (statusFilter) params.set("status", statusFilter)
       if (channelFilter) params.set("channel", channelFilter)
-      const res = await fetch(`/api/proxy/notification/api/v1/notifications?${params}`)
+      const res = await fetch(apiUrl(`/api/proxy/notification/api/v1/notifications?${params}`))
       if (res.ok) setNotifications(await res.json())
       setLoading(false)
     }

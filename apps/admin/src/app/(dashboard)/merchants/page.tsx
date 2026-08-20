@@ -5,6 +5,7 @@ import { Search, ChevronLeft, ChevronRight, Store } from "lucide-react"
 import Link from "next/link"
 import type { MerchantDto } from "@paymentswitch/shared"
 import { StatusBadge } from "@paymentswitch/ui"
+import { apiUrl } from "@/lib/api"
 
 export default function MerchantsPage() {
   const [merchants, setMerchants] = useState<MerchantDto[]>([])
@@ -23,7 +24,7 @@ export default function MerchantsPage() {
         const params = new URLSearchParams({ skip: String(skip), take: String(take) })
         if (search) params.set("search", search)
 
-        const res = await fetch(`/api/proxy/merchant/api/v1/merchants?${params}`)
+        const res = await fetch(apiUrl(`/api/proxy/merchant/api/v1/merchants?${params}`))
 
         if (res.status === 403) {
           setError("You need admin access to view merchants.")

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { Shield, User, Check } from "lucide-react"
 import type { UserDto } from "@paymentswitch/shared"
+import { apiUrl } from "@/lib/api"
 
 export default function AdminPage() {
   const [user, setUser] = useState<UserDto | null>(null)
@@ -16,7 +17,7 @@ export default function AdminPage() {
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch("/api/proxy/identity/api/v1/users/me")
+        const res = await fetch(apiUrl("/api/proxy/identity/api/v1/users/me"))
         if (res.ok) setUser(await res.json())
       } finally {
         setLoading(false)
@@ -30,7 +31,7 @@ export default function AdminPage() {
     setAssigning(true)
     setAssignResult(null)
     try {
-      const res = await fetch("/api/proxy/identity/api/v1/admin/roles", {
+      const res = await fetch(apiUrl("/api/proxy/identity/api/v1/admin/roles"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ targetUserId, role }),
