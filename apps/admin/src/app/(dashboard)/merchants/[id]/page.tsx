@@ -6,6 +6,7 @@ import { ArrowLeft, Store, Check, X, ThumbsUp, ThumbsDown, RotateCcw } from "luc
 import Link from "next/link"
 import type { MerchantDto } from "@paymentswitch/shared"
 import { StatusBadge } from "@paymentswitch/ui"
+import { apiUrl } from "@/lib/api"
 
 const paymentMethods = ["card", "bank_transfer", "wallet", "ussd"]
 
@@ -31,7 +32,7 @@ export default function MerchantDetailPage() {
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch(`/api/proxy/merchant/api/v1/merchants/${id}`)
+        const res = await fetch(apiUrl(`/api/proxy/merchant/api/v1/merchants/${id}`))
         if (!res.ok) {
           setError(`Request failed (${res.status})`)
           return
@@ -60,7 +61,7 @@ export default function MerchantDetailPage() {
     setSaving(true)
     setSaveMessage(null)
     try {
-      const res = await fetch(`/api/proxy/merchant/api/v1/merchants/${id}/configuration`, {
+      const res = await fetch(apiUrl(`/api/proxy/merchant/api/v1/merchants/${id}/configuration`), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -86,7 +87,7 @@ export default function MerchantDetailPage() {
   const runAction = async (action: string, body?: unknown) => {
     setActionError(null)
     try {
-      const res = await fetch(`/api/proxy/merchant/api/v1/merchants/${id}/${action}`, {
+      const res = await fetch(apiUrl(`/api/proxy/merchant/api/v1/merchants/${id}/${action}`), {
         method: "POST",
         headers: body ? { "Content-Type": "application/json" } : undefined,
         body: body ? JSON.stringify(body) : undefined,
@@ -96,7 +97,7 @@ export default function MerchantDetailPage() {
         setActionError(text || `Request failed (${res.status})`)
         return
       }
-      const fresh = await fetch(`/api/proxy/merchant/api/v1/merchants/${id}`)
+      const fresh = await fetch(apiUrl(`/api/proxy/merchant/api/v1/merchants/${id}`))
       if (fresh.ok) {
         const data: MerchantDto = await fresh.json()
         setMerchant(data)

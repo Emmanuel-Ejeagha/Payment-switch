@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { BookOpen, ChevronLeft, ChevronRight, Wallet, ArrowDownLeft, ArrowUpRight, Lock } from "lucide-react"
 import type { MerchantDto, BalanceDto, LedgerTransactionDto } from "@paymentswitch/shared"
+import { apiUrl } from "@/lib/api"
 
 const txTypeColors: Record<string, string> = {
   Credit: "bg-emerald-500/10 text-emerald-600",
@@ -30,7 +31,7 @@ export default function LedgerPage() {
 
   useEffect(() => {
     async function loadMerchants() {
-      const res = await fetch("/api/proxy/merchant/api/v1/merchants?skip=0&take=100")
+      const res = await fetch(apiUrl("/api/proxy/merchant/api/v1/merchants?skip=0&take=100"))
       if (res.ok) {
         const list: MerchantDto[] = await res.json()
         setMerchants(list)
@@ -50,8 +51,8 @@ export default function LedgerPage() {
       setLoadError(null)
       try {
         const [balRes, txRes] = await Promise.all([
-          fetch(`/api/proxy/ledger/api/v1/ledger/balances?merchantId=${selectedMerchantId}`),
-          fetch(`/api/proxy/ledger/api/v1/ledger/transactions?merchantId=${selectedMerchantId}&skip=${skip}&take=${take}`),
+          fetch(apiUrl(`/api/proxy/ledger/api/v1/ledger/balances?merchantId=${selectedMerchantId}`)),
+          fetch(apiUrl(`/api/proxy/ledger/api/v1/ledger/transactions?merchantId=${selectedMerchantId}&skip=${skip}&take=${take}`)),
         ])
         if (balRes.ok) {
           const balances = await balRes.json()
