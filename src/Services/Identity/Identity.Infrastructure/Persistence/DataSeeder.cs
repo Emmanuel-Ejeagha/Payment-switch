@@ -24,12 +24,25 @@ public static class DataSeeder
 
         if (existing is not null)
         {
-            if (!existing.Roles.Contains("Admin"))
+            if (existing.Roles.Contains("Admin"))
             {
-                existing.AddRole("Admin");
-                dbContext.Entry(existing).Property("Roles").IsModified = true;
-                await dbContext.SaveChangesAsync();
+                return;
             }
+
+            // The seed email is already registered by someone else. Handing out
+            // the Admin role here would let anyone who registers the address
+            // first take over the bootstrap admin, so promotion requires proof
+            // of the bootstrap secret and anything else fails startup loudly.
+            if (!BCrypt.Net.BCrypt.Verify(adminPassword, existing.PasswordHash.Hash))
+            {
+                throw new InvalidOperationException(
+                    "Seed admin email is already registered by an unknown owner. Refusing to grant the Admin role.");
+            }
+
+            existing.AddRole("Admin");
+            existing.MarkEmailConfirmed();
+            dbContext.Entry(existing).Property("Roles").IsModified = true;
+            await dbContext.SaveChangesAsync();
             return;
         }
 
