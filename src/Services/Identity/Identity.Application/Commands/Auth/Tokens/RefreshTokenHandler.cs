@@ -1,6 +1,7 @@
 ﻿using BuildingBlocks.Shared.Results;
 using FluentValidation;
 using Identity.Application.Interfaces;
+using Identity.Domain.DomainErrors;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -47,6 +48,18 @@ public class RefreshTokenHandler
             user.RevokeAllRefreshTokens();
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             return new Error("Identity.RefreshTokenReuseDetected", "Refresh token reuse detected. All refresh tokens revoked.");
+        }
+
+        if (user.IsLockedOut(DateTime.UtcNow))
+        {
+            _logger.LogWarning("Refresh rejected for locked user {UserId}", user.Id);
+            return IdentityErrors.AccountLocked;
+        }
+
+        if (!user.IsActive)
+        {
+            _logger.LogWarning("Refresh rejected for deactivated user {UserId}", user.Id);
+            return new Error("Identity.UserInactive", "User account is deactivated.");
         }
 
         user.RevokeRefreshToken(tokenHash);
