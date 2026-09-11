@@ -4,6 +4,7 @@ using BuildingBlocks.Shared.Results;
 using Ledger.Application.Features.Commands.CaptureFunds;
 using Ledger.Application.Features.Commands.CreateLedgerAccount;
 using Ledger.Application.Features.Commands.RefundFunds;
+using Ledger.Application.Features.Commands.ReleaseFunds;
 using Ledger.Application.Features.Commands.ReserveFunds;
 using Ledger.Infrastructure.Inbox;
 using Ledger.Infrastructure.Persistence;
@@ -106,6 +107,7 @@ public class RabbitMQConsumerService : BackgroundService
         await _channel.QueueBindAsync(_queueName, _sourceExchange, "PaymentAuthorizedDomainEvent", null, cancellationToken: cancellationToken);
         await _channel.QueueBindAsync(_queueName, _sourceExchange, "PaymentCapturedDomainEvent", null, cancellationToken: cancellationToken);
         await _channel.QueueBindAsync(_queueName, _sourceExchange, "PaymentRefundedDomainEvent", null, cancellationToken: cancellationToken);
+        await _channel.QueueBindAsync(_queueName, _sourceExchange, "PaymentVoidedDomainEvent", null, cancellationToken: cancellationToken);
 
         var consumer = new AsyncEventingBasicConsumer(_channel);
         consumer.ReceivedAsync += async (sender, ea) =>
@@ -225,6 +227,13 @@ public class RabbitMQConsumerService : BackgroundService
                 return await refundHandler.Handle(
                     new RefundFundsCommand(refundEvent.MerchantId, refundEvent.Amount.Amount, refundEvent.Amount.Currency,
                         correlationId ?? $"PaymentRef:{refundEvent.IntentId}"), cancellationToken);
+
+            case "PaymentVoidedDomainEvent":
+                var voidEvent = JsonSerializer.Deserialize<PaymentVoidedEvent>(body)!;
+                var releaseHandler = scope.ServiceProvider.GetRequiredService<ReleaseFundsHandler>();
+                return await releaseHandler.Handle(
+                    new ReleaseFundsCommand(voidEvent.MerchantId, voidEvent.Amount.Amount, voidEvent.Amount.Currency,
+                        correlationId ?? $"PaymentVoid:{voidEvent.IntentId}"), cancellationToken);
 
             default:
                 _logger.LogWarning("Unknown event type: {EventType}", eventType);

@@ -59,6 +59,22 @@ public class LedgerAccount : AggregateRoot
         AddDomainEvent(new FundsCapturedEvent(MerchantId, amount, correlationId.Value));
     }
 
+    public void ReleaseFunds(Money amount, CorrelationId correlationId)
+    {
+        if (amount.Currency != Currency)
+            throw new InvalidOperationException("Currency mismatch.");
+        if (PendingBalance < amount.Amount || ReservedBalance < amount.Amount)
+            throw new InvalidOperationException("Insufficient reserved funds.");
+
+        // Reverse of ReserveFunds: a voided authorization frees the hold.
+        PendingBalance -= amount.Amount;
+        ReservedBalance -= amount.Amount;
+
+        var entry = new JournalEntry(EntryType.Debit, GlAccountCode.Reserve, GlAccountCode.Cash, amount, "Funds released", correlationId);
+        _journal.Add(entry);
+        AddDomainEvent(new FundsReleasedEvent(MerchantId, amount, correlationId.Value));
+    }
+
     public void RefundFunds(Money amount, CorrelationId correlationId)
     {
         if (amount.Currency != Currency)

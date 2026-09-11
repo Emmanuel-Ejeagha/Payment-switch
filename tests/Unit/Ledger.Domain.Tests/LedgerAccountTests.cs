@@ -173,4 +173,53 @@ public class LedgerAccountTests
         account.ClearDomainEvents();
         return account;
     }
+
+    [Fact]
+    public void ReleaseFunds_ShouldDecreasePendingAndReserved()
+    {
+        var account = CreateAccountWithPending(500L);
+
+        var amount = new Money(500L, "USD");
+        var correlationId = new CorrelationId("PaymentVoid:123");
+        account.ReleaseFunds(amount, correlationId);
+
+        Assert.Equal(0L, account.PendingBalance);
+        Assert.Equal(0L, account.ReservedBalance);
+        Assert.Equal(0L, account.AvailableBalance);
+        var entry = Assert.Single(account.Journal);
+        Assert.Equal(EntryType.Debit, entry.Type);
+        Assert.Equal(GlAccountCode.Reserve, entry.DebitAccount);
+        Assert.Equal(GlAccountCode.Cash, entry.CreditAccount);
+        Assert.Equal(500L, entry.Amount.Amount);
+        Assert.Contains(account.DomainEvents, e => e is FundsReleasedEvent);
+    }
+
+    [Fact]
+    public void ReleaseFunds_PartialRelease_ShouldLeaveRemainderReserved()
+    {
+        var account = CreateAccountWithPending(500L);
+
+        account.ReleaseFunds(new Money(200L, "USD"), new CorrelationId("PaymentVoid:123"));
+
+        Assert.Equal(300L, account.PendingBalance);
+        Assert.Equal(300L, account.ReservedBalance);
+    }
+
+    [Fact]
+    public void ReleaseFunds_CurrencyMismatch_ShouldThrow()
+    {
+        var account = CreateAccountWithPending(500L);
+
+        Assert.Throws<InvalidOperationException>(
+            () => account.ReleaseFunds(new Money(100L, "EUR"), new CorrelationId("test")));
+    }
+
+    [Fact]
+    public void ReleaseFunds_ExceedingReserved_ShouldThrow()
+    {
+        var account = CreateAccountWithPending(100L);
+
+        Assert.Throws<InvalidOperationException>(
+            () => account.ReleaseFunds(new Money(500L, "USD"), new CorrelationId("test")));
+    }
 }
