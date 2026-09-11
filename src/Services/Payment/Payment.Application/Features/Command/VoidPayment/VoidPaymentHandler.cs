@@ -55,7 +55,7 @@ public class VoidPaymentHandler
         if (intent.Status != PaymentStatus.Authorized)
             return PaymentErrors.InvalidStatusTransition(intent.Status.Value, "Voided");
 
-        var gatewayResult = await _gateway.VoidAsync(intent.MerchantId, intent.GatewayReference!, cancellationToken);
+        var gatewayResult = await _gateway.VoidAsync(intent.MerchantId, intent.GatewayReference!, command.IdempotencyKey, cancellationToken);
         if (!gatewayResult.IsSuccess)
             return new Error("Payment.VoidFailed", gatewayResult.Errors.First().Message);
 
