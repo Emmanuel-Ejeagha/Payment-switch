@@ -84,7 +84,7 @@ public class CreatePaymentIntentHandler
         if (!configResult.IsSuccess)
             return new Error("Payment.MerchantConfigRetrievalFailed", "Unable to retrieve merchant configuration.");
 
-        var authResult = await _gateway.AuthorizeAsync(intent.MerchantId, intent.Amount, intent.CardDetails, securityCode, cancellationToken);
+        var authResult = await _gateway.AuthorizeAsync(intent.MerchantId, intent.Amount, intent.CardDetails, securityCode, idempotencyKey.Value, cancellationToken);
         if (!authResult.IsSuccess)
         {
             intent.Fail();
