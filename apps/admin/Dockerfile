@@ -18,6 +18,9 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 # the workspace root and hoisted node_modules.
 COPY package.json package-lock.json* ./
 COPY --from=deps /app/node_modules ./node_modules
+# @vitejs/plugin-react and other dev deps are nested under the workspace by the
+# lockfile (not hoisted to root); the builder needs them to type-check.
+COPY --from=deps /app/apps/admin/node_modules ./apps/admin/node_modules
 COPY packages packages
 COPY apps/admin apps/admin
 RUN cd apps/admin && npm run build
