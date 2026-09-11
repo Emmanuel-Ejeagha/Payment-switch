@@ -137,6 +137,12 @@ jobs:
       - name: Lint merchant
         run: npm run lint --workspace=merchant
 
+      - name: Test admin
+        run: npm run test --workspace=admin
+
+      - name: Test merchant
+        run: npm run test --workspace=merchant
+
       - name: Build admin
         run: npm run build --workspace=admin
 
