@@ -76,6 +76,57 @@ public class WebhookSignatureTests
 
         Assert.False(WebhookSignature.Verify("secret", payload, "1755500000", "sha256=zz-not-hex"));
     }
+
+    [Fact]
+    public void Verify_WrongTimestamp_ShouldFail()
+    {
+        // The signature binds the transmitted timestamp: verifying the same
+        // signature against any other timestamp must fail. (The old code
+        // ignored the supplied timestamp and re-signed with UtcNow, so this
+        // passed whenever both calls landed in the same second.)
+        var payload = System.Text.Encoding.UTF8.GetBytes("{\"id\":1}");
+        var signature = WebhookSignature.Compute("secret", payload, out _);
+
+        Assert.False(WebhookSignature.Verify("secret", payload, "1000000000", signature));
+    }
+
+    [Fact]
+    public void Verify_MissingTimestamp_ShouldFail()
+    {
+        var payload = System.Text.Encoding.UTF8.GetBytes("payload");
+        var signature = WebhookSignature.Compute("secret", payload, out _);
+
+        Assert.False(WebhookSignature.Verify("secret", payload, null, signature));
+        Assert.False(WebhookSignature.Verify("secret", payload, "  ", signature));
+    }
+
+    [Fact]
+    public void VerifyWithRotation_CurrentSecret_ShouldPass()
+    {
+        var payload = System.Text.Encoding.UTF8.GetBytes("{\"id\":1}");
+        var signature = WebhookSignature.Compute("new-secret", payload, out var timestamp);
+
+        Assert.True(WebhookSignature.VerifyWithRotation("new-secret", "old-secret", payload, timestamp, signature));
+    }
+
+    [Fact]
+    public void VerifyWithRotation_PreviousSecret_ShouldPass()
+    {
+        var payload = System.Text.Encoding.UTF8.GetBytes("{\"id\":1}");
+        var signature = WebhookSignature.Compute("old-secret", payload, out var timestamp);
+
+        Assert.True(WebhookSignature.VerifyWithRotation("new-secret", "old-secret", payload, timestamp, signature));
+    }
+
+    [Fact]
+    public void VerifyWithRotation_UnknownSecret_ShouldFail()
+    {
+        var payload = System.Text.Encoding.UTF8.GetBytes("{\"id\":1}");
+        var signature = WebhookSignature.Compute("attacker-secret", payload, out var timestamp);
+
+        Assert.False(WebhookSignature.VerifyWithRotation("new-secret", "other-secret", payload, timestamp, signature));
+        Assert.False(WebhookSignature.VerifyWithRotation("new-secret", null, payload, timestamp, signature));
+    }
 }
 
 public class WebhookEventTests
