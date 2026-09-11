@@ -82,6 +82,11 @@ public static class WebhookSignature
     public static string Compute(string? secret, byte[] payload, out string timestamp)
     {
         timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString();
+        return ComputeWithTimestamp(secret, payload, timestamp);
+    }
+
+    private static string ComputeWithTimestamp(string? secret, byte[] payload, string timestamp)
+    {
         var keyBytes = Encoding.UTF8.GetBytes(secret ?? string.Empty);
         var body = Encoding.UTF8.GetBytes($"{timestamp}.{Convert.ToBase64String(payload)}");
         using var hmac = new HMACSHA256(keyBytes);
@@ -92,16 +97,17 @@ public static class WebhookSignature
     /// <summary>
     /// Constant-time verification of a received webhook signature. Used by
     /// merchants to validate a delivery (see docs/webhooks.md). The signature
-    /// is an HMAC-SHA256 of "<timestamp>.<base64(payload)>" with the signing
-    /// secret, formatted "sha256=&lt;hex&gt;".
+    /// is an HMAC-SHA256 of "&lt;timestamp&gt;.&lt;base64(payload)&gt;" with the signing
+    /// secret, formatted "sha256=&lt;hex&gt;", recomputed over the transmitted
+    /// timestamp — never the current time.
     /// </summary>
-    public static bool Verify(string? secret, byte[] payload, string timestamp, string signature)
+    public static bool Verify(string? secret, byte[] payload, string? timestamp, string? signature)
     {
-        if (string.IsNullOrWhiteSpace(signature))
+        if (string.IsNullOrWhiteSpace(signature) || string.IsNullOrWhiteSpace(timestamp))
             return false;
 
-        var expected = Compute(secret, payload, out _);
-        if (expected is null || !expected.StartsWith("sha256=", StringComparison.Ordinal))
+        var expected = ComputeWithTimestamp(secret, payload, timestamp);
+        if (!expected.StartsWith("sha256=", StringComparison.Ordinal))
             return false;
 
         var expectedHex = expected[7..];
@@ -121,6 +127,23 @@ public static class WebhookSignature
         {
             return false;
         }
+    }
+
+    /// <summary>
+    /// Verification across a rotation grace window: accepts a signature made
+    /// with either the current or the previous secret, so merchants can rotate
+    /// without dropping deliveries (see docs/webhooks.md).
+    /// </summary>
+    public static bool VerifyWithRotation(
+        string? currentSecret,
+        string? previousSecret,
+        byte[] payload,
+        string? timestamp,
+        string? signature)
+    {
+        return Verify(currentSecret, payload, timestamp, signature)
+            || (!string.IsNullOrWhiteSpace(previousSecret)
+                && Verify(previousSecret, payload, timestamp, signature));
     }
 }
 
