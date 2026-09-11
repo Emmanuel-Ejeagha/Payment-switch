@@ -3,6 +3,7 @@ using FluentValidation;
 using Ledger.Application.Features.Commands.CaptureFunds;
 using Ledger.Application.Features.Commands.CreateLedgerAccount;
 using Ledger.Application.Features.Commands.RefundFunds;
+using Ledger.Application.Features.Commands.ReleaseFunds;
 using Ledger.Application.Features.Commands.ReserveFunds;
 using Ledger.Application.Features.Commands.RunReconciliation;
 using Ledger.Application.Features.Queries.GetAllBalances;
@@ -22,6 +23,7 @@ public static class DependencyInjection
         services.AddScoped<ReserveFundsHandler>();
         services.AddScoped<CaptureFundsHandler>();
         services.AddScoped<RefundFundsHandler>();
+        services.AddScoped<ReleaseFundsHandler>();
         services.AddScoped<GetBalanceHandler>();
         services.AddScoped<GetAllBalancesHandler>();
         services.AddScoped<GetTransactionHistoryHandler>();

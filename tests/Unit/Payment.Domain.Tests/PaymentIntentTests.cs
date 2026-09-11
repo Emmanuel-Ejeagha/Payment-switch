@@ -103,6 +103,7 @@ public class PaymentIntentTests
         Assert.Single(intent.Transactions, t => t.Type == TransactionType.Void);
         var voidedEvent = Assert.Single(intent.DomainEvents.OfType<PaymentVoidedDomainEvent>());
         Assert.Equal(intent.MerchantId, voidedEvent.MerchantId);
+        Assert.Equal(intent.Amount, voidedEvent.Amount);
     }
 
     [Fact]

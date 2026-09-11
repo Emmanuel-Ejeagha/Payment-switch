@@ -82,6 +82,49 @@ public class BrokerFlowTests : IClassFixture<LedgerApiFactory>
     }
 
     [Fact]
+    public async Task VoidedEvent_ReleasesReservation()
+    {
+        var merchantId = Guid.NewGuid();
+        var intentId = Guid.NewGuid();
+
+        var authPayload = JsonSerializer.Serialize(new PaymentAuthorizedEvent(
+            intentId, merchantId, new MoneyPayload(5000, "USD"), "auth-code", "gateway-ref"));
+        await PublishToPaymentEventsAsync(Guid.NewGuid().ToString(), authPayload);
+
+        await WaitUntilAsync(async () =>
+        {
+            using var scope = _factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var account = await db.LedgerAccounts.FirstOrDefaultAsync(a => a.MerchantId == merchantId);
+            return account is not null && account.PendingBalance == 5000;
+        });
+
+        var voidMessageId = Guid.NewGuid().ToString();
+        var voidPayload = JsonSerializer.Serialize(new PaymentVoidedEvent(
+            intentId, merchantId, new MoneyPayload(5000, "USD")));
+        await PublishToPaymentEventsAsync(voidMessageId, voidPayload, "PaymentVoidedDomainEvent");
+
+        await WaitUntilAsync(async () =>
+        {
+            using var scope = _factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            return await db.InboxMessages.AnyAsync(m => m.MessageId == voidMessageId && m.ProcessedAt != null);
+        });
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var account = await db.LedgerAccounts
+                .Include(a => a.Journal)
+                .FirstAsync(a => a.MerchantId == merchantId);
+            Assert.Equal(0, account.PendingBalance);
+            Assert.Equal(0, account.ReservedBalance);
+            Assert.Equal(0, account.AvailableBalance);
+            Assert.Contains(account.Journal, j => j.Description == "Funds released" && j.Amount.Amount == 5000);
+        }
+    }
+
+    [Fact]
     public async Task RedeliveredMessage_AfterCrashBeforeMarkProcessed_DoesNotDoublePost()
     {
         // Simulate a crash AFTER the posting is committed but BEFORE the inbox row
@@ -135,7 +178,7 @@ public class BrokerFlowTests : IClassFixture<LedgerApiFactory>
         }
     }
 
-    private async Task PublishToPaymentEventsAsync(string messageId, string payload)
+    private async Task PublishToPaymentEventsAsync(string messageId, string payload, string routingKey = "PaymentAuthorizedDomainEvent")
     {
         using var scope = _factory.Services.CreateScope();
         var settings = scope.ServiceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<RabbitMQSettings>>();
@@ -157,7 +200,7 @@ public class BrokerFlowTests : IClassFixture<LedgerApiFactory>
         };
         await channel.BasicPublishAsync(
             exchange: "payment.events",
-            routingKey: "PaymentAuthorizedDomainEvent",
+            routingKey: routingKey,
             mandatory: false,
             basicProperties: properties,
             body: Encoding.UTF8.GetBytes(payload));
