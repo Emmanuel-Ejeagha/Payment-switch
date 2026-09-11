@@ -75,12 +75,12 @@ public class AuthorizePaymentHandler
         {
             if (gwResponse.RequiresChallenge)
             {
-                intent.RequireAction(gatewayRef);
+                intent.RequireAction(gatewayRef, gwResponse.ProviderName);
             }
             else
             {
                 var authCode = new AuthorizationCode(gwResponse.AuthorizationCode!);
-                intent.Authorize(authCode, gatewayRef, command.IdempotencyKey);
+                intent.Authorize(authCode, gatewayRef, command.IdempotencyKey, gwResponse.ProviderName);
             }
         }
         catch (InvalidOperationException)

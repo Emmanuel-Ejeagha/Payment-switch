@@ -1,6 +1,7 @@
 using FluentValidation;
 using Microsoft.Extensions.Logging.Abstractions;
 using Payment.Application.DTOs;
+using Payment.Application.DTOs;
 using Payment.Application.Features.Command.CapturePayment;
 using Payment.Application.Interfaces;
 using Payment.Domain.Entities;

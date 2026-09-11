@@ -31,7 +31,7 @@ public class RefundPaymentHandlerTests
         var command = new RefundPaymentCommand(intent.Id, null); // full refund
         SetupValidatorSuccess(command);
         _repoMock.Setup(r => r.GetByIdAsync(intent.Id, It.IsAny<CancellationToken>())).ReturnsAsync(intent);
-        _gatewayMock.Setup(g => g.RefundAsync(intent.MerchantId, intent.GatewayReference!, It.IsAny<Money>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+        _gatewayMock.Setup(g => g.RefundAsync(intent.MerchantId, intent.GatewayReference!, It.IsAny<Money>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<GatewayResponse>.Success(new GatewayResponse(true, null, "GW-REF", null)));
         _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
@@ -48,7 +48,7 @@ public class RefundPaymentHandlerTests
         var command = new RefundPaymentCommand(intent.Id, 50);
         SetupValidatorSuccess(command);
         _repoMock.Setup(r => r.GetByIdAsync(intent.Id, It.IsAny<CancellationToken>())).ReturnsAsync(intent);
-        _gatewayMock.Setup(g => g.RefundAsync(intent.MerchantId, intent.GatewayReference!, It.IsAny<Money>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+        _gatewayMock.Setup(g => g.RefundAsync(intent.MerchantId, intent.GatewayReference!, It.IsAny<Money>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<GatewayResponse>.Failure(new Error("Gateway.Error", "Refund failed")));
 
         var result = await _handler.Handle(command);
@@ -69,7 +69,7 @@ public class RefundPaymentHandlerTests
 
         Assert.True(result.IsFailure);
         Assert.Equal("Payment.InvalidStatusTransition", result.Errors[0].Code);
-        _gatewayMock.Verify(g => g.RefundAsync(It.IsAny<Guid>(), It.IsAny<GatewayReference>(), It.IsAny<Money>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+        _gatewayMock.Verify(g => g.RefundAsync(It.IsAny<Guid>(), It.IsAny<GatewayReference>(), It.IsAny<Money>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -79,7 +79,7 @@ public class RefundPaymentHandlerTests
         var command = new RefundPaymentCommand(intent.Id, 150);
         SetupValidatorSuccess(command);
         _repoMock.Setup(r => r.GetByIdAsync(intent.Id, It.IsAny<CancellationToken>())).ReturnsAsync(intent);
-        _gatewayMock.Setup(g => g.RefundAsync(intent.MerchantId, intent.GatewayReference!, It.IsAny<Money>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+        _gatewayMock.Setup(g => g.RefundAsync(intent.MerchantId, intent.GatewayReference!, It.IsAny<Money>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<GatewayResponse>.Success(new GatewayResponse(true, null, "GW-REF", null)));
 
         var result = await _handler.Handle(command);
@@ -102,7 +102,7 @@ public class RefundPaymentHandlerTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal("FullyRefunded", result.Value!.Status);
-        _gatewayMock.Verify(g => g.RefundAsync(It.IsAny<Guid>(), It.IsAny<GatewayReference>(), It.IsAny<Money>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+        _gatewayMock.Verify(g => g.RefundAsync(It.IsAny<Guid>(), It.IsAny<GatewayReference>(), It.IsAny<Money>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
         _uowMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 

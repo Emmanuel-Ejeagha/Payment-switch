@@ -44,6 +44,16 @@ public class PaymentIntentTests
     }
 
     [Fact]
+    public void Authorize_WithProviderName_ShouldRecordItForFollowOnPinning()
+    {
+        var intent = CreatePendingIntent();
+
+        intent.Authorize(new AuthorizationCode("AUTH123"), new GatewayReference("GTW-1"), providerName: "stripe");
+
+        Assert.Equal("stripe", intent.ProviderName);
+    }
+
+    [Fact]
     public void Authorize_FromNonPending_Throws()
     {
         var intent = CreatePendingIntent();

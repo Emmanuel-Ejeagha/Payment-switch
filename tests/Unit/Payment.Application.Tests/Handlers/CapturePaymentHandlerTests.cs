@@ -31,7 +31,7 @@ public class CapturePaymentHandlerTests
         var command = new CapturePaymentCommand(intent.Id, null); // full capture
         SetupValidatorSuccess(command);
         _repoMock.Setup(r => r.GetByIdAsync(intent.Id, It.IsAny<CancellationToken>())).ReturnsAsync(intent);
-        _gatewayMock.Setup(g => g.CaptureAsync(intent.MerchantId, intent.GatewayReference!, It.IsAny<Money>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+        _gatewayMock.Setup(g => g.CaptureAsync(intent.MerchantId, intent.GatewayReference!, It.IsAny<Money>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<GatewayResponse>.Success(new GatewayResponse(true, null, "GW-CAP", null)));
         _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
@@ -48,7 +48,7 @@ public class CapturePaymentHandlerTests
         var command = new CapturePaymentCommand(intent.Id, 50);
         SetupValidatorSuccess(command);
         _repoMock.Setup(r => r.GetByIdAsync(intent.Id, It.IsAny<CancellationToken>())).ReturnsAsync(intent);
-        _gatewayMock.Setup(g => g.CaptureAsync(intent.MerchantId, intent.GatewayReference!, It.IsAny<Money>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+        _gatewayMock.Setup(g => g.CaptureAsync(intent.MerchantId, intent.GatewayReference!, It.IsAny<Money>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<GatewayResponse>.Failure(new Error("Gateway.Error", "Capture failed")));
 
         var result = await _handler.Handle(command);
@@ -69,7 +69,7 @@ public class CapturePaymentHandlerTests
 
         Assert.True(result.IsFailure);
         Assert.Equal("Payment.InvalidStatusTransition", result.Errors[0].Code);
-        _gatewayMock.Verify(g => g.CaptureAsync(It.IsAny<Guid>(), It.IsAny<GatewayReference>(), It.IsAny<Money>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+        _gatewayMock.Verify(g => g.CaptureAsync(It.IsAny<Guid>(), It.IsAny<GatewayReference>(), It.IsAny<Money>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -79,7 +79,7 @@ public class CapturePaymentHandlerTests
         var command = new CapturePaymentCommand(intent.Id, 150);
         SetupValidatorSuccess(command);
         _repoMock.Setup(r => r.GetByIdAsync(intent.Id, It.IsAny<CancellationToken>())).ReturnsAsync(intent);
-        _gatewayMock.Setup(g => g.CaptureAsync(intent.MerchantId, intent.GatewayReference!, It.IsAny<Money>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+        _gatewayMock.Setup(g => g.CaptureAsync(intent.MerchantId, intent.GatewayReference!, It.IsAny<Money>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<GatewayResponse>.Success(new GatewayResponse(true, null, "GW-CAP", null)));
 
         var result = await _handler.Handle(command);
@@ -102,7 +102,7 @@ public class CapturePaymentHandlerTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal("Captured", result.Value!.Status);
-        _gatewayMock.Verify(g => g.CaptureAsync(It.IsAny<Guid>(), It.IsAny<GatewayReference>(), It.IsAny<Money>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+        _gatewayMock.Verify(g => g.CaptureAsync(It.IsAny<Guid>(), It.IsAny<GatewayReference>(), It.IsAny<Money>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
         _uowMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -113,14 +113,14 @@ public class CapturePaymentHandlerTests
         var command = new CapturePaymentCommand(intent.Id, null, "cap-key-123");
         SetupValidatorSuccess(command);
         _repoMock.Setup(r => r.GetByIdAsync(intent.Id, It.IsAny<CancellationToken>())).ReturnsAsync(intent);
-        _gatewayMock.Setup(g => g.CaptureAsync(intent.MerchantId, intent.GatewayReference!, It.IsAny<Money>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+        _gatewayMock.Setup(g => g.CaptureAsync(intent.MerchantId, intent.GatewayReference!, It.IsAny<Money>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<GatewayResponse>.Success(new GatewayResponse(true, null, "GW-CAP", null)));
         _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
         var result = await _handler.Handle(command);
 
         Assert.True(result.IsSuccess);
-        _gatewayMock.Verify(g => g.CaptureAsync(intent.MerchantId, intent.GatewayReference!, It.IsAny<Money>(), "cap-key-123", It.IsAny<CancellationToken>()), Times.Once);
+        _gatewayMock.Verify(g => g.CaptureAsync(intent.MerchantId, intent.GatewayReference!, It.IsAny<Money>(), "cap-key-123", It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     private PaymentIntent CreateAuthorizedIntent()
