@@ -77,10 +77,19 @@ public class OutboxInterceptor : SaveChangesInterceptor
                 if (PublishedEventTypes.Contains(eventType))
                 {
                     var payload = JsonSerializer.Serialize(domainEvent, domainEvent.GetType());
+                    // Downstream journal postings are keyed by correlation: sibling
+                    // events flushed in one SaveChanges (e.g. authorize+capture on
+                    // auto-capture) must not share a correlation, or the second
+                    // posting violates the unique journal index and DLQs with
+                    // funds stuck reserved. Scope each row to its event; the
+                    // stored value keeps redeliveries stable.
+                    var rowCorrelationId = correlationId is null || entry.Entity is not PaymentIntent scopedIntent
+                        ? correlationId
+                        : $"{correlationId}:{scopedIntent.Id}:{eventType}";
                     var outboxMessage = new OutboxMessage(
                         eventType,
                         payload,
-                        correlationId,
+                        rowCorrelationId,
                         traceParent);
                     dbContext.Set<OutboxMessage>().Add(outboxMessage);
                 }

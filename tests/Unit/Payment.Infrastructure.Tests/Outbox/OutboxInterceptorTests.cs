@@ -32,7 +32,7 @@ public class OutboxInterceptorTests
         var outbox = await context.OutboxMessages.ToListAsync();
         var message = Assert.Single(outbox);
         Assert.Equal("PaymentIntentCreatedDomainEvent", message.EventType);
-        Assert.Equal("corr-123", message.CorrelationId);
+        Assert.Equal($"corr-123:{intent.Id}:PaymentIntentCreatedDomainEvent", message.CorrelationId);
     }
 
     [Fact]
@@ -54,6 +54,36 @@ public class OutboxInterceptorTests
         var outbox = await context.OutboxMessages.ToListAsync();
         var message = Assert.Single(outbox);
         Assert.Null(message.CorrelationId);
+    }
+
+    [Fact]
+    public async Task SavingChanges_AuthorizePlusCaptureInOneSave_WritesDistinctCorrelations()
+    {
+        // Auto-capture flushes Authorized + Captured together. Sharing one
+        // correlation made the capture leg violate the unique journal index
+        // downstream (funds stuck reserved); each row must carry its own.
+        var provider = new CorrelationIdProvider();
+        provider.Set("corr-auto");
+
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+            .AddInterceptors(new OutboxInterceptor(provider))
+            .Options;
+
+        await using var context = new AppDbContext(options);
+        var intent = new PaymentIntent(Guid.NewGuid(), Guid.NewGuid(), new Money(100, "USD"), new IdempotencyKey("key"), PaymentMethod.Card);
+        intent.Authorize(new AuthorizationCode("AUTH-1"), new GatewayReference("GW-1"), "auth-key");
+        intent.Capture(null, "cap-key");
+        context.PaymentIntents.Add(intent);
+
+        await context.SaveChangesAsync();
+
+        var outbox = await context.OutboxMessages
+            .Where(m => m.EventType == "PaymentAuthorizedDomainEvent" || m.EventType == "PaymentCapturedDomainEvent")
+            .ToListAsync();
+        Assert.Equal(2, outbox.Count);
+        Assert.All(outbox, m => Assert.StartsWith("corr-auto:", m.CorrelationId));
+        Assert.Equal(2, outbox.Select(m => m.CorrelationId).Distinct().Count());
     }
 
     [Fact]
