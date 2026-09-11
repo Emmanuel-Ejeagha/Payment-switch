@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { useState } from "react"
 import { Shield, ArrowRight, Check } from "lucide-react"
+import { apiUrl } from "@/lib/api"
 
 const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -35,7 +36,7 @@ export default function LoginPage() {
 
   const onSubmit = async (data: LoginForm) => {
     setError(null)
-    const res = await fetch("/api/auth/login", {
+    const res = await fetch(apiUrl("/api/auth/login"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
