@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
+import { apiUrl } from "@/lib/api"
 
 const publicPaths = ["/login", "/forgot-password", "/reset-password"]
 
@@ -21,14 +22,14 @@ export async function middleware(request: NextRequest) {
 
   if (publicPaths.includes(pathname)) {
     if (accessToken && !isExpired(accessToken)) {
-      return NextResponse.redirect(new URL("/", request.url))
+      return NextResponse.redirect(new URL(apiUrl("/"), request.url))
     }
     return NextResponse.next()
   }
 
   // No credentials at all — unauthenticated.
   if (!accessToken && !refreshToken) {
-    return NextResponse.redirect(new URL("/login", request.url))
+    return NextResponse.redirect(new URL(apiUrl("/login"), request.url))
   }
 
   // Access token still valid — proceed.
@@ -40,7 +41,7 @@ export async function middleware(request: NextRequest) {
   // refresh. The /api/auth/token route rotates both cookies on success.
   if (refreshToken) {
     try {
-      const res = await fetch(new URL("/api/auth/token", request.url), {
+      const res = await fetch(new URL(apiUrl("/api/auth/token"), request.url), {
         headers: { cookie: request.headers.get("cookie") ?? "" },
       })
       const data = await res.json()
@@ -56,7 +57,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  return NextResponse.redirect(new URL("/login?reason=expired", request.url))
+  return NextResponse.redirect(new URL(apiUrl("/login?reason=expired"), request.url))
 }
 
 export const config = {

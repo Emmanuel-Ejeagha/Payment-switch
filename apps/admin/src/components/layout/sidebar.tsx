@@ -16,6 +16,7 @@ import {
   X,
 } from "lucide-react"
 import { useTheme } from "@/components/theme-provider"
+import { apiUrl } from "@/lib/api"
 import { useEffect, useState } from "react"
 import * as signalR from "@microsoft/signalr"
 
@@ -26,7 +27,7 @@ interface PaymentEvent {
 }
 
 async function getAccessToken(): Promise<string> {
-  const res = await fetch("/api/auth/token")
+  const res = await fetch(apiUrl("/api/auth/token"))
   if (!res.ok) throw new Error("Not authenticated")
   const data = (await res.json()) as { accessToken?: string }
   return data.accessToken ?? ""
@@ -90,7 +91,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
   }, [])
 
   const handleLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" })
+    await fetch(apiUrl("/api/auth/logout"), { method: "POST" })
     router.push("/login")
   }
 
