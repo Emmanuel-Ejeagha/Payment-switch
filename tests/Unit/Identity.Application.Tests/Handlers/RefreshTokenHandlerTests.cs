@@ -197,6 +197,43 @@ public class RefreshTokenHandlerTests
             .ReturnsAsync(new ValidationResult());
     }
 
+    [Fact]
+    public async Task Handle_LockedOutUser_ShouldRejectWithoutRotating()
+    {
+        var command = new RefreshTokenCommand("valid_refresh_token");
+        var user = CreateUserWithRefreshToken("valid_refresh_token");
+        for (var i = 0; i < User.MaxAccessFailedAttempts; i++)
+            user.RegisterFailedLogin(DateTime.UtcNow);
+        SetupValidatorSuccess(command);
+        _userRepositoryMock.Setup(r => r.FindByRefreshTokenAsync("hash-valid_refresh_token", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Identity.AccountLocked", result.Errors[0].Code);
+        _tokenServiceMock.Verify(t => t.GenerateAccessToken(It.IsAny<User>()), Times.Never);
+        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_DeactivatedUser_ShouldRejectWithoutRotating()
+    {
+        var command = new RefreshTokenCommand("valid_refresh_token");
+        var user = CreateUserWithRefreshToken("valid_refresh_token");
+        user.Deactivate();
+        SetupValidatorSuccess(command);
+        _userRepositoryMock.Setup(r => r.FindByRefreshTokenAsync("hash-valid_refresh_token", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Identity.UserInactive", result.Errors[0].Code);
+        _tokenServiceMock.Verify(t => t.GenerateAccessToken(It.IsAny<User>()), Times.Never);
+        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     private void SetupValidatorFailure(RefreshTokenCommand command, string propertyName, string errorMessage)
     {
         _validatorMock.Setup(v => v.ValidateAsync(command, It.IsAny<CancellationToken>()))
