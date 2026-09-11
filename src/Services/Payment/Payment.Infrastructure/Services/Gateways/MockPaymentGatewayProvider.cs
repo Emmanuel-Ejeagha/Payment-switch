@@ -48,32 +48,34 @@ public abstract class MockPaymentGatewayProvider : IPaymentGatewayProvider
                     null,
                     $"{Name}-GW-{Guid.NewGuid().ToString("N")[..8]}",
                     null,
-                    RequiresChallenge: true);
+                    RequiresChallenge: true,
+                    ProviderName: Name);
 
             return new GatewayResponse(
                 true,
                 $"{Name}-AUTH-{Guid.NewGuid().ToString("N")[..8]}",
                 $"{Name}-GW-{Guid.NewGuid().ToString("N")[..8]}",
-                null);
+                null,
+                ProviderName: Name);
         });
     }
 
     public Task<GatewayResponse> CaptureAsync(Guid merchantId, GatewayReference gatewayRef, Money amount, string? idempotencyKey = null, CancellationToken cancellationToken = default)
     {
         return ExecuteOnce(idempotencyKey, () =>
-            new GatewayResponse(true, null, $"{Name}-CAP-{Guid.NewGuid().ToString("N")[..8]}", null));
+            new GatewayResponse(true, null, $"{Name}-CAP-{Guid.NewGuid().ToString("N")[..8]}", null, ProviderName: Name));
     }
 
     public Task<GatewayResponse> VoidAsync(Guid merchantId, GatewayReference gatewayRef, string? idempotencyKey = null, CancellationToken cancellationToken = default)
     {
         return ExecuteOnce(idempotencyKey, () =>
-            new GatewayResponse(true, null, $"{Name}-VOID-{Guid.NewGuid().ToString("N")[..8]}", null));
+            new GatewayResponse(true, null, $"{Name}-VOID-{Guid.NewGuid().ToString("N")[..8]}", null, ProviderName: Name));
     }
 
     public Task<GatewayResponse> RefundAsync(Guid merchantId, GatewayReference gatewayRef, Money amount, string? idempotencyKey = null, CancellationToken cancellationToken = default)
     {
         return ExecuteOnce(idempotencyKey, () =>
-            new GatewayResponse(true, null, $"{Name}-REF-{Guid.NewGuid().ToString("N")[..8]}", null));
+            new GatewayResponse(true, null, $"{Name}-REF-{Guid.NewGuid().ToString("N")[..8]}", null, ProviderName: Name));
     }
 
     public Task<GatewayResponse> ConfirmChallengeAsync(Guid merchantId, Money amount, CardDetails? cardDetails, string gatewayReference, CardSecurityCode? securityCode = null, string? idempotencyKey = null, CancellationToken cancellationToken = default)
@@ -87,7 +89,8 @@ public abstract class MockPaymentGatewayProvider : IPaymentGatewayProvider
                 true,
                 $"{Name}-AUTH-{Guid.NewGuid().ToString("N")[..8]}",
                 gatewayReference,
-                null);
+                null,
+                ProviderName: Name);
         });
     }
 

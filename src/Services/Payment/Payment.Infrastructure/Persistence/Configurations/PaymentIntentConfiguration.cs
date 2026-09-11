@@ -35,6 +35,8 @@ public class PaymentIntentConfiguration : IEntityTypeConfiguration<PaymentIntent
             gr.Property(g => g.Value).HasColumnName("GatewayReference").HasMaxLength(100);
         });
 
+        builder.Property(p => p.ProviderName).HasMaxLength(100);
+
         builder.Property(p => p.PaymentMethod)
             .HasConversion(v => v.Value, v => PaymentMethod.FromString(v))
             .IsRequired();

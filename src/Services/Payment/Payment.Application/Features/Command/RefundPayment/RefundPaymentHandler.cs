@@ -58,7 +58,7 @@ public class RefundPaymentHandler
         Money? amount = command.Amount.HasValue ? new Money(command.Amount.Value, intent.Amount.Currency) : null;
         var refundAmount = amount ?? new Money(intent.Amount.Amount, intent.Amount.Currency);
 
-        var gatewayResult = await _gateway.RefundAsync(intent.MerchantId, intent.GatewayReference!, refundAmount, command.IdempotencyKey, cancellationToken);
+        var gatewayResult = await _gateway.RefundAsync(intent.MerchantId, intent.GatewayReference!, refundAmount, command.IdempotencyKey, intent.ProviderName, cancellationToken);
         if (!gatewayResult.IsSuccess)
             return new Error("Payment.RefundFailed", gatewayResult.Errors.First().Message);
 

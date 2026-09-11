@@ -68,7 +68,7 @@ public class ConfirmPaymentIntentHandler
 
         // No CVC here: the code was collected on the original authorization and is not
         // retained, so a challenge confirm is always cardholder-not-present to us.
-        var gatewayResult = await _gateway.ConfirmChallengeAsync(intent.MerchantId, intent.Amount, intent.CardDetails, intent.GatewayReference!.Value, idempotencyKey: command.IdempotencyKey, cancellationToken: cancellationToken);
+        var gatewayResult = await _gateway.ConfirmChallengeAsync(intent.MerchantId, intent.Amount, intent.CardDetails, intent.GatewayReference!.Value, idempotencyKey: command.IdempotencyKey, providerName: intent.ProviderName, cancellationToken: cancellationToken);
         if (!gatewayResult.IsSuccess)
             return new Error("Payment.ChallengeConfirmationFailed", gatewayResult.Errors.First().Message);
 
@@ -80,7 +80,7 @@ public class ConfirmPaymentIntentHandler
         try
         {
             intent.MarkProcessing();
-            intent.ConfirmAction(authCode, gatewayRef, command.IdempotencyKey);
+            intent.ConfirmAction(authCode, gatewayRef, command.IdempotencyKey, gwResponse.ProviderName);
 
             if (configResult.Value!.AutoCapture)
                 intent.Capture();

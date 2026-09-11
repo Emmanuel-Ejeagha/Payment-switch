@@ -5,4 +5,5 @@ public record GatewayResponse(
     string? AuthorizationCode,
     string? GatewayReference,
     string? ErrorMessage,
-    bool RequiresChallenge = false);
+    bool RequiresChallenge = false,
+    string? ProviderName = null);

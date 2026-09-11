@@ -15,6 +15,7 @@ public class PaymentIntent : AggregateRoot
     public CardDetails? CardDetails { get; private set; }
     public AuthorizationCode? AuthorizationCode { get; private set; }
     public GatewayReference? GatewayReference { get; private set; }
+    public string? ProviderName { get; private set; }
     public IReadOnlyList<Transaction> Transactions => _transactions.AsReadOnly();
     private List<Transaction> _transactions = new();
     public DateTime CreatedAt { get; private set; }
@@ -41,13 +42,14 @@ public class PaymentIntent : AggregateRoot
         AddDomainEvent(new PaymentIntentCreatedDomainEvent(Id, MerchantId, Amount, IdempotencyKey.Value));
     }
 
-    public void Authorize(AuthorizationCode authorizationCode, GatewayReference gatewayReference, string? idempotencyKey = null)
+    public void Authorize(AuthorizationCode authorizationCode, GatewayReference gatewayReference, string? idempotencyKey = null, string? providerName = null)
     {
         if (Status != PaymentStatus.Pending)
             throw new InvalidOperationException($"Cannot authorize payment in '{Status}' status.");
 
         AuthorizationCode = authorizationCode;
         GatewayReference = gatewayReference;
+        ProviderName = providerName;
         Status = PaymentStatus.Authorized;
         UpdatedAt = DateTime.UtcNow;
 
@@ -57,12 +59,13 @@ public class PaymentIntent : AggregateRoot
         AddDomainEvent(new PaymentAuthorizedDomainEvent(Id, MerchantId, authorizationCode.Value, Amount, gatewayReference.Value));
     }
 
-    public void RequireAction(GatewayReference gatewayReference)
+    public void RequireAction(GatewayReference gatewayReference, string? providerName = null)
     {
         if (Status != PaymentStatus.Pending)
             throw new InvalidOperationException($"Cannot require action for payment in '{Status}' status.");
 
         GatewayReference = gatewayReference;
+        ProviderName = providerName;
         Status = PaymentStatus.RequiresAction;
         UpdatedAt = DateTime.UtcNow;
 
@@ -80,13 +83,14 @@ public class PaymentIntent : AggregateRoot
         AddDomainEvent(new PaymentProcessingDomainEvent(Id, MerchantId, status));
     }
 
-    public void ConfirmAction(AuthorizationCode authorizationCode, GatewayReference gatewayReference, string? idempotencyKey = null)
+    public void ConfirmAction(AuthorizationCode authorizationCode, GatewayReference gatewayReference, string? idempotencyKey = null, string? providerName = null)
     {
         if (Status != PaymentStatus.RequiresAction && Status != PaymentStatus.Processing)
             throw new InvalidOperationException($"Cannot confirm payment in '{Status}' status.");
 
         AuthorizationCode = authorizationCode;
         GatewayReference = gatewayReference;
+        ProviderName = providerName;
         Status = PaymentStatus.Authorized;
         UpdatedAt = DateTime.UtcNow;
 

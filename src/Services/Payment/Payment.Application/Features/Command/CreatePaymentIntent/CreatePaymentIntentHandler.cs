@@ -84,7 +84,7 @@ public class CreatePaymentIntentHandler
         if (!configResult.IsSuccess)
             return new Error("Payment.MerchantConfigRetrievalFailed", "Unable to retrieve merchant configuration.");
 
-        var authResult = await _gateway.AuthorizeAsync(intent.MerchantId, intent.Amount, intent.CardDetails, securityCode, idempotencyKey.Value, cancellationToken);
+        var authResult = await _gateway.AuthorizeAsync(intent.MerchantId, intent.Amount, intent.CardDetails, securityCode, idempotencyKey.Value, cancellationToken: cancellationToken);
         if (!authResult.IsSuccess)
         {
             intent.Fail();
@@ -108,12 +108,12 @@ public class CreatePaymentIntentHandler
 
         if (gwResponse.RequiresChallenge)
         {
-            intent.RequireAction(gatewayRef);
+            intent.RequireAction(gatewayRef, gwResponse.ProviderName);
         }
         else
         {
             var authCode = new AuthorizationCode(gwResponse.AuthorizationCode!);
-            intent.Authorize(authCode, gatewayRef);
+            intent.Authorize(authCode, gatewayRef, idempotencyKey.Value, gwResponse.ProviderName);
 
             if (configResult.Value!.AutoCapture)
                 intent.Capture();

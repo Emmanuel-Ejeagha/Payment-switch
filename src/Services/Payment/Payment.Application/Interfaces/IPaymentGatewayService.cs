@@ -18,9 +18,15 @@ public interface IPaymentGatewayService
     /// retry after a crash between gateway success and local commit cannot
     /// double-charge. Keys must be unique per gateway operation.
     /// </param>
-    Task<Result<GatewayResponse>> AuthorizeAsync(Guid merchantId, Money amount, CardDetails? cardDetails, CardSecurityCode? securityCode = null, string? idempotencyKey = null, CancellationToken cancellationToken = default);
-    Task<Result<GatewayResponse>> ConfirmChallengeAsync(Guid merchantId, Money amount, CardDetails? cardDetails, string gatewayReference, CardSecurityCode? securityCode = null, string? idempotencyKey = null, CancellationToken cancellationToken = default);
-    Task<Result<GatewayResponse>> CaptureAsync(Guid merchantId, GatewayReference gatewayRef, Money amount, string? idempotencyKey = null, CancellationToken cancellationToken = default);
-    Task<Result<GatewayResponse>> VoidAsync(Guid merchantId, GatewayReference gatewayRef, string? idempotencyKey = null, CancellationToken cancellationToken = default);
-    Task<Result<GatewayResponse>> RefundAsync(Guid merchantId, GatewayReference gatewayRef, Money amount, string? idempotencyKey = null, CancellationToken cancellationToken = default);
+    /// <param name="providerName">
+    /// Pins this follow-on operation (capture/void/refund/confirm) to the
+    /// acquirer that authorized the intent. Null (authorize-time) keeps normal
+    /// routing with failover; a pinned call fails over only when the pinned
+    /// provider is unknown or its circuit is open.
+    /// </param>
+    Task<Result<GatewayResponse>> AuthorizeAsync(Guid merchantId, Money amount, CardDetails? cardDetails, CardSecurityCode? securityCode = null, string? idempotencyKey = null, string? providerName = null, CancellationToken cancellationToken = default);
+    Task<Result<GatewayResponse>> ConfirmChallengeAsync(Guid merchantId, Money amount, CardDetails? cardDetails, string gatewayReference, CardSecurityCode? securityCode = null, string? idempotencyKey = null, string? providerName = null, CancellationToken cancellationToken = default);
+    Task<Result<GatewayResponse>> CaptureAsync(Guid merchantId, GatewayReference gatewayRef, Money amount, string? idempotencyKey = null, string? providerName = null, CancellationToken cancellationToken = default);
+    Task<Result<GatewayResponse>> VoidAsync(Guid merchantId, GatewayReference gatewayRef, string? idempotencyKey = null, string? providerName = null, CancellationToken cancellationToken = default);
+    Task<Result<GatewayResponse>> RefundAsync(Guid merchantId, GatewayReference gatewayRef, Money amount, string? idempotencyKey = null, string? providerName = null, CancellationToken cancellationToken = default);
 }

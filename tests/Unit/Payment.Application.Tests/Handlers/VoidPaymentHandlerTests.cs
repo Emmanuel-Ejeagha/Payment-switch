@@ -31,7 +31,7 @@ public class VoidPaymentHandlerTests
         var command = new VoidPaymentCommand(intent.Id);
         SetupValidatorSuccess(command);
         _repoMock.Setup(r => r.GetByIdAsync(intent.Id, It.IsAny<CancellationToken>())).ReturnsAsync(intent);
-        _gatewayMock.Setup(g => g.VoidAsync(intent.MerchantId, intent.GatewayReference!, It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+        _gatewayMock.Setup(g => g.VoidAsync(intent.MerchantId, intent.GatewayReference!, It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<GatewayResponse>.Success(new GatewayResponse(true, null, null, null)));
         _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
@@ -48,7 +48,7 @@ public class VoidPaymentHandlerTests
         var command = new VoidPaymentCommand(intent.Id);
         SetupValidatorSuccess(command);
         _repoMock.Setup(r => r.GetByIdAsync(intent.Id, It.IsAny<CancellationToken>())).ReturnsAsync(intent);
-        _gatewayMock.Setup(g => g.VoidAsync(intent.MerchantId, intent.GatewayReference!, It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+        _gatewayMock.Setup(g => g.VoidAsync(intent.MerchantId, intent.GatewayReference!, It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<GatewayResponse>.Failure(new Error("Gateway.Error", "Void failed")));
 
         var result = await _handler.Handle(command);
@@ -69,7 +69,7 @@ public class VoidPaymentHandlerTests
 
         Assert.True(result.IsFailure);
         Assert.Equal("Payment.InvalidStatusTransition", result.Errors[0].Code);
-        _gatewayMock.Verify(g => g.VoidAsync(It.IsAny<Guid>(), It.IsAny<GatewayReference>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+        _gatewayMock.Verify(g => g.VoidAsync(It.IsAny<Guid>(), It.IsAny<GatewayReference>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -86,7 +86,7 @@ public class VoidPaymentHandlerTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal("Voided", result.Value!.Status);
-        _gatewayMock.Verify(g => g.VoidAsync(It.IsAny<Guid>(), It.IsAny<GatewayReference>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+        _gatewayMock.Verify(g => g.VoidAsync(It.IsAny<Guid>(), It.IsAny<GatewayReference>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
         _uowMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -108,4 +108,23 @@ public class VoidPaymentHandlerTests
 
     private void SetupValidatorSuccess(VoidPaymentCommand command) =>
         _validatorMock.Setup(v => v.ValidateAsync(command, It.IsAny<CancellationToken>())).ReturnsAsync(new ValidationResult());
+
+    [Fact]
+    public async Task Handle_PinnedIntent_ForwardsProviderToGateway()
+    {
+        var intent = new PaymentIntent(Guid.NewGuid(), Guid.NewGuid(), new Money(100, "USD"), new IdempotencyKey("k"), PaymentMethod.Card);
+        intent.Authorize(new AuthorizationCode("AUTH"), new GatewayReference("GW"), providerName: "stripe");
+        intent.ClearDomainEvents();
+        var command = new VoidPaymentCommand(intent.Id, "void-key");
+        SetupValidatorSuccess(command);
+        _repoMock.Setup(r => r.GetByIdAsync(intent.Id, It.IsAny<CancellationToken>())).ReturnsAsync(intent);
+        _gatewayMock.Setup(g => g.VoidAsync(intent.MerchantId, intent.GatewayReference!, It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<GatewayResponse>.Success(new GatewayResponse(true, null, null, null)));
+        _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsSuccess);
+        _gatewayMock.Verify(g => g.VoidAsync(intent.MerchantId, intent.GatewayReference!, "void-key", "stripe", It.IsAny<CancellationToken>()), Times.Once);
+    }
 }
