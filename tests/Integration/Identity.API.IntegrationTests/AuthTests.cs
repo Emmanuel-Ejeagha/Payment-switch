@@ -15,7 +15,7 @@ public class AuthTests : IClassFixture<IdentityApiFactory>
     public async Task Register_And_Login_Succeeds()
     {
         var email = $"test-{Guid.NewGuid()}@example.com";
-        var password = "Test123456!";
+        var password = "Test1234567!";
         var fullName = "Test User";
 
         var registerResponse = await _client.PostAsJsonAsync("/api/v1/auth/register", new
@@ -91,7 +91,7 @@ public class AuthTests : IClassFixture<IdentityApiFactory>
     public async Task Refresh_ConcurrentSameToken_ExactlyOneSucceeds()
     {
         var email = $"test-{Guid.NewGuid()}@example.com";
-        var password = "Test123456!";
+        var password = "Test1234567!";
 
         var registerResponse = await _client.PostAsJsonAsync("/api/v1/auth/register", new
         {

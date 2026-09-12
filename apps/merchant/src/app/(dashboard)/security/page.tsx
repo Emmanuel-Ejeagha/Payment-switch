@@ -12,9 +12,10 @@ const changePasswordSchema = z
     currentPassword: z.string().min(1, "Current password is required"),
     newPassword: z
       .string()
-      .min(10, "Password must be at least 10 characters")
+      .min(12, "Password must be at least 12 characters")
       .regex(/[A-Za-z]/, "Password must contain at least one letter")
-      .regex(/[0-9]/, "Password must contain at least one digit"),
+      .regex(/[0-9]/, "Password must contain at least one digit")
+      .regex(/([A-Z]|[^A-Za-z0-9])/, "Password must contain an uppercase letter or symbol"),
     confirmPassword: z.string(),
   })
   .refine((d) => d.newPassword === d.confirmPassword, {
@@ -135,7 +136,7 @@ export default function SecurityPage() {
                   id="newPassword"
                   type={show.next ? "text" : "password"}
                   autoComplete="new-password"
-                  placeholder="Min. 8 characters"
+                  placeholder="Min. 12 characters, incl. uppercase or symbol"
                   aria-invalid={!!errors.newPassword}
                   aria-describedby={errors.newPassword ? "newPassword-error" : undefined}
                   className={`${inputClass} pr-11`}

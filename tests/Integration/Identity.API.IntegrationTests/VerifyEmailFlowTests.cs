@@ -27,7 +27,7 @@ public class VerifyEmailFlowTests : IClassFixture<IdentityApiFactory>
     public async Task Register_Verify_Login_FullFlow()
     {
         var email = $"verify-{Guid.NewGuid()}@example.com";
-        var password = "Test123456!";
+        var password = "Test1234567!";
 
         var userId = await RegisterAsync(email, password);
 
@@ -66,7 +66,7 @@ public class VerifyEmailFlowTests : IClassFixture<IdentityApiFactory>
     public async Task Verify_WithInvalidToken_Returns400()
     {
         var email = $"invalid-token-{Guid.NewGuid()}@example.com";
-        await RegisterAsync(email, "Test123456!");
+        await RegisterAsync(email, "Test1234567!");
 
         var response = await _client.PostAsJsonAsync("/api/v1/auth/verify-email", new
         {
@@ -81,7 +81,7 @@ public class VerifyEmailFlowTests : IClassFixture<IdentityApiFactory>
     public async Task Resend_IssuesNewToken_AndInvalidatesTheOldOne()
     {
         var email = $"resend-{Guid.NewGuid()}@example.com";
-        await RegisterAsync(email, "Test123456!");
+        await RegisterAsync(email, "Test1234567!");
         var firstToken = AssertTokenFrom(email);
 
         var resend = await _client.PostAsJsonAsync("/api/v1/auth/resend-verification", new { Email = email });
@@ -111,7 +111,7 @@ public class VerifyEmailFlowTests : IClassFixture<IdentityApiFactory>
     public async Task Verify_WithExpiredToken_Returns400()
     {
         var email = $"expired-{Guid.NewGuid()}@example.com";
-        var userId = await RegisterAsync(email, "Test123456!");
+        var userId = await RegisterAsync(email, "Test1234567!");
         var token = AssertTokenFrom(email);
 
         // Force the token past its expiry in the database, as a real account
