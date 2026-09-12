@@ -55,6 +55,41 @@ public class AuthTests : IClassFixture<IdentityApiFactory>
         Assert.Equal(System.Net.HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Refresh_ConcurrentSameToken_ExactlyOneSucceeds()
+    {
+        var email = $"test-{Guid.NewGuid()}@example.com";
+        var password = "Test123456!";
+
+        var registerResponse = await _client.PostAsJsonAsync("/api/v1/auth/register", new
+        {
+            Email = email,
+            Password = password,
+            FullName = "Test User"
+        });
+        Assert.Equal(System.Net.HttpStatusCode.OK, registerResponse.StatusCode);
+
+        var loginResponse = await _client.PostAsJsonAsync("/api/v1/auth/login", new
+        {
+            Email = email,
+            Password = password
+        });
+        var loginResult = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>();
+        Assert.NotNull(loginResult);
+
+        // Two rotations racing on the same token: the loser must not mint a
+        // second live session — reuse (400) or conflict (409), never 200.
+        var responses = await Task.WhenAll(
+            _client.PostAsJsonAsync("/api/v1/auth/refresh", new { RefreshToken = loginResult.RefreshToken }),
+            _client.PostAsJsonAsync("/api/v1/auth/refresh", new { RefreshToken = loginResult.RefreshToken }));
+
+        Assert.Equal(1, responses.Count(r => r.StatusCode == System.Net.HttpStatusCode.OK));
+        foreach (var loser in responses.Where(r => r.StatusCode != System.Net.HttpStatusCode.OK))
+            Assert.True(
+                loser.StatusCode is System.Net.HttpStatusCode.BadRequest or System.Net.HttpStatusCode.Conflict,
+                $"unexpected loser status {loser.StatusCode}");
+    }
+
     private record RegisterResponse(Guid UserId);
     private record LoginResponse(string AccessToken, string RefreshToken, int ExpiresIn);
 }

@@ -1,4 +1,5 @@
-﻿using Identity.Application.Exceptions;
+﻿using BuildingBlocks.Shared.Exceptions;
+using Identity.Application.Exceptions;
 using Identity.Application.Interfaces;
 using Identity.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -28,6 +29,13 @@ public class UnitOfWork : IUnitOfWork
             // existence check hits the unique index here. Translate it into a
             // domain result instead of leaking a 500 to the client.
             throw new EmailConflictException("The email address is already registered.", ex);
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            // Optimistic concurrency (User.RowVersion): a concurrent writer won.
+            // Surface it as a domain result so callers can distinguish a lost
+            // race (retryable) from a replayed token (revoke-all).
+            throw new ConcurrencyConflictException("A concurrent update was detected. Please retry.");
         }
     }
 

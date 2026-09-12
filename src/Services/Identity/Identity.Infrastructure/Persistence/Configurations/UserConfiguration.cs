@@ -40,6 +40,11 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
             rt.HasIndex(t => t.Value).IsUnique();
             rt.Property(t => t.ExpiresAt).IsRequired();
             rt.Property(t => t.IsRevoked);
+            // Rotations only UPDATE the owned token rows (revoke flag), so the
+            // parent xmin is never checked: concurrent rotations of the same
+            // token would both succeed. A row-version on the owned table makes
+            // the second UPDATE conflict instead.
+            rt.Property<uint>("RowVersion").IsRowVersion();
             rt.ToTable("RefreshTokens");
         });
 
@@ -52,6 +57,7 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.PasswordResetTokenExpiresAt);
         builder.Property(u => u.AccessFailedCount).IsRequired();
         builder.Property(u => u.LockoutEnd);
+        builder.Property(u => u.RowVersion).IsRowVersion();
         builder.Ignore(u => u.DomainEvents);
     }
 }

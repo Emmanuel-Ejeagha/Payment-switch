@@ -18,6 +18,7 @@ public class User : AggregateRoot
     public DateTime? PasswordResetTokenExpiresAt { get; private set; }
     public int AccessFailedCount { get; private set; }
     public DateTime? LockoutEnd { get; private set; }
+    public uint RowVersion { get; private set; }
     private readonly List<string> _roles = new();
     private readonly List<TokenValue> _refreshTokens = new();
     public IReadOnlyList<string> Roles => _roles.AsReadOnly();
@@ -128,7 +129,16 @@ public class User : AggregateRoot
     }
 
     public void Activate() => IsActive = true;
-    public void Deactivate() => IsActive = false;
+
+    /// <summary>
+    /// Deactivates the account and revokes every refresh token, so a
+    /// suspended user cannot keep minting access tokens (see Step 2.1).
+    /// </summary>
+    public void Deactivate()
+    {
+        IsActive = false;
+        RevokeAllRefreshTokens();
+    }
 
     /// <summary>Consecutive failed sign-in attempts tolerated before the account is locked.</summary>
     public const int MaxAccessFailedAttempts = 5;

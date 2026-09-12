@@ -35,6 +35,7 @@ public static class ResultExtensions
             "Identity.InvalidCurrentPassword" => 400,
             "Identity.InvalidPasswordResetToken" => 400,
             "Identity.PasswordResetTokenExpired" => 400,
+            "Identity.ConcurrencyConflict" => 409,
             _ => 400
         };
 
