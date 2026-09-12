@@ -44,6 +44,11 @@ public class ResetPasswordHandler
         if (user == null)
             return IdentityErrors.InvalidPasswordResetToken;
 
+        // A deactivated account must stay unusable even with a previously
+        // issued token; reactivation is an explicit admin action.
+        if (!user.IsActive)
+            return new Error("Identity.UserInactive", "User account is deactivated.");
+
         var result = user.ResetPassword(_tokenFactory.Hash(command.Token), _passwordHasher.Hash(command.NewPassword));
         switch (result)
         {
