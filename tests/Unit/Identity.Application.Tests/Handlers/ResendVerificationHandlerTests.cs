@@ -82,7 +82,7 @@ public class ResendVerificationHandlerTests
     }
 
     [Fact]
-    public async Task Handle_UnknownUser_ShouldReturnNotFound()
+    public async Task Handle_UnknownUser_ShouldReturnSuccessWithoutRevealingExistence()
     {
         var command = new ResendVerificationCommand("missing@example.com");
         _validatorMock.Setup(v => v.ValidateAsync(command, It.IsAny<CancellationToken>()))
@@ -92,8 +92,9 @@ public class ResendVerificationHandlerTests
 
         var result = await _handler.Handle(command);
 
-        Assert.True(result.IsFailure);
-        Assert.Equal("Identity.UserNotFound", result.Errors[0].Code);
+        Assert.True(result.IsSuccess);
+        _emailSenderMock.Verify(s => s.SendAsync(It.IsAny<EmailMessage>(), It.IsAny<CancellationToken>()), Times.Never);
+        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
     private static User CreateUser(bool confirmed, string? tokenHash, DateTime? expiresAt)

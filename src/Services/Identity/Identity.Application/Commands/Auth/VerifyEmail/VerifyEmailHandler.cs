@@ -39,7 +39,12 @@ public class VerifyEmailHandler
 
         var user = await _userRepository.GetByEmailAsync(command.Email, cancellationToken);
         if (user == null)
-            return IdentityErrors.UserNotFoundByEmail(command.Email);
+        {
+            // Respond identically for unknown addresses so the endpoint cannot be
+            // used to enumerate which emails have accounts.
+            _logger.LogWarning("Email verification requested for unknown {Identifier}", DataMasker.MaskEmail(command.Email));
+            return Result.Success();
+        }
 
         var result = user.VerifyEmail(_tokenFactory.Hash(command.Token));
         switch (result)
