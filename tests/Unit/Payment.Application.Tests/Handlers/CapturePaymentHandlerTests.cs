@@ -107,6 +107,26 @@ public class CapturePaymentHandlerTests
     }
 
     [Fact]
+    public async Task Handle_NullAmountAfterPartialCapture_GatewayReceivesRemainder()
+    {
+        var intent = CreateAuthorizedIntent();
+        intent.Capture(new Money(60L, "USD"), "first-cap");
+        intent.ClearDomainEvents();
+        var command = new CapturePaymentCommand(intent.Id, null, "second-cap");
+        SetupValidatorSuccess(command);
+        _repoMock.Setup(r => r.GetByIdAsync(intent.Id, It.IsAny<CancellationToken>())).ReturnsAsync(intent);
+        _gatewayMock.Setup(g => g.CaptureAsync(intent.MerchantId, intent.GatewayReference!, It.IsAny<Money>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<GatewayResponse>.Success(new GatewayResponse(true, null, "GW-CAP", null)));
+        _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Captured", result.Value!.Status);
+        _gatewayMock.Verify(g => g.CaptureAsync(intent.MerchantId, intent.GatewayReference!, It.Is<Money>(m => m.Amount == 40L), "second-cap", It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task Handle_WithIdempotencyKey_ForwardsKeyToGateway()
     {
         var intent = CreateAuthorizedIntent();
