@@ -56,6 +56,38 @@ public class AuthTests : IClassFixture<IdentityApiFactory>
     }
 
     [Fact]
+    public async Task UnknownEmail_VerifyResendForgot_ReturnIndistinguishableSuccess()
+    {
+        // Enumeration defense: all three endpoints must answer unknown
+        // addresses with the identical success shape.
+        var email = $"unknown-{Guid.NewGuid()}@example.com";
+
+        var verify = await _client.PostAsJsonAsync("/api/v1/auth/verify-email", new
+        {
+            Email = email,
+            Token = "some-token"
+        });
+        var resend = await _client.PostAsJsonAsync("/api/v1/auth/resend-verification", new
+        {
+            Email = email
+        });
+        var forgot = await _client.PostAsJsonAsync("/api/v1/auth/forgot-password", new
+        {
+            Email = email
+        });
+
+        Assert.Equal(System.Net.HttpStatusCode.OK, verify.StatusCode);
+        Assert.Equal(System.Net.HttpStatusCode.OK, resend.StatusCode);
+        Assert.Equal(System.Net.HttpStatusCode.OK, forgot.StatusCode);
+        Assert.Equal(
+            (await verify.Content.ReadAsStringAsync()).Length,
+            (await resend.Content.ReadAsStringAsync()).Length);
+        Assert.Equal(
+            (await verify.Content.ReadAsStringAsync()).Length,
+            (await forgot.Content.ReadAsStringAsync()).Length);
+    }
+
+    [Fact]
     public async Task Refresh_ConcurrentSameToken_ExactlyOneSucceeds()
     {
         var email = $"test-{Guid.NewGuid()}@example.com";
