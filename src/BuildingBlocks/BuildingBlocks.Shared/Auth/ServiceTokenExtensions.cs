@@ -13,15 +13,27 @@ public static class ServiceTokenExtensions
         var section = configuration.GetSection(ServiceTokenOptions.SectionName);
         var jwt = configuration.GetSection("Jwt");
 
+        var secret = section["Secret"];
+        if (string.IsNullOrWhiteSpace(secret))
+        {
+            throw new InvalidOperationException(
+                "ServiceToken:Secret is not configured. Set a dedicated service secret (ServiceToken__Secret); "
+                + "falling back to Jwt:Secret would let a user-secret compromise forge inter-service calls.");
+        }
+
+        if (string.Equals(secret, jwt["Secret"], StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                "ServiceToken:Secret must differ from Jwt:Secret so a user-secret compromise cannot forge inter-service calls.");
+        }
+
         var options = new ServiceTokenOptions
         {
             ServiceName = section["ServiceName"] ?? serviceName,
             ExpiryMinutes = int.TryParse(section["ExpiryMinutes"], out var minutes) ? minutes : 10,
             Issuer = section["Issuer"] ?? jwt["Issuer"] ?? "IdentityService",
             Audience = section["Audience"] ?? jwt["Audience"] ?? "PaymentSwitch",
-            Secret = section["Secret"] ?? jwt["Secret"]
-                ?? throw new InvalidOperationException(
-                    "Service token secret is not configured. Set ServiceToken:Secret or Jwt:Secret.")
+            Secret = secret
         };
 
         services.AddSingleton(new ServiceTokenProvider(options));

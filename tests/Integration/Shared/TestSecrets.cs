@@ -25,6 +25,7 @@ public static class TestSecrets
 
     public const string JwtSecret = "integration-test-jwt-secret-32-bytes-min!";
     public const string JwtAudience = "PaymentSwitch";
+    public const string ServiceTokenSecret = "integration-test-service-secret-32bytes!";
     public const string RabbitMqUserName = "integration-test";
     public const string RabbitMqPassword = "integration-test-rabbit-password";
     public const string WebhookSecretEncryptionKey = "integration-test-webhook-secret-encryption-key";
@@ -59,6 +60,7 @@ public static class TestSecrets
             // down by DisposeAsync, so the reaper is unnecessary here.
             Environment.SetEnvironmentVariable("TESTCONTAINERS_RYUK_DISABLED", "true");
             Environment.SetEnvironmentVariable("Jwt__Secret", JwtSecret);
+            Environment.SetEnvironmentVariable("ServiceToken__Secret", ServiceTokenSecret);
             Environment.SetEnvironmentVariable("Jwt__Issuer", jwtIssuer);
             Environment.SetEnvironmentVariable("Jwt__Audience", JwtAudience);
             Environment.SetEnvironmentVariable("RabbitMQ__HostName", RabbitMqHostName);

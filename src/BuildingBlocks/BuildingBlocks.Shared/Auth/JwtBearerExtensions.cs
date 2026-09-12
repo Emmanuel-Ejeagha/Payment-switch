@@ -45,6 +45,17 @@ public static class JwtBearerExtensions
             signingKeys.Add(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(previousSecret)));
         }
 
+        // Inter-service tokens are minted with a dedicated ServiceToken:Secret
+        // (see ServiceTokenExtensions). Trust it here so ServiceOnly endpoints
+        // keep validating; without this, separating the secrets would break
+        // every gRPC call. Already-trusted material is not added twice.
+        var serviceSecret = configuration.GetSection(ServiceTokenOptions.SectionName)["Secret"];
+        if (!string.IsNullOrWhiteSpace(serviceSecret) &&
+            signingKeys.All(k => !KeysEqual(k, serviceSecret)))
+        {
+            signingKeys.Add(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(serviceSecret)));
+        }
+
         return services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>
             {
@@ -62,5 +73,10 @@ public static class JwtBearerExtensions
 
                 configure?.Invoke(options);
             }).Services;
+    }
+
+    private static bool KeysEqual(SymmetricSecurityKey key, string secret)
+    {
+        return key.Key.SequenceEqual(Encoding.UTF8.GetBytes(secret));
     }
 }
