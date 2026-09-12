@@ -38,18 +38,24 @@ public class LoginHandler
         if (user == null)
             return IdentityErrors.InvalidCredentials;
 
+        // Verify the password before consulting lockout state: returning a
+        // distinct locked error for wrong passwords lets attackers enumerate
+        // locked accounts without credentials (lockout oracle).
+        if (!_passwordHasher.Verify(command.Password, user.PasswordHash))
+        {
+            if (!user.IsLockedOut(DateTime.UtcNow))
+            {
+                user.RegisterFailedLogin(DateTime.UtcNow);
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
+                _logger.LogWarning("Failed login for user {UserId}; failed attempts now {Count}", user.Id, user.AccessFailedCount);
+            }
+            return IdentityErrors.InvalidCredentials;
+        }
+
         if (user.IsLockedOut(DateTime.UtcNow))
         {
             _logger.LogWarning("Login rejected for locked user {UserId}", user.Id);
             return IdentityErrors.AccountLocked;
-        }
-
-        if (!_passwordHasher.Verify(command.Password, user.PasswordHash))
-        {
-            user.RegisterFailedLogin(DateTime.UtcNow);
-            await _unitOfWork.SaveChangesAsync(cancellationToken);
-            _logger.LogWarning("Failed login for user {UserId}; failed attempts now {Count}", user.Id, user.AccessFailedCount);
-            return IdentityErrors.InvalidCredentials;
         }
 
         if (!user.IsActive)
