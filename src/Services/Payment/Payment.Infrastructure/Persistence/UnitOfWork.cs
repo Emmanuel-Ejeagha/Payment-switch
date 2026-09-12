@@ -1,6 +1,7 @@
 ﻿using BuildingBlocks.Shared.Exceptions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
+using Npgsql;
 using Payment.Application.Interfaces;
 
 namespace Payment.Infrastructure.Persistence;
@@ -31,6 +32,13 @@ public class UnitOfWork : IUnitOfWork
             throw new ConcurrencyConflictException(
                 $"A concurrency conflict occurred while saving. {ex.Message}");
         }
+        catch (DbUpdateException ex) when (IsUniqueViolation(ex))
+        {
+            // Backstop for check-then-insert races (e.g. duplicate idempotency
+            // keys): surface it as a domain result instead of a 500.
+            throw new UniqueConstraintViolationException(
+                $"A uniqueness constraint was violated while saving. {ex.Message}");
+        }
     }
 
     public async Task CommitAsync(CancellationToken cancellationToken = default)
@@ -52,4 +60,8 @@ public class UnitOfWork : IUnitOfWork
         await _transaction.DisposeAsync();
         _transaction = null;
     }
+
+    private static bool IsUniqueViolation(DbUpdateException ex) =>
+        ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation }
+        || ex.InnerException?.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation };
 }
