@@ -49,17 +49,51 @@ public class ReserveFundsHandler
             var amount = new Money(command.Amount, command.Currency);
             var correlationId = new CorrelationId(command.CorrelationId);
             account.ReserveFunds(amount, correlationId);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            await _unitOfWork.CommitAsync(cancellationToken);
+        }
+        catch (UniqueConstraintViolationException)
+        {
+            // A concurrent first payment won the account-insert race (unique
+            // MerchantId+Currency). Roll back, drop the tracked insert, and
+            // post against the winner's account instead of failing.
+            await _unitOfWork.RollbackAsync(cancellationToken);
+            _unitOfWork.ClearTrackedEntities();
+            return await ReserveOnExistingAccountAsync(command, cancellationToken);
         }
         catch (InvalidOperationException ex)
         {
             await _unitOfWork.RollbackAsync(cancellationToken);
             return new Error("Ledger.ReserveFailed", ex.Message);
         }
+        catch (ConcurrencyConflictException)
+        {
+            await _unitOfWork.RollbackAsync(cancellationToken);
+            return LedgerErrors.ConcurrencyConflict;
+        }
 
+        return Result.Success();
+    }
+
+    private async Task<Result> ReserveOnExistingAccountAsync(ReserveFundsCommand command, CancellationToken cancellationToken)
+    {
+        var account = await _repository.GetByMerchantIdAndCurrencyAsync(command.MerchantId, command.Currency, cancellationToken);
+        if (account is null)
+            return LedgerErrors.AccountNotFound(command.MerchantId);
+
+        await _unitOfWork.BeginTransactionAsync(cancellationToken);
         try
         {
+            var amount = new Money(command.Amount, command.Currency);
+            var correlationId = new CorrelationId(command.CorrelationId);
+            account.ReserveFunds(amount, correlationId);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             await _unitOfWork.CommitAsync(cancellationToken);
+        }
+        catch (InvalidOperationException ex)
+        {
+            await _unitOfWork.RollbackAsync(cancellationToken);
+            return new Error("Ledger.ReserveFailed", ex.Message);
         }
         catch (ConcurrencyConflictException)
         {

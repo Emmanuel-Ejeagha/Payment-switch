@@ -1,4 +1,5 @@
-﻿using FluentValidation;
+﻿using BuildingBlocks.Shared.Exceptions;
+using FluentValidation;
 using FluentValidation.Results;
 using Ledger.Application.Features.Commands.ReserveFunds;
 using Ledger.Application.Interfaces;
@@ -84,6 +85,28 @@ public class ReserveFundsHandlerTests
 
     private void SetupValidatorSuccess(ReserveFundsCommand command) =>
         _validatorMock.Setup(v => v.ValidateAsync(command, It.IsAny<CancellationToken>())).ReturnsAsync(new ValidationResult());
+
+    [Fact]
+    public async Task Handle_ConcurrentInsertRace_ConvergesOnWinnerAccount()
+    {
+        var merchantId = Guid.NewGuid();
+        var command = new ReserveFundsCommand(merchantId, 100L, "USD", "race-1");
+        var winner = new LedgerAccount(Guid.NewGuid(), merchantId, "USD");
+        SetupValidatorSuccess(command);
+        _repoMock.SetupSequence(r => r.GetByMerchantIdAndCurrencyAsync(merchantId, "USD", It.IsAny<CancellationToken>()))
+            .ReturnsAsync((LedgerAccount?)null)
+            .ReturnsAsync(winner);
+        _uowMock.SetupSequence(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new UniqueConstraintViolationException())
+            .ReturnsAsync(1);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(100L, winner.PendingBalance);
+        Assert.Equal(100L, winner.ReservedBalance);
+        _uowMock.Verify(u => u.ClearTrackedEntities(), Times.Once);
+    }
 
     private void SetupValidatorFailure(ReserveFundsCommand command, string property, string error) =>
         _validatorMock.Setup(v => v.ValidateAsync(command, It.IsAny<CancellationToken>())).ReturnsAsync(new ValidationResult(new[] { new ValidationFailure(property, error) }));
