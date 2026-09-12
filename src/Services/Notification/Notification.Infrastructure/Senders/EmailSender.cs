@@ -1,4 +1,5 @@
-﻿using BuildingBlocks.Shared.Results;
+﻿using BuildingBlocks.Shared.Email;
+using BuildingBlocks.Shared.Results;
 using BuildingBlocks.Shared.Security;
 using MailKit.Net.Smtp;
 using MailKit.Security;
@@ -34,8 +35,8 @@ public class EmailSender : INotificationSender
             // must surface as a failure rather than silently pretending to send.
             if (_environment.IsDevelopment())
             {
-                _logger.LogWarning("SIMULATED EMAIL (Smtp:Host not configured): To={Recipient}, Subject={Subject}, Body={Body}",
-                    DataMasker.MaskEmail(notification.Recipient), notification.Subject, notification.Body);
+                _logger.LogWarning("SIMULATED EMAIL (Smtp:Host not configured): To={Recipient}, Subject={Subject}, BodyHash={BodyHash}",
+                    DataMasker.MaskEmail(notification.Recipient), notification.Subject, EmailLogRedactor.Redact(notification.Body));
                 return Result.Success();
             }
 
