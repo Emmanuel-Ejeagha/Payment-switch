@@ -35,6 +35,19 @@ public class SettlementBatchTests
     }
 
     [Fact]
+    public void AddPayout_FeesExceedingGross_FloorsNetAtZero()
+    {
+        // Refund-heavy day: gross is wiped but the non-refundable fee remains.
+        // The payout must floor at zero rather than throw in Money(negative).
+        var batch = CreatePendingBatch();
+
+        batch.AddPayout(_merchantId1, new Money(0L, "USD"), new Money(150L, "USD"));
+
+        Assert.Equal(0L, batch.Payouts[0].NetAmount.Amount);
+        Assert.Equal(0L, batch.TotalAmount);
+    }
+
+    [Fact]
     public void AddPayout_DuplicateMerchant_Throws()
     {
         var batch = CreatePendingBatch();
