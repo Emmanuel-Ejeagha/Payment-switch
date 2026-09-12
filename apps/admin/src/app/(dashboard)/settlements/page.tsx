@@ -39,8 +39,9 @@ export default function SettlementsPage() {
         body: JSON.stringify({ batchDate: new Date().toISOString().split("T")[0] }),
       })
       if (res.ok) {
-        const batchId = await res.json()
-        setTriggerResult(`Settlement triggered — Batch ID: ${batchId}`)
+        const body = (await res.json()) as { batchIds?: string[] }
+        const ids = Array.isArray(body?.batchIds) ? body.batchIds.join(", ") : JSON.stringify(body)
+        setTriggerResult(`Settlement triggered — Batch ID(s): ${ids}`)
         setSkip(0)
       } else {
         setTriggerResult(`Failed (${res.status})`)

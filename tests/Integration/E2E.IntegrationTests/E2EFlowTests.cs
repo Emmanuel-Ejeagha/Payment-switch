@@ -142,7 +142,7 @@ public class E2EFlowTests : IClassFixture<E2EFactory>
         var trigger = await settlement.PostAsJsonAsync("/api/v1/settlement/trigger", new { BatchDate = DateTime.UtcNow.Date });
         trigger.EnsureSuccessStatusCode();
         var triggerResult = await trigger.Content.ReadFromJsonAsync<TriggerSettlementResponse>();
-        var batch = await settlement.GetFromJsonAsync<SettlementBatchDto>($"/api/v1/settlement/{triggerResult!.Id}");
+        var batch = await settlement.GetFromJsonAsync<SettlementBatchDto>($"/api/v1/settlement/{Assert.Single(triggerResult!.BatchIds)}");
         Assert.Equal(9850, batch!.TotalAmount);
     }
 

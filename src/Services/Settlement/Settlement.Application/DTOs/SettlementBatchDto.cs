@@ -5,5 +5,6 @@ public record SettlementBatchDto(
     DateTime BatchDate,
     string Status,
     long TotalAmount,
+    string? Currency,
     List<PayoutDto> Payouts
 );

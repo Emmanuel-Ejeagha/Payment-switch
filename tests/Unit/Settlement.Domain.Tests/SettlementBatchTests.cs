@@ -57,6 +57,28 @@ public class SettlementBatchTests
     }
 
     [Fact]
+    public void AddPayout_DifferentCurrencyThanBatch_Throws()
+    {
+        var batch = CreatePendingBatch();
+        batch.AddPayout(_merchantId1, new Money(100L, "USD"), new Money(5L, "USD"));
+
+        Assert.Throws<ArgumentException>(() => batch.AddPayout(Guid.NewGuid(), new Money(50L, "EUR"), new Money(2L, "EUR")));
+        Assert.Equal("USD", batch.Currency);
+    }
+
+    [Fact]
+    public void Complete_UsesBatchCurrencyInEvent()
+    {
+        var batch = CreatePendingBatch();
+        batch.AddPayout(_merchantId1, new Money(100L, "EUR"), new Money(5L, "EUR"));
+
+        batch.Complete();
+
+        var completed = Assert.Single(batch.DomainEvents.OfType<SettlementBatchCompletedEvent>());
+        Assert.Equal("EUR", completed.Currency);
+    }
+
+    [Fact]
     public void AddPayout_CurrencyMismatch_Throws()
     {
         var batch = CreatePendingBatch();

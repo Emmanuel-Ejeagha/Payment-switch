@@ -35,6 +35,7 @@ public class GetSettlementBatchHandler
             batch.BatchDate,
             batch.Status.Value,
             batch.TotalAmount,
+            batch.Currency,
             batch.Payouts.Select(p => new PayoutDto(p.MerchantId, p.GrossVolume.Amount, p.Fees.Amount, p.NetAmount.Amount, p.Currency)).ToList()
         );
 }

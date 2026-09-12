@@ -44,15 +44,35 @@ public class TriggerSettlementHandler
             ? DateTime.SpecifyKind(command.BatchDate, DateTimeKind.Utc)
             : command.BatchDate;
 
-        var existing = await _repository.GetByBatchDateAsync(batchDate, cancellationToken);
-        if (existing is not null)
-            return new TriggerSettlementResponse(existing.Id);
-
         var ledgerResult = await _ledgerService.GetDailyPayoutDataAsync(batchDate, cancellationToken);
         if (!ledgerResult.IsSuccess)
             return Result<TriggerSettlementResponse>.Failure(ledgerResult.Errors);
 
-        var payoutDataList = ledgerResult.Value!;
+        // One batch per currency: a bare TotalAmount is only meaningful within
+        // a single currency, so each currency group settles independently.
+        // (Existing batches are detected per currency inside the loop, so a
+        // re-trigger converges without duplicating.)
+        var batchIds = new List<Guid>();
+        foreach (var group in ledgerResult.Value!.GroupBy(d => d.Currency, StringComparer.OrdinalIgnoreCase))
+        {
+            var batchId = await TriggerCurrencyBatchAsync(batchDate, group.Key, group.ToList(), cancellationToken);
+            if (!batchId.IsSuccess)
+                return Result<TriggerSettlementResponse>.Failure(batchId.Errors);
+            batchIds.Add(batchId.Value);
+        }
+
+        return new TriggerSettlementResponse(batchIds);
+    }
+
+    private async Task<Result<Guid>> TriggerCurrencyBatchAsync(
+        DateTime batchDate,
+        string currency,
+        List<MerchantPayoutData> payoutDataList,
+        CancellationToken cancellationToken)
+    {
+        var existing = await _repository.GetByBatchDateAndCurrencyAsync(batchDate, currency, cancellationToken);
+        if (existing is not null)
+            return existing.Id;
 
         var batch = new SettlementBatch(Guid.NewGuid(), batchDate);
 
@@ -63,20 +83,22 @@ public class TriggerSettlementHandler
             batch.AddPayout(data.MerchantId, gross, fees);
         }
 
-        // Tie-out: re-query the ledger and refuse to complete a batch whose totals
-        // drift from the ledger's daily figures (e.g. activity landing mid-batch).
+        // Tie-out, scoped to this currency: re-query the ledger and refuse to
+        // complete a batch whose totals drift from the ledger's daily figures
+        // (e.g. activity landing mid-batch).
         var tieOutResult = await _ledgerService.GetDailyPayoutDataAsync(batchDate, cancellationToken);
         if (!tieOutResult.IsSuccess)
-            return Result<TriggerSettlementResponse>.Failure(tieOutResult.Errors);
+            return Result<Guid>.Failure(tieOutResult.Errors);
 
-        var tieOutList = tieOutResult.Value!;
+        var tieOutList = tieOutResult.Value!.Where(d =>
+            string.Equals(d.Currency, currency, StringComparison.OrdinalIgnoreCase)).ToList();
         var ledgerGross = tieOutList.Sum(d => d.GrossVolume);
         var ledgerFees = tieOutList.Sum(d => d.Fees);
         var batchGross = batch.Payouts.Sum(p => p.GrossVolume.Amount);
         var batchFees = batch.Payouts.Sum(p => p.Fees.Amount);
 
         if (ledgerGross != batchGross || ledgerFees != batchFees)
-            return Result<TriggerSettlementResponse>.Failure(SettlementErrors.LedgerTieOutMismatch);
+            return Result<Guid>.Failure(SettlementErrors.LedgerTieOutMismatch);
 
         batch.Complete();
 
@@ -94,15 +116,15 @@ public class TriggerSettlementHandler
         }
         catch (UniqueConstraintViolationException)
         {
-            // A concurrent trigger already created a batch for this date (unique
-            // BatchDate index). Surface the existing batch instead of failing.
+            // A concurrent trigger already created this currency's batch
+            // (unique BatchDate+Currency index). Surface the existing batch.
             await _unitOfWork.RollbackAsync(cancellationToken);
-            var existingBatch = await _repository.GetByBatchDateAsync(batchDate, cancellationToken);
+            var existingBatch = await _repository.GetByBatchDateAndCurrencyAsync(batchDate, currency, cancellationToken);
             if (existingBatch is not null)
-                return new TriggerSettlementResponse(existingBatch.Id);
+                return existingBatch.Id;
             return new Error("Settlement.BatchCreateFailed", "Could not create settlement batch.");
         }
 
-        return new TriggerSettlementResponse(batch.Id);
+        return batch.Id;
     }
 }
