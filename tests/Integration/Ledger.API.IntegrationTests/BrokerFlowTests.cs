@@ -125,6 +125,65 @@ public class BrokerFlowTests : IClassFixture<LedgerApiFactory>
     }
 
     [Fact]
+    public async Task VoidedRemainder_ReleasesOnlyTheUncapturedHold()
+    {
+        var merchantId = Guid.NewGuid();
+        var intentId = Guid.NewGuid();
+
+        var authPayload = JsonSerializer.Serialize(new PaymentAuthorizedEvent(
+            intentId, merchantId, new MoneyPayload(10000, "USD"), "auth-code", "gateway-ref"));
+        await PublishToPaymentEventsAsync(Guid.NewGuid().ToString(), authPayload);
+
+        await WaitUntilAsync(async () =>
+        {
+            using var scope = _factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var account = await db.LedgerAccounts.FirstOrDefaultAsync(a => a.MerchantId == merchantId);
+            return account is not null && account.PendingBalance == 10000;
+        });
+
+        var capturePayload = JsonSerializer.Serialize(new PaymentCapturedEvent(
+            intentId, merchantId, new MoneyPayload(6000, "USD"), Guid.NewGuid()));
+        await PublishToPaymentEventsAsync(Guid.NewGuid().ToString(), capturePayload, "PaymentCapturedDomainEvent");
+
+        await WaitUntilAsync(async () =>
+        {
+            using var scope = _factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var account = await db.LedgerAccounts
+                .Include(a => a.Journal)
+                .FirstOrDefaultAsync(a => a.MerchantId == merchantId);
+            return account is not null
+                && account.Journal.Any(j => j.Description == "Funds captured" && j.Amount.Amount == 6000);
+        });
+
+        var voidMessageId = Guid.NewGuid().ToString();
+        var voidPayload = JsonSerializer.Serialize(new PaymentVoidedEvent(
+            intentId, merchantId, new MoneyPayload(4000, "USD")));
+        await PublishToPaymentEventsAsync(voidMessageId, voidPayload, "PaymentVoidedDomainEvent");
+
+        await WaitUntilAsync(async () =>
+        {
+            using var scope = _factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            return await db.InboxMessages.AnyAsync(m => m.MessageId == voidMessageId && m.ProcessedAt != null);
+        });
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var account = await db.LedgerAccounts
+                .Include(a => a.Journal)
+                .FirstAsync(a => a.MerchantId == merchantId);
+            Assert.Equal(0, account.PendingBalance);
+            Assert.Equal(0, account.ReservedBalance);
+            var feeTotal = account.Journal.Where(j => j.Description == "Processing fees").Sum(j => j.Amount.Amount);
+            Assert.Equal(6000 - feeTotal, account.AvailableBalance);
+            Assert.Contains(account.Journal, j => j.Description == "Funds released" && j.Amount.Amount == 4000);
+        }
+    }
+
+    [Fact]
     public async Task RedeliveredMessage_AfterCrashBeforeMarkProcessed_DoesNotDoublePost()
     {
         // Simulate a crash AFTER the posting is committed but BEFORE the inbox row

@@ -47,6 +47,8 @@ describe("NotificationPreferences", () => {
       PaymentRefundedDomainEvent: "Payment Refunded Domain Event",
       PaymentIntentCreatedDomainEvent: "Payment Intent Created Domain Event",
       PaymentVoidedDomainEvent: "Payment Voided Domain Event",
+      PaymentFailedDomainEvent: "Payment Failed Domain Event",
+      PaymentExpiredDomainEvent: "Payment Expired Domain Event",
     }
     for (const eventType of NOTIFICATION_EVENT_TYPES) {
       expect(screen.getByText(labels[eventType])).toBeInTheDocument()

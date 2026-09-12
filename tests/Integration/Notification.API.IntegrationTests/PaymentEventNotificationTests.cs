@@ -88,6 +88,37 @@ public class PaymentEventNotificationTests : IClassFixture<NotificationApiFactor
         }
     }
 
+    [Fact]
+    public async Task PaymentFailedEvent_CreatesNotification()
+    {
+        var merchantId = Guid.NewGuid();
+        var messageId = Guid.NewGuid().ToString();
+        var payload = JsonSerializer.Serialize(new PaymentFailedEvent(
+            Guid.NewGuid(), merchantId, new MoneyPayload(10000, "USD")));
+
+        await PublishToPaymentEventsAsync("PaymentFailedDomainEvent", messageId, payload);
+
+        await WaitUntilAsync(async () =>
+        {
+            using var scope = _factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            return await db.InboxMessages.AnyAsync(m => m.MessageId == messageId && m.ProcessedAt != null);
+        });
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            var inbox = await db.InboxMessages.FirstAsync(m => m.MessageId == messageId);
+            Assert.Equal("PaymentFailedDomainEvent", inbox.EventType);
+
+            var notification = await db.Notifications
+                .FirstOrDefaultAsync(n => n.Recipient == $"merchant-{merchantId}@example.com");
+            Assert.NotNull(notification);
+            Assert.Equal("Payment Failed", notification!.Subject);
+        }
+    }
+
     private async Task PublishToPaymentEventsAsync(string routingKey, string messageId, string payload)
     {
         using var scope = _factory.Services.CreateScope();

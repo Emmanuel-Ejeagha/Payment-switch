@@ -202,6 +202,47 @@ public class PaymentIntentTests
     }
 
     [Fact]
+    public void Fail_FromRequiresAction_EmitsFailedEvent()
+    {
+        var intent = CreateRequiresActionIntent();
+
+        intent.Fail();
+
+        Assert.Equal(PaymentStatus.Failed, intent.Status);
+        var failed = Assert.Single(intent.DomainEvents.OfType<PaymentFailedDomainEvent>());
+        Assert.Equal(intent.MerchantId, failed.MerchantId);
+        Assert.Equal(intent.Amount, failed.Amount);
+    }
+
+    [Fact]
+    public void Fail_FromProcessing_EmitsFailedEvent()
+    {
+        var intent = CreateRequiresActionIntent();
+        intent.MarkProcessing();
+
+        intent.Fail();
+
+        Assert.Equal(PaymentStatus.Failed, intent.Status);
+        Assert.Single(intent.DomainEvents.OfType<PaymentFailedDomainEvent>());
+    }
+
+    [Fact]
+    public void Void_FromPartiallyCaptured_VoidsRemainder()
+    {
+        var intent = CreateAuthorizedIntent();
+        intent.Capture(new Money(60L, "USD"));
+        intent.ClearDomainEvents();
+
+        intent.Void();
+
+        Assert.Equal(PaymentStatus.Voided, intent.Status);
+        var voidTx = Assert.Single(intent.Transactions, t => t.Type == TransactionType.Void);
+        Assert.Equal(40L, voidTx.Amount.Amount);
+        var voidedEvent = Assert.Single(intent.DomainEvents.OfType<PaymentVoidedDomainEvent>());
+        Assert.Equal(40L, voidedEvent.Amount.Amount);
+    }
+
+    [Fact]
     public void RequireAction_FromPending_ShouldSetRequiresActionAndRaiseEvent()
     {
         var intent = CreatePendingIntent();
