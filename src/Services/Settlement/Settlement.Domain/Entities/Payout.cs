@@ -24,7 +24,10 @@ public class Payout : BaseEntity
         MerchantId = merchantId;
         GrossVolume = grossVolume;
         Fees = fees;
-        NetAmount = new Money(grossVolume.Amount - fees.Amount, grossVolume.Currency);
+        // Processing fees are non-refundable: when refunds wipe the day's
+        // gross, the payout floors at zero instead of going negative (and
+        // throwing in Money). The unrecovered fee remains platform income.
+        NetAmount = new Money(Math.Max(0, grossVolume.Amount - fees.Amount), grossVolume.Currency);
         Currency = grossVolume.Currency;
     }
 }

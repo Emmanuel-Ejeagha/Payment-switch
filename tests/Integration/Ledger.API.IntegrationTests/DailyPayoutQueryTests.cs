@@ -67,4 +67,49 @@ public class DailyPayoutQueryTests : IClassFixture<LedgerApiFactory>
             Assert.Empty(otherDay);
         }
     }
+
+    [Fact]
+    public async Task DailyPayout_RefundHeavyDay_ClampsGrossAtZero()
+    {
+        // Capture on day 1, partial refund on day 2: the refund day has no
+        // captures, so its raw gross is negative. The payout must floor at
+        // zero instead of aborting downstream batch creation in Money(negative).
+        var day1 = new DateTime(2026, 8, 5, 0, 0, 0, DateTimeKind.Utc);
+        var day2 = day1.AddDays(1);
+        var merchant = Guid.NewGuid();
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var account = new LedgerAccount(Guid.NewGuid(), merchant, "USD");
+            account.ReserveFunds(new Money(3000, "USD"), new CorrelationId("reserve-c"));
+            account.CaptureFunds(new Money(3000, "USD"), new CorrelationId("capture-c"));
+            account.ChargeFees(new Money(150, "USD"), new CorrelationId("fees-c"));
+            account.RefundFunds(new Money(2000, "USD"), new CorrelationId("refund-c"));
+            db.LedgerAccounts.Add(account);
+            await db.SaveChangesAsync();
+
+            await db.Database.ExecuteSqlRawAsync(
+                "UPDATE \"JournalEntries\" SET \"Timestamp\" = {0} WHERE \"LedgerAccountId\" = {1} AND \"Description\" <> 'Funds refunded'",
+                day1, account.Id);
+            await db.Database.ExecuteSqlRawAsync(
+                "UPDATE \"JournalEntries\" SET \"Timestamp\" = {0} WHERE \"LedgerAccountId\" = {1} AND \"Description\" = 'Funds refunded'",
+                day2, account.Id);
+        }
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var query = scope.ServiceProvider.GetRequiredService<IDailyPayoutQuery>();
+
+            var day1Payouts = await query.GetAsync(day1);
+            var payoutDay1 = Assert.Single(day1Payouts, p => p.MerchantId == merchant);
+            Assert.Equal(3000, payoutDay1.GrossVolume);
+            Assert.Equal(150, payoutDay1.Fees);
+
+            var day2Payouts = await query.GetAsync(day2);
+            var payoutDay2 = Assert.Single(day2Payouts, p => p.MerchantId == merchant);
+            Assert.Equal(0, payoutDay2.GrossVolume);
+            Assert.Equal(0, payoutDay2.Fees);
+        }
+    }
 }

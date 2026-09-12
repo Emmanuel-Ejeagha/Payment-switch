@@ -49,6 +49,25 @@ public class TriggerSettlementHandlerTests
     }
 
     [Fact]
+    public async Task Handle_RefundHeavyDay_ShouldCompleteWithZeroNetPayout()
+    {
+        var command = new TriggerSettlementCommand(new DateTime(2026, 7, 4));
+        SetupValidatorSuccess(command);
+        _repoMock.Setup(r => r.GetByBatchDateAsync(command.BatchDate, It.IsAny<CancellationToken>())).ReturnsAsync((SettlementBatch?)null);
+        _ledgerMock.Setup(l => l.GetDailyPayoutDataAsync(command.BatchDate, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<List<MerchantPayoutData>>.Success(new List<MerchantPayoutData>
+            {
+                new(Guid.NewGuid(), 0L, 150L, "USD")
+            }));
+        _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsSuccess);
+        _repoMock.Verify(r => r.AddAsync(It.Is<SettlementBatch>(b => b.Payouts.Count == 1 && b.Payouts[0].NetAmount.Amount == 0L), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task Handle_ExistingBatch_ShouldReturnExistingId()
     {
         var existingBatch = new SettlementBatch(Guid.NewGuid(), new DateTime(2026, 7, 3));

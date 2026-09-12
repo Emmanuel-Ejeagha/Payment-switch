@@ -39,9 +39,12 @@ public class DailyPayoutQuery : IDailyPayoutQuery
                 Fees = g.Sum(e => e.CreditAccount == GlAccountCode.FeesIncome ? e.Amount.Amount : 0)
             }).ToListAsync(cancellationToken);
 
+        // A day never pays out negative gross: refunds already reduced
+        // AvailableBalance when posted, so a refund-heavy day settles at zero
+        // here instead of aborting the batch in `new Money(negative)`.
         return rows
             .Where(r => r.Captures - r.Refunds != 0 || r.Fees != 0)
-            .Select(r => new DailyPayout(r.MerchantId, r.Currency, r.Captures - r.Refunds, r.Fees))
+            .Select(r => new DailyPayout(r.MerchantId, r.Currency, Math.Max(0, r.Captures - r.Refunds), r.Fees))
             .ToList();
     }
 }
