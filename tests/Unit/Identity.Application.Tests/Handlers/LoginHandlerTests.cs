@@ -150,7 +150,30 @@ public class LoginHandlerTests
 
         Assert.True(result.IsFailure);
         Assert.Equal("Identity.AccountLocked", result.Errors[0].Code);
-        _passwordHasherMock.Verify(h => h.Verify(It.IsAny<string>(), It.IsAny<PasswordHash>()), Times.Never);
+        _passwordHasherMock.Verify(h => h.Verify(It.IsAny<string>(), It.IsAny<PasswordHash>()), Times.Once);
+        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_LockedAccountWithWrongPassword_ShouldReturnGenericErrorWithoutExtendingLockout()
+    {
+        var command = new LoginCommand("user@example.com", "WrongPassword");
+        var user = CreateActiveUser("user@example.com");
+        for (var i = 0; i < User.MaxAccessFailedAttempts; i++)
+            user.RegisterFailedLogin(DateTime.UtcNow);
+        var lockoutEnd = user.LockoutEnd;
+        SetupValidatorSuccess(command);
+        _userRepositoryMock.Setup(r => r.GetByEmailAsync(command.Email, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+        _passwordHasherMock.Setup(h => h.Verify(command.Password, user.PasswordHash))
+            .Returns(false);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Identity.InvalidCredentials", result.Errors[0].Code);
+        Assert.Equal(lockoutEnd, user.LockoutEnd);
+        Assert.Equal(0, user.AccessFailedCount);
         _unitOfWorkMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
