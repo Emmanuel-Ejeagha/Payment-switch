@@ -11,13 +11,19 @@ service LedgerService {
 
 message GetBalancesRequest {
   string merchant_id = 1;
+  // Optional ISO currency filter. Empty returns every account.
+  string currency = 2;
 }
 
-message GetBalancesResponse {
+message Balance {
   int64 available = 1;
   int64 pending = 2;
   int64 reserved = 3;
   string currency = 4;
+}
+
+message GetBalancesResponse {
+  repeated Balance balances = 1;
 }
 
 message GetDailyPayoutDataRequest {
