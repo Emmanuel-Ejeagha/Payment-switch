@@ -14,4 +14,30 @@ public class FeeCalculatorTests
     {
         Assert.Equal(expected, FeeCalculator.Calculate(amount, basisPoints));
     }
+
+    [Fact]
+    public void Calculate_HugeAmount_ThrowsInsteadOfOverflowing()
+    {
+        Assert.Throws<InvalidOperationException>(() => FeeCalculator.Calculate(long.MaxValue, 150));
+    }
+
+    [Theory]
+    [InlineData(10001)]
+    [InlineData(int.MaxValue)]
+    public void Calculate_RateAboveHundredPercent_Throws(int basisPoints)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => FeeCalculator.Calculate(10000L, basisPoints));
+    }
+
+    [Fact]
+    public void Calculate_MaxRate_EqualsAmount()
+    {
+        Assert.Equal(10000L, FeeCalculator.Calculate(10000L, 10_000));
+    }
+
+    [Fact]
+    public void Calculate_FeeNeverExceedsAmount()
+    {
+        Assert.True(FeeCalculator.Calculate(9999L, 10_000) <= 9999L);
+    }
 }

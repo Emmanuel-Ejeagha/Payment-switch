@@ -39,8 +39,8 @@ public static class DependencyInjection
             s => !string.IsNullOrEmpty(s.HostName),
             "RabbitMQ HostName is required");
         services.AddValidatedOptions<LedgerOptions>(configuration, "Ledger",
-            o => o.FeeBasisPoints >= 0,
-            "Ledger FeeBasisPoints must be >= 0");
+            o => o.FeeBasisPoints >= 0 && o.FeeBasisPoints <= LedgerOptions.MaxFeeBasisPoints,
+            $"Ledger FeeBasisPoints must be between 0 and {LedgerOptions.MaxFeeBasisPoints}");
         services.AddValidatedOptions<ReconciliationOptions>(configuration, "Reconciliation",
             o => o.IntervalMinutes >= 1,
             "Reconciliation IntervalMinutes must be >= 1");
