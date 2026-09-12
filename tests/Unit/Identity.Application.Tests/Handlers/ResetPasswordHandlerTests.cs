@@ -102,6 +102,25 @@ public class ResetPasswordHandlerTests
         _unitOfWorkMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
+    [Fact]
+    public async Task Handle_DeactivatedUser_ShouldRejectEvenWithValidToken()
+    {
+        var command = new ResetPasswordCommand("test@example.com", "plain-token", "NewPassw0rd!");
+        var user = CreateUser();
+        user.InitiatePasswordReset("sha256(plain-token)", DateTime.UtcNow.AddHours(1));
+        user.Deactivate();
+        SetupValidatorSuccess(command);
+        _userRepositoryMock.Setup(r => r.GetByEmailAsync(command.Email, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Identity.UserInactive", result.Errors[0].Code);
+        Assert.Equal(new PasswordHash("hash"), user.PasswordHash);
+        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     private void SetupValidatorSuccess(ResetPasswordCommand command)
     {
         _validatorMock.Setup(v => v.ValidateAsync(command, It.IsAny<CancellationToken>()))

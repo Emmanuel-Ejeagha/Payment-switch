@@ -54,6 +54,15 @@ public class ForgotPasswordHandler
             return Result.Success();
         }
 
+        if (!user.IsActive)
+        {
+            // A deactivated account cannot complete a reset (see
+            // ResetPasswordHandler), so issue nothing — silently, to avoid an
+            // oracle and to spare the owner a useless email.
+            _logger.LogWarning("Forgot-password requested for deactivated {Identifier}", DataMasker.MaskEmail(command.Email));
+            return Result.Success();
+        }
+
         var token = _tokenFactory.Generate(TimeSpan.FromHours(_options.TokenLifetimeHours));
         user.InitiatePasswordReset(token.Hash, token.ExpiresAtUtc);
 

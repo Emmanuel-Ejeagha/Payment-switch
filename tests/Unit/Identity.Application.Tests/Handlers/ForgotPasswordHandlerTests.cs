@@ -81,6 +81,25 @@ public class ForgotPasswordHandlerTests
     }
 
     [Fact]
+    public async Task Handle_DeactivatedUser_ShouldSucceedSilentlyWithoutIssuingToken()
+    {
+        var command = new ForgotPasswordCommand("test@example.com");
+        var user = CreateUser();
+        user.Deactivate();
+        _validatorMock.Setup(v => v.ValidateAsync(command, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ValidationResult());
+        _userRepositoryMock.Setup(r => r.GetByEmailAsync(command.Email, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(user.PasswordResetTokenHash);
+        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+        _emailSenderMock.Verify(s => s.SendAsync(It.IsAny<EmailMessage>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task Handle_InvalidEmail_ShouldReturnValidationError()
     {
         var command = new ForgotPasswordCommand("not-an-email");
