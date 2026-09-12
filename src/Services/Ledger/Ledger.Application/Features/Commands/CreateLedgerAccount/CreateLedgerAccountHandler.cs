@@ -51,6 +51,15 @@ public class CreateLedgerAccountHandler
             await _unitOfWork.RollbackAsync(cancellationToken);
             return LedgerErrors.ConcurrencyConflict;
         }
+        catch (UniqueConstraintViolationException)
+        {
+            // A concurrent create won the insert race (unique
+            // MerchantId+Currency). That is the desired end state, so converge
+            // on success instead of failing.
+            await _unitOfWork.RollbackAsync(cancellationToken);
+            _logger.LogInformation("Ledger account for Merchant {MerchantId}/{Currency} already created concurrently", command.MerchantId, command.Currency);
+            return Result.Success();
+        }
 
         return Result.Success();
     }
