@@ -22,7 +22,10 @@ public class MerchantRepository : IMerchantRepository
 
     public async Task<MerchantEntity?> GetByEmailAsync(string email, CancellationToken cancellationToken = default)
     {
-        var normalized = email.ToLowerInvariant();
+        // Mirror Identity's UserRepository: stored emails are normalized, so
+        // the lookup must trim/lowercase the input (and tolerate null) or a
+        // spaced/cased query misses its match.
+        var normalized = (email ?? string.Empty).Trim().ToLowerInvariant();
         return await _context.Merchants.FirstOrDefaultAsync(m => m.Email.Value == normalized, cancellationToken);
     }
 
@@ -39,7 +42,7 @@ public class MerchantRepository : IMerchantRepository
 
     public async Task<bool> ExistsByEmailAsync(string email, CancellationToken cancellationToken = default)
     {
-        var normalized = email.ToLowerInvariant();
+        var normalized = (email ?? string.Empty).Trim().ToLowerInvariant();
         return await _context.Merchants.AnyAsync(m => m.Email.Value == normalized, cancellationToken);
     }
 

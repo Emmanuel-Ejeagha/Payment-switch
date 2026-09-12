@@ -33,6 +33,13 @@ public class ValueObjectTests
     }
 
     [Fact]
+    public void MerchantEmail_SpacedInput_ShouldTrim()
+    {
+        var email = new MerchantEmail("  Test@Example.com  ");
+        Assert.Equal("test@example.com", email.Value);
+    }
+
+    [Fact]
     public void WebhookUrl_Invalid_Throws()
     {
         Assert.Throws<ArgumentException>(() => new WebhookUrl("ftp://test.com"));
