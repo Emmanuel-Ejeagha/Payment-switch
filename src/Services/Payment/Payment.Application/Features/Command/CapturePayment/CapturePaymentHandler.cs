@@ -57,7 +57,11 @@ public class CapturePaymentHandler
 
         Money? amount = command.Amount.HasValue ? new Money(command.Amount.Value, intent.Amount.Currency) : null;
 
-        var gatewayResult = await _gateway.CaptureAsync(intent.MerchantId, intent.GatewayReference!, amount ?? intent.Amount, command.IdempotencyKey, intent.ProviderName, cancellationToken);
+        // Default to the uncaptured remainder so a null-amount follow-up
+        // captures what is left instead of re-requesting the full amount.
+        var captureAmount = amount ?? intent.GetCapturableAmount();
+
+        var gatewayResult = await _gateway.CaptureAsync(intent.MerchantId, intent.GatewayReference!, captureAmount, command.IdempotencyKey, intent.ProviderName, cancellationToken);
         if (!gatewayResult.IsSuccess)
             return new Error("Payment.CaptureFailed", gatewayResult.Errors.First().Message);
 

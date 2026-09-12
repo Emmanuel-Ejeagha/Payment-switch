@@ -56,7 +56,10 @@ public class RefundPaymentHandler
             return PaymentErrors.InvalidStatusTransition(intent.Status.Value, "Refunded");
 
         Money? amount = command.Amount.HasValue ? new Money(command.Amount.Value, intent.Amount.Currency) : null;
-        var refundAmount = amount ?? new Money(intent.Amount.Amount, intent.Amount.Currency);
+
+        // Default to captured-minus-refunded so a null-amount refund after a
+        // partial capture does not over-request the authorized total.
+        var refundAmount = amount ?? intent.GetRefundableAmount();
 
         var gatewayResult = await _gateway.RefundAsync(intent.MerchantId, intent.GatewayReference!, refundAmount, command.IdempotencyKey, intent.ProviderName, cancellationToken);
         if (!gatewayResult.IsSuccess)

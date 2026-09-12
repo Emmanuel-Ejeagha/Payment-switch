@@ -87,6 +87,18 @@ public class PaymentIntentTests
     }
 
     [Fact]
+    public void Capture_NullAmountAfterPartial_ShouldCaptureRemainder()
+    {
+        var intent = CreateAuthorizedIntent();
+        intent.Capture(new Money(60L, "USD"));
+
+        intent.Capture(null);
+
+        Assert.Equal(PaymentStatus.Captured, intent.Status);
+        Assert.Equal(40L, intent.Transactions.Last(t => t.Type == TransactionType.Capture).Amount.Amount);
+    }
+
+    [Fact]
     public void Capture_ExceedsAuthorized_Throws()
     {
         var intent = CreateAuthorizedIntent();
@@ -145,6 +157,18 @@ public class PaymentIntentTests
         intent.Refund(refundAmount);
 
         Assert.Equal(PaymentStatus.PartiallyRefunded, intent.Status);
+    }
+
+    [Fact]
+    public void Refund_NullAmountAfterPartialCapture_ShouldRefundCapturedTotal()
+    {
+        var intent = CreateAuthorizedIntent();
+        intent.Capture(new Money(60L, "USD"));
+
+        intent.Refund(null);
+
+        Assert.Equal(PaymentStatus.FullyRefunded, intent.Status);
+        Assert.Equal(60L, intent.Transactions.Last(t => t.Type == TransactionType.Refund).Amount.Amount);
     }
 
     [Fact]

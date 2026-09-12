@@ -105,7 +105,7 @@ public class PaymentIntent : AggregateRoot
         if (Status != PaymentStatus.Authorized && Status != PaymentStatus.PartiallyCaptured)
             throw new InvalidOperationException($"Cannot capture payment in '{Status}' status.");
 
-        var captureAmount = amount ?? new Money(Amount.Amount, Amount.Currency);
+        var captureAmount = amount ?? GetCapturableAmount();
 
         var capturedSoFar = _transactions
             .Where(t => t.Type == TransactionType.Capture)
@@ -150,7 +150,7 @@ public class PaymentIntent : AggregateRoot
         if (Status != PaymentStatus.Captured && Status != PaymentStatus.PartiallyCaptured && Status != PaymentStatus.PartiallyRefunded)
             throw new InvalidOperationException($"Cannot refund payment in '{Status}' status.");
 
-        var refundAmount = amount ?? new Money(GetTotalCaptured() - GetTotalRefunded(), Amount.Currency);
+        var refundAmount = amount ?? GetRefundableAmount();
 
         var totalCaptured = GetTotalCaptured();
         var totalRefunded = GetTotalRefunded();
@@ -217,4 +217,12 @@ public class PaymentIntent : AggregateRoot
 
     private long GetTotalRefunded() =>
         _transactions.Where(t => t.Type == TransactionType.Refund).Sum(t => t.Amount.Amount);
+
+    /// <summary>Authorized-but-uncaptured remainder. Used as the default capture amount.</summary>
+    public Money GetCapturableAmount() =>
+        new(Amount.Amount - GetTotalCaptured(), Amount.Currency);
+
+    /// <summary>Captured-but-unrefunded remainder. Used as the default refund amount.</summary>
+    public Money GetRefundableAmount() =>
+        new(GetTotalCaptured() - GetTotalRefunded(), Amount.Currency);
 }
