@@ -157,4 +157,59 @@ public class JwtBearerExtensionsTests
 
         Assert.NotNull(options.Events);
     }
+
+    [Fact]
+    public void AddPaymentSwitchJwtBearer_WithServiceTokenSecret_TrustsBothKeys()
+    {
+        const string serviceSecret = "service-secret-key-at-least-32-chars-lo!";
+        var config = BuildConfig(
+            ("Jwt:Secret", CurrentSecret),
+            ("Jwt:Issuer", "IdentityService"),
+            ("Jwt:Audience", "PaymentSwitch"),
+            ("ServiceToken:Secret", serviceSecret));
+
+        var options = GetOptions(config);
+
+        Assert.Equal(2, options.TokenValidationParameters.IssuerSigningKeys.Count());
+    }
+
+    [Fact]
+    public void AddPaymentSwitchJwtBearer_WithServiceTokenSecret_AcceptsServiceSignedToken()
+    {
+        const string serviceSecret = "service-secret-key-at-least-32-chars-lo!";
+        var config = BuildConfig(
+            ("Jwt:Secret", CurrentSecret),
+            ("Jwt:Issuer", "IdentityService"),
+            ("Jwt:Audience", "PaymentSwitch"),
+            ("ServiceToken:Secret", serviceSecret));
+
+        var options = GetOptions(config);
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(serviceSecret));
+        var token = new JwtSecurityToken(
+            issuer: "IdentityService",
+            audience: "PaymentSwitch",
+            claims: new[] { new Claim("client_type", "service") },
+            expires: DateTime.UtcNow.AddMinutes(5),
+            signingCredentials: new SigningCredentials(key, SecurityAlgorithms.HmacSha256));
+        var rawToken = new JwtSecurityTokenHandler().WriteToken(token);
+
+        var handler = new JwtSecurityTokenHandler();
+        var principal = handler.ValidateToken(rawToken, options.TokenValidationParameters, out _);
+
+        Assert.True(principal.Identity!.IsAuthenticated);
+    }
+
+    [Fact]
+    public void AddPaymentSwitchJwtBearer_WithServiceTokenSecretEqualToJwtSecret_DoesNotDuplicateKey()
+    {
+        var config = BuildConfig(
+            ("Jwt:Secret", CurrentSecret),
+            ("Jwt:Issuer", "IdentityService"),
+            ("Jwt:Audience", "PaymentSwitch"),
+            ("ServiceToken:Secret", CurrentSecret));
+
+        var options = GetOptions(config);
+
+        Assert.Single(options.TokenValidationParameters.IssuerSigningKeys);
+    }
 }

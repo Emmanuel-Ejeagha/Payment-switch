@@ -159,6 +159,10 @@ config:
     # Set alongside config.jwt.secret on the first rotation step; remove once
     # the window closes (see infra/secrets/rotate-jwt.sh).
     previousSecret: ""
+  serviceToken:
+    # REQUIRED: dedicated inter-service secret, must differ from config.jwt.secret.
+    # Provide via --set config.serviceToken.secret="..." or a secrets values file.
+    secret: ""
   rabbitmq:
     hostName: "rabbitmq"
     # REQUIRED: provide a strong username/password via --set or a secrets values file

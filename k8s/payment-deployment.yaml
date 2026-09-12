@@ -39,6 +39,11 @@ spec:
                 secretKeyRef:
                   name: payment-switch-secret
                   key: Jwt__Secret
+            - name: ServiceToken__Secret
+              valueFrom:
+                secretKeyRef:
+                  name: payment-switch-secret
+                  key: ServiceToken__Secret
             - name: Jwt__PreviousSecret
               valueFrom:
                 secretKeyRef:
