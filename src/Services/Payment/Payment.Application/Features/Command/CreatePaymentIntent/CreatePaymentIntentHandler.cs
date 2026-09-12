@@ -110,6 +110,13 @@ public class CreatePaymentIntentHandler
                 await _unitOfWork.RollbackAsync(cancellationToken);
                 return PaymentErrors.ConcurrencyConflict;
             }
+            catch (UniqueConstraintViolationException)
+            {
+                // Lost an insert race on the idempotency key: load the winner
+                // and replay it instead of failing.
+                await _unitOfWork.RollbackAsync(cancellationToken);
+                return await ReplayWinnerAsync(command, cancellationToken);
+            }
             return new PaymentIntentResponse(intent.Id, intent.Status.Value, null);
         }
 
@@ -141,8 +148,29 @@ public class CreatePaymentIntentHandler
             await _unitOfWork.RollbackAsync(cancellationToken);
             return PaymentErrors.ConcurrencyConflict;
         }
+        catch (UniqueConstraintViolationException)
+        {
+            await _unitOfWork.RollbackAsync(cancellationToken);
+            return await ReplayWinnerAsync(command, cancellationToken);
+        }
 
         return ToResponse(intent);
+    }
+
+    private async Task<Result<PaymentIntentResponse>> ReplayWinnerAsync(
+        CreatePaymentIntentCommand command, CancellationToken cancellationToken)
+    {
+        var winner = await _repository.GetByIdempotencyKeyAsync(command.MerchantId, command.IdempotencyKey, cancellationToken);
+        if (winner is null)
+            return new Error("Payment.CreateFailed", "Could not create payment intent.");
+
+        if (winner.Amount.Amount != command.Amount
+            || !string.Equals(winner.Amount.Currency, command.Currency, StringComparison.OrdinalIgnoreCase))
+        {
+            return PaymentErrors.IdempotencyKeyConflict(command.IdempotencyKey);
+        }
+
+        return ToResponse(winner);
     }
 
     private static PaymentIntentResponse ToResponse(PaymentIntent intent)

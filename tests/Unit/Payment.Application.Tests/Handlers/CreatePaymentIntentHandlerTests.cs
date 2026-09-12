@@ -1,4 +1,5 @@
 ﻿using BuildingBlocks.Shared.Results;
+using BuildingBlocks.Shared.Exceptions;
 using FluentValidation;
 using FluentValidation.Results;
 using Moq;
@@ -96,6 +97,28 @@ public class CreatePaymentIntentHandlerTests
         Assert.True(result.IsSuccess);
         Assert.Equal(existing.Id, result.Value!.IntentId);
         _repoMock.Verify(r => r.AddAsync(It.IsAny<PaymentIntent>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_UniqueViolationOnSave_ReplaysWinnerInsteadOfFailing()
+    {
+        var command = new CreatePaymentIntentCommand(Guid.NewGuid(), 100, "USD", "Card", "1234", "Visa", "race-key");
+        SetupValidatorSuccess(command);
+        var winner = new PaymentIntent(Guid.NewGuid(), command.MerchantId, new Money(100, "USD"), new IdempotencyKey("race-key"), PaymentMethod.Card);
+        _repoMock.SetupSequence(r => r.GetByIdempotencyKeyAsync(command.MerchantId, command.IdempotencyKey, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((PaymentIntent?)null)
+            .ReturnsAsync(winner);
+        SetupMerchantConfig(autoCapture: false);
+        _gatewayMock.Setup(g => g.AuthorizeAsync(command.MerchantId, It.IsAny<Money>(), It.IsAny<CardDetails?>(), It.IsAny<CardSecurityCode?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<GatewayResponse>.Success(new GatewayResponse(true, "AUTH123", "GW-1", null)));
+        _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new UniqueConstraintViolationException());
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(winner.Id, result.Value!.IntentId);
+        _uowMock.Verify(u => u.RollbackAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Theory]
