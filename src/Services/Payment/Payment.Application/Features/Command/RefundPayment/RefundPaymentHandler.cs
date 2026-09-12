@@ -47,6 +47,14 @@ public class RefundPaymentHandler
             var replay = intent.Transactions.FirstOrDefault(t => t.Type == TransactionType.Refund && t.IdempotencyKey == command.IdempotencyKey);
             if (replay is not null)
             {
+                // Null amount defers to the recorded result; a concrete
+                // different amount is a conflicting reuse, not a replay.
+                if (command.Amount.HasValue && command.Amount.Value != replay.Amount.Amount)
+                {
+                    _logger.LogWarning("Idempotency key {Key} reused with different amount for Intent {IntentId}", command.IdempotencyKey, intent.Id);
+                    return PaymentErrors.IdempotencyKeyConflict(command.IdempotencyKey!);
+                }
+
                 _logger.LogInformation("Replaying refund for Intent {IntentId} with key {Key}", intent.Id, command.IdempotencyKey);
                 return new RefundPaymentResponse(replay.Id, intent.Status.Value);
             }
