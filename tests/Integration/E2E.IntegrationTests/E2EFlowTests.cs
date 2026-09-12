@@ -44,7 +44,7 @@ public class E2EFlowTests : IClassFixture<E2EFactory>
         var settlement = _factory.SettlementHost.CreateClient();
 
         var email = $"e2e-{Guid.NewGuid():N}@example.com";
-        const string password = "E2ePass123!";
+        const string password = "E2ePass1234!";
 
         // 1. Register, verify (via the captured plaintext token), login as owner.
         var register = await identity.PostAsJsonAsync("/api/v1/auth/register", new { Email = email, Password = password, FullName = "E2E Owner" });
@@ -237,7 +237,7 @@ public class E2EFlowTests : IClassFixture<E2EFactory>
         var merchantAdmin = _factory.MerchantHost.CreateClient();
 
         var email = $"e2e-idem-{Guid.NewGuid():N}@example.com";
-        const string password = "E2ePass123!";
+        const string password = "E2ePass1234!";
 
         var register = await identity.PostAsJsonAsync("/api/v1/auth/register", new { Email = email, Password = password, FullName = "E2E Idempotency Owner" });
         register.EnsureSuccessStatusCode();

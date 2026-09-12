@@ -13,8 +13,10 @@ public class ChangePasswordCommandValidator : AbstractValidator<ChangePasswordCo
             .NotEmpty().WithMessage("Password is required.")
             .MinimumLength(PasswordPolicy.MinLength).WithMessage($"Password must be at least {PasswordPolicy.MinLength} characters.")
             .MaximumLength(PasswordPolicy.MaxLength)
-            .Must(p => p is not null && p.Any(char.IsLetter) && p.Any(char.IsDigit))
-            .WithMessage("Password must contain at least one letter and one digit.");
+            .Must(PasswordPolicy.HasComplexity)
+            .WithMessage("Password must contain a letter, a digit, and an uppercase letter or symbol.")
+            .Must(p => !PasswordPolicy.IsCommonPassword(p))
+            .WithMessage("This password is too common. Choose a less predictable password.");
 
         RuleFor(x => x).Must(x => x.NewPassword != x.CurrentPassword)
             .WithMessage("New password must be different from the current password.")

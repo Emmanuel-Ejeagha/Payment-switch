@@ -15,9 +15,10 @@ const registerSchema = z.object({
   email: z.string().email("Invalid email address"),
   password: z
     .string()
-    .min(10, "Password must be at least 10 characters")
+    .min(12, "Password must be at least 12 characters")
     .regex(/[A-Za-z]/, "Password must contain at least one letter")
-    .regex(/[0-9]/, "Password must contain at least one digit"),
+    .regex(/[0-9]/, "Password must contain at least one digit")
+    .regex(/([A-Z]|[^A-Za-z0-9])/, "Password must contain an uppercase letter or symbol"),
   confirmPassword: z.string(),
 }).refine((d) => d.password === d.confirmPassword, {
   message: "Passwords do not match",
@@ -262,7 +263,7 @@ export default function RegisterPage() {
               id="password"
               type={showPassword ? "text" : "password"}
               autoComplete="new-password"
-              placeholder="Min. 6 characters"
+              placeholder="Min. 12 characters, incl. uppercase or symbol"
               aria-invalid={!!errors.password}
               aria-describedby={errors.password ? "password-error" : undefined}
               className={`${inputClass} pr-11`}

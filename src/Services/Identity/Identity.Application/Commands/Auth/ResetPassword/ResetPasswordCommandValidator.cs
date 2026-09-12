@@ -17,7 +17,9 @@ public class ResetPasswordCommandValidator : AbstractValidator<ResetPasswordComm
             .NotEmpty().WithMessage("Password is required.")
             .MinimumLength(PasswordPolicy.MinLength).WithMessage($"Password must be at least {PasswordPolicy.MinLength} characters.")
             .MaximumLength(PasswordPolicy.MaxLength)
-            .Must(p => p is not null && p.Any(char.IsLetter) && p.Any(char.IsDigit))
-            .WithMessage("Password must contain at least one letter and one digit.");
+            .Must(PasswordPolicy.HasComplexity)
+            .WithMessage("Password must contain a letter, a digit, and an uppercase letter or symbol.")
+            .Must(p => !PasswordPolicy.IsCommonPassword(p))
+            .WithMessage("This password is too common. Choose a less predictable password.");
     }
 }
