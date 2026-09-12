@@ -24,16 +24,26 @@ public class LedgerGrpcService : LedgerService.LedgerServiceBase
         GetBalancesRequest request, ServerCallContext context)
     {
         var merchantId = Guid.Parse(request.MerchantId);
-        var account = await _db.LedgerAccounts
-            .FirstOrDefaultAsync(a => a.MerchantId == merchantId);
-
-        return new GetBalancesResponse
+        var accounts = _db.LedgerAccounts.Where(a => a.MerchantId == merchantId);
+        if (!string.IsNullOrWhiteSpace(request.Currency))
         {
-            Available = account?.AvailableBalance ?? 0,
-            Pending = account?.PendingBalance ?? 0,
-            Reserved = account?.ReservedBalance ?? 0,
-            Currency = account?.Currency ?? "USD"
-        };
+            var currency = request.Currency.Trim().ToUpperInvariant();
+            accounts = accounts.Where(a => a.Currency == currency);
+        }
+
+        var response = new GetBalancesResponse();
+        foreach (var account in await accounts.OrderBy(a => a.Currency).ToListAsync())
+        {
+            response.Balances.Add(new Balance
+            {
+                Available = account.AvailableBalance,
+                Pending = account.PendingBalance,
+                Reserved = account.ReservedBalance,
+                Currency = account.Currency
+            });
+        }
+
+        return response;
     }
 
     public override async Task<GetDailyPayoutDataResponse> GetDailyPayoutData(
