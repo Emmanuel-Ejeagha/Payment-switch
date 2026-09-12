@@ -1,4 +1,5 @@
-﻿using BuildingBlocks.Shared.Messaging;
+﻿using BuildingBlocks.Shared.Exceptions;
+using BuildingBlocks.Shared.Messaging;
 using BuildingBlocks.Shared.Middleware;
 using BuildingBlocks.Shared.Results;
 using Ledger.Application.Features.Commands.CaptureFunds;
@@ -166,6 +167,15 @@ public class RabbitMQConsumerService : BackgroundService
                 // A prior delivery committed the posting but crashed before marking
                 // the inbox row processed. The unique CorrelationId index makes the
                 // re-run a no-op; treat it as an idempotent completion.
+                _logger.LogWarning("Duplicate posting detected for {MessageId}; completing idempotently", messageId);
+                await MarkAsProcessedAsync(messageId, cancellationToken);
+                await _channel.BasicAckAsync(ea.DeliveryTag, false);
+            }
+            catch (UniqueConstraintViolationException)
+            {
+                // Same idempotent completion as above, surfacing through the
+                // UnitOfWork translation instead of raw EF. Must stay an ack:
+                // sending this to the DLQ would lose an already-posted effect.
                 _logger.LogWarning("Duplicate posting detected for {MessageId}; completing idempotently", messageId);
                 await MarkAsProcessedAsync(messageId, cancellationToken);
                 await _channel.BasicAckAsync(ea.DeliveryTag, false);

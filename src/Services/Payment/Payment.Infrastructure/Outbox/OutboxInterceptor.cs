@@ -18,7 +18,9 @@ public class OutboxInterceptor : SaveChangesInterceptor
         "PaymentProcessingDomainEvent",
         "PaymentCapturedDomainEvent",
         "PaymentRefundedDomainEvent",
-        "PaymentVoidedDomainEvent"
+        "PaymentVoidedDomainEvent",
+        "PaymentFailedDomainEvent",
+        "PaymentExpiredDomainEvent"
     };
 
     /// <summary>
@@ -33,7 +35,9 @@ public class OutboxInterceptor : SaveChangesInterceptor
         "PaymentAuthorizedDomainEvent",
         "PaymentCapturedDomainEvent",
         "PaymentRefundedDomainEvent",
-        "PaymentVoidedDomainEvent"
+        "PaymentVoidedDomainEvent",
+        "PaymentFailedDomainEvent",
+        "PaymentExpiredDomainEvent"
     };
 
     private readonly ICorrelationIdProvider _correlationIdProvider;

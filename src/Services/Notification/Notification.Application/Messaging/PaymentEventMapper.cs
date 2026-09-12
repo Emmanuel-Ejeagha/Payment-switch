@@ -7,6 +7,8 @@ public record PaymentCapturedEvent(Guid IntentId, Guid MerchantId, MoneyPayload 
 public record PaymentRefundedEvent(Guid IntentId, Guid MerchantId, MoneyPayload Amount, Guid TransactionId);
 public record PaymentIntentCreatedEvent(Guid IntentId, Guid MerchantId, MoneyPayload Amount, string IdempotencyKey);
 public record PaymentVoidedEvent(Guid IntentId, Guid MerchantId);
+public record PaymentFailedEvent(Guid IntentId, Guid MerchantId, MoneyPayload Amount);
+public record PaymentExpiredEvent(Guid IntentId, Guid MerchantId, MoneyPayload Amount);
 public record MoneyPayload(long Amount, string Currency);
 
 /// <summary>
@@ -34,4 +36,12 @@ public static class PaymentEventMapper
     public static CreateNotificationCommand MapVoided(PaymentVoidedEvent e, string recipient, string body) =>
         new(recipient, "email", "Payment Voided",
             $"A payment was voided for your account.", null, body);
+
+    public static CreateNotificationCommand MapFailed(PaymentFailedEvent e, string recipient, string body) =>
+        new(recipient, "email", "Payment Failed",
+            $"A payment of {e.Amount.Amount} {e.Amount.Currency} failed for your account.", null, body);
+
+    public static CreateNotificationCommand MapExpired(PaymentExpiredEvent e, string recipient, string body) =>
+        new(recipient, "email", "Payment Expired",
+            $"A payment of {e.Amount.Amount} {e.Amount.Currency} expired before completion.", null, body);
 }
