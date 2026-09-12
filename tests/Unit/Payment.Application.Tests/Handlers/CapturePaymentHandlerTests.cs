@@ -127,6 +127,23 @@ public class CapturePaymentHandlerTests
     }
 
     [Fact]
+    public async Task Handle_ReplayedKeyWithDifferentAmount_ShouldConflict()
+    {
+        var intent = CreateAuthorizedIntent();
+        intent.Capture(new Money(60L, "USD"), "cap-key");
+        intent.ClearDomainEvents();
+        var command = new CapturePaymentCommand(intent.Id, 50, "cap-key");
+        SetupValidatorSuccess(command);
+        _repoMock.Setup(r => r.GetByIdAsync(intent.Id, It.IsAny<CancellationToken>())).ReturnsAsync(intent);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Payment.IdempotencyKeyConflict", result.Errors[0].Code);
+        _gatewayMock.Verify(g => g.CaptureAsync(It.IsAny<Guid>(), It.IsAny<GatewayReference>(), It.IsAny<Money>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task Handle_WithIdempotencyKey_ForwardsKeyToGateway()
     {
         var intent = CreateAuthorizedIntent();

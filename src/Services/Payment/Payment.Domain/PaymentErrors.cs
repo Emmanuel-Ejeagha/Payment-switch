@@ -25,6 +25,9 @@ public static class PaymentErrors
     public static Error ConcurrencyConflict =>
         new("Payment.ConcurrencyConflict", "This payment was modified concurrently. Please retry.");
 
+    public static Error IdempotencyKeyConflict(string key) =>
+        new("Payment.IdempotencyKeyConflict", $"Idempotency key '{key}' was already used with different parameters.");
+
     public static Error Unauthorized() =>
         new("Payment.Unauthorized", "You do not have permission to access this merchant.");
 

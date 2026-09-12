@@ -126,6 +126,23 @@ public class RefundPaymentHandlerTests
         _uowMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
+    [Fact]
+    public async Task Handle_ReplayedKeyWithDifferentAmount_ShouldConflict()
+    {
+        var intent = CreateCapturedIntent();
+        intent.Refund(new Money(100, "USD"), "ref-key");
+        intent.ClearDomainEvents();
+        var command = new RefundPaymentCommand(intent.Id, 50, "ref-key");
+        SetupValidatorSuccess(command);
+        _repoMock.Setup(r => r.GetByIdAsync(intent.Id, It.IsAny<CancellationToken>())).ReturnsAsync(intent);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Payment.IdempotencyKeyConflict", result.Errors[0].Code);
+        _gatewayMock.Verify(g => g.RefundAsync(It.IsAny<Guid>(), It.IsAny<GatewayReference>(), It.IsAny<Money>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     private PaymentIntent CreateAuthorizedIntent()
     {
         var intent = new PaymentIntent(Guid.NewGuid(), Guid.NewGuid(), new Money(100, "USD"), new IdempotencyKey("k"), PaymentMethod.Card);

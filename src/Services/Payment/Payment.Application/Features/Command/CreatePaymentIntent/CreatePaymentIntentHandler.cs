@@ -49,6 +49,16 @@ public class CreatePaymentIntentHandler
         var existing = await _repository.GetByIdempotencyKeyAsync(command.MerchantId, command.IdempotencyKey, cancellationToken);
         if (existing is not null)
         {
+            // Same key must mean the same request: a different amount or
+            // currency is a client bug, not a replay — fail loudly instead of
+            // returning someone else's intent.
+            if (existing.Amount.Amount != command.Amount
+                || !string.Equals(existing.Amount.Currency, command.Currency, StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogWarning("Idempotency key {Key} reused with different parameters for Merchant {MerchantId}", command.IdempotencyKey, command.MerchantId);
+                return PaymentErrors.IdempotencyKeyConflict(command.IdempotencyKey);
+            }
+
             _logger.LogInformation("Replaying create for Merchant {MerchantId} with key {Key}", command.MerchantId, command.IdempotencyKey);
             return ToResponse(existing);
         }
