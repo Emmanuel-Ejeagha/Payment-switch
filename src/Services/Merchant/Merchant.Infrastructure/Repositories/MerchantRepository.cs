@@ -46,9 +46,15 @@ public class MerchantRepository : IMerchantRepository
         return await _context.Merchants.AnyAsync(m => m.Email.Value == normalized, cancellationToken);
     }
 
-    public async Task<List<MerchantDto>> ListAsync(int skip, int take, CancellationToken cancellationToken = default)
+    public async Task<List<MerchantDto>> ListAsync(int skip, int take, string? search = null, CancellationToken cancellationToken = default)
     {
-        return await _context.Merchants
+        var query = _context.Merchants.AsQueryable();
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim().ToLowerInvariant();
+            query = query.Where(m => m.BusinessName.Value.ToLower().Contains(term) || m.Email.Value.ToLower().Contains(term));
+        }
+        return await query
             .OrderByDescending(m => m.CreatedAt)
             .Skip(skip).Take(take)
             .Select(m => new MerchantDto(
@@ -72,9 +78,12 @@ public class MerchantRepository : IMerchantRepository
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<int> CountAsync(CancellationToken cancellationToken = default)
+    public async Task<int> CountAsync(string? search = null, CancellationToken cancellationToken = default)
     {
-        return await _context.Merchants.CountAsync(cancellationToken);
+        if (string.IsNullOrWhiteSpace(search))
+            return await _context.Merchants.CountAsync(cancellationToken);
+        var term = search.Trim().ToLowerInvariant();
+        return await _context.Merchants.CountAsync(m => m.BusinessName.Value.ToLower().Contains(term) || m.Email.Value.ToLower().Contains(term), cancellationToken);
     }
 
     public async Task<MerchantEntity?> GetByIdWithApiKeysAsync(Guid id, CancellationToken cancellationToken = default)

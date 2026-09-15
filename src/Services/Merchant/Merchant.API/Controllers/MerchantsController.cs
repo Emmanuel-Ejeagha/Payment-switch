@@ -285,10 +285,11 @@ public class MerchantsController : BaseApiController
     public async Task<IActionResult> List(
         [FromServices] ListMerchantsHandler handler,
         [FromQuery] int skip = PageBounds.DefaultSkip,
-        [FromQuery] int take = PageBounds.DefaultTake)
+        [FromQuery] int take = PageBounds.DefaultTake,
+        [FromQuery] string? search = null)
     {
         var (normalizedSkip, normalizedTake) = PageBounds.Normalize(skip, take);
-        var result = await handler.Handle(new ListMerchantsQuery(normalizedSkip, normalizedTake));
+        var result = await handler.Handle(new ListMerchantsQuery(normalizedSkip, normalizedTake, search));
         if (result.IsFailure) return result.ToActionResult();
 
         Response.Headers["X-Total-Count"] = result.Value!.TotalCount.ToString(CultureInfo.InvariantCulture);

@@ -19,8 +19,8 @@ public class ListMerchantsHandler
     {
         _logger.LogInformation("Handling {QueryName}", nameof(ListMerchantsQuery));
 
-        var merchants = await _repository.ListAsync(query.Skip, query.Take, cancellationToken);
-        var total = await _repository.CountAsync(cancellationToken);
+        var merchants = await _repository.ListAsync(query.Skip, query.Take, query.Search, cancellationToken);
+        var total = await _repository.CountAsync(query.Search, cancellationToken);
         return new PagedData<MerchantDto>(merchants, total);
     }
 }
