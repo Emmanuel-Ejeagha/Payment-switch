@@ -44,13 +44,11 @@ export default function PaymentLinksPage() {
   const [currency, setCurrency] = useState("USD")
   const [description, setDescription] = useState("")
 
-  // The checkout URL is built from the browser's own origin. Reading it during
-  // render keeps the first server-rendered pass and the hydrated pass identical;
-  // the browser-only origin is resolved with a render-time state adjustment.
   const [origin, setOrigin] = useState("")
-  if (origin === "" && typeof window !== "undefined") {
+
+  useEffect(() => {
     setOrigin(window.location.origin)
-  }
+  }, [])
 
   const loadLinks = useCallback(async (merchantId: string) => {
     const res = await fetch(`/api/proxy/payment/api/v1/payment-links?merchantId=${merchantId}&skip=0&take=50`)

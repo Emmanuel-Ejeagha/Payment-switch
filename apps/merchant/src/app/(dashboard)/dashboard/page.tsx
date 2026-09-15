@@ -51,14 +51,26 @@ export default function MerchantDashboardPage() {
     return SUPPORTED_CURRENCIES.map((c) => map.get(c) ?? zeroBalance(c, merchant.id))
   }, [balances, merchant])
 
+  const [pollError, setPollError] = useState<string | null>(null)
+
   const loadData = useCallback(async () => {
     if (!merchant) return
-    const [balanceRes, paymentsRes] = await Promise.all([
-      fetch(`/api/proxy/ledger/api/v1/ledger/balances?merchantId=${merchant.id}`),
-      fetch(`/api/proxy/payment/api/v1/payments?merchantId=${merchant.id}&skip=0&take=5`),
-    ])
-    if (balanceRes.ok) setBalances(await balanceRes.json())
-    if (paymentsRes.ok) setPayments(await paymentsRes.json())
+    if (typeof document !== "undefined" && document.hidden) return
+    try {
+      const [balanceRes, paymentsRes] = await Promise.all([
+        fetch(`/api/proxy/ledger/api/v1/ledger/balances?merchantId=${merchant.id}`),
+        fetch(`/api/proxy/payment/api/v1/payments?merchantId=${merchant.id}&skip=0&take=5`),
+      ])
+      if (balanceRes.ok) {
+        setBalances(await balanceRes.json())
+        setPollError(null)
+      } else {
+        setPollError(`Balance refresh failed (${balanceRes.status})`)
+      }
+      if (paymentsRes.ok) setPayments(await paymentsRes.json())
+    } catch (e) {
+      setPollError(e instanceof Error ? e.message : "Background refresh failed")
+    }
   }, [merchant])
 
   useEffect(() => {
@@ -98,8 +110,15 @@ export default function MerchantDashboardPage() {
 
   useEffect(() => {
     if (!merchant) return
+    const onVisibility = () => {
+      if (!document.hidden) loadData()
+    }
+    document.addEventListener("visibilitychange", onVisibility)
     const interval = setInterval(loadData, 30000)
-    return () => clearInterval(interval)
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener("visibilitychange", onVisibility)
+    }
   }, [merchant, loadData])
 
   const allZero = allBalances.every((b) => b.available === 0 && b.pending === 0 && b.reserved === 0)
@@ -247,6 +266,15 @@ export default function MerchantDashboardPage() {
               Payments are paused. Contact support to find out why and get reactivated.
             </p>
           </div>
+        </div>
+      )}
+
+      {pollError && (
+        <div role="alert" className="flex items-center justify-between rounded-lg border border-amber-600/30 bg-amber-600/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
+          <span>Background refresh failed: {pollError}</span>
+          <button onClick={() => loadData()} className="rounded-md bg-amber-600/20 px-3 py-1 text-xs font-medium hover:bg-amber-600/30">
+            Retry
+          </button>
         </div>
       )}
 
