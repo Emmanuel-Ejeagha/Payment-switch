@@ -14,6 +14,9 @@ export default function AdminPage() {
   const [assigning, setAssigning] = useState(false)
   const [assignResult, setAssignResult] = useState<string | null>(null)
 
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  const isUuidValid = uuidRegex.test(targetUserId.trim())
+
   useEffect(() => {
     async function load() {
       try {
@@ -28,6 +31,10 @@ export default function AdminPage() {
 
   const handleAssignRole = async () => {
     if (!targetUserId.trim()) return
+    if (!isUuidValid) {
+      setAssignResult("Enter a valid UUID")
+      return
+    }
     setAssigning(true)
     setAssignResult(null)
     try {
@@ -101,8 +108,12 @@ export default function AdminPage() {
                 value={targetUserId}
                 onChange={(e) => setTargetUserId(e.target.value)}
                 placeholder="00000000-0000-0000-0000-000000000000"
-                className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm font-mono ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                aria-invalid={!!targetUserId && !isUuidValid}
+                className={`flex h-10 w-full rounded-lg border bg-background px-3 py-2 text-sm font-mono ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${targetUserId && !isUuidValid ? "border-destructive" : "border-input"}`}
               />
+              {targetUserId && !isUuidValid && (
+                <p className="text-xs text-destructive">Enter a valid UUID</p>
+              )}
             </div>
             <div className="space-y-2">
               <label htmlFor="role" className="text-sm font-medium">Role</label>
@@ -119,7 +130,7 @@ export default function AdminPage() {
             </div>
             <button
               onClick={handleAssignRole}
-              disabled={assigning || !targetUserId.trim()}
+              disabled={assigning || !targetUserId.trim() || !isUuidValid}
               className="inline-flex h-10 w-full items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
             >
               {assigning ? "Assigning..." : "Assign Role"}

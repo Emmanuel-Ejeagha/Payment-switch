@@ -136,7 +136,7 @@ export default function SecurityPage() {
                   id="newPassword"
                   type={show.next ? "text" : "password"}
                   autoComplete="new-password"
-                  placeholder="Min. 12 characters, incl. uppercase or symbol"
+                  placeholder="Min. 12 chars: letter, digit, uppercase/symbol - not common"
                   aria-invalid={!!errors.newPassword}
                   aria-describedby={errors.newPassword ? "newPassword-error" : undefined}
                   className={`${inputClass} pr-11`}

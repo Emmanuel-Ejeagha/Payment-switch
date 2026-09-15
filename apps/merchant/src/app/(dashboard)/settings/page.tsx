@@ -57,12 +57,29 @@ export default function SettingsPage() {
     setSaveMessage(null)
     setSaveError(false)
     try {
+      const trimmedUrl = webhookUrl.trim()
+      if (trimmedUrl) {
+        try {
+          const u = new URL(trimmedUrl)
+          if (u.protocol !== "http:" && u.protocol !== "https:") throw new Error()
+        } catch {
+          setSaveMessage("Webhook URL must be a valid http(s) URL")
+          setSaveError(true)
+          setSaving(false)
+          return
+        }
+      }
+      if (enabledMethods.length === 0) {
+        setSaveMessage("Select at least one payment method")
+        setSaveError(true)
+        setSaving(false)
+        return
+      }
       const res = await fetch(`/api/proxy/merchant/api/v1/merchants/${merchant.id}/configuration`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          merchantId: merchant.id,
-          webhookUrl: webhookUrl || null,
+          webhookUrl: trimmedUrl || null,
           paymentMethods: enabledMethods,
           autoCapture,
         }),
