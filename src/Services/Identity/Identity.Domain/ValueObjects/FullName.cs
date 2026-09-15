@@ -10,7 +10,14 @@ public class FullName : ValueObject
     {
         if (string.IsNullOrWhiteSpace(value))
             throw new ArgumentException("Full name cannot be empty.", nameof(value));
-        Value = value;
+        var sanitized = value.Trim();
+        if (sanitized.Length > 100)
+            throw new ArgumentException("Full name must not exceed 100 characters.", nameof(value));
+        // Strip control characters
+        sanitized = new string(sanitized.Where(c => !char.IsControl(c)).ToArray()).Trim();
+        if (string.IsNullOrWhiteSpace(sanitized))
+            throw new ArgumentException("Full name cannot be empty.", nameof(value));
+        Value = sanitized;
     }
 
     protected override IEnumerable<object?> GetEqualityComponents()
