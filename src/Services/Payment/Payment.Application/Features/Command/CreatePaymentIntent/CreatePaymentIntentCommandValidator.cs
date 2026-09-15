@@ -9,7 +9,10 @@ public class CreatePaymentIntentCommandValidator : AbstractValidator<CreatePayme
     {
         RuleFor(x => x.MerchantId).NotEmpty();
         RuleFor(x => x.Amount).GreaterThan(0).WithMessage("Amount must be greater than zero.");
-        RuleFor(x => x.Currency).NotEmpty().Length(3).WithMessage("Currency must be a 3-letter ISO code.");
+        RuleFor(x => x.Currency)
+            .NotEmpty().Length(3).WithMessage("Currency must be a 3-letter ISO code.")
+            .Must(code => { try { BuildingBlocks.Shared.ValueObjects.CurrencyInfo.Lookup(code); return true; } catch { return false; } })
+            .WithMessage("Currency must be a valid ISO 4217 code.");
         RuleFor(x => x.PaymentMethod).NotEmpty().Must(m => m is "Card" or "Bank" or "MobileMoney")
             .WithMessage("Payment method must be Card, Bank, or MobileMoney.");
         RuleFor(x => x.IdempotencyKey)
