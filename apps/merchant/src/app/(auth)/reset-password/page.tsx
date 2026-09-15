@@ -154,7 +154,7 @@ function ResetPasswordContent() {
               id="password"
               type={showPassword ? "text" : "password"}
               autoComplete="new-password"
-              placeholder="Min. 12 characters, incl. uppercase or symbol"
+              placeholder="Min. 12 chars: letter, digit, uppercase/symbol - not common"
               aria-invalid={!!errors.password}
               aria-describedby={errors.password ? "password-error" : undefined}
               className={`${inputClass} pr-11`}

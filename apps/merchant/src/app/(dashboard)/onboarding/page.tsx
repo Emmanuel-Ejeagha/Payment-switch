@@ -80,7 +80,6 @@ export default function OnboardingPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ownerId: user.id,
           businessName: businessName.trim(),
           email: user.email,
         }),
