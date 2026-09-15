@@ -37,12 +37,14 @@ export default function DashboardPage() {
           const list: MerchantDto[] = await merchantsRes.json()
           setMerchants(list)
 
+          const totalHeader = merchantsRes.headers.get("x-total-count")
+          const total = totalHeader ? parseInt(totalHeader, 10) : list.length
           const active = list.filter((m) => m.status === "Active").length
           const pending = list.filter((m) => m.status === "Pending").length
           const suspended = list.filter((m) => m.status === "Suspended").length
 
           setStats({
-            total: list.length,
+            total,
             active,
             pending,
             suspended,

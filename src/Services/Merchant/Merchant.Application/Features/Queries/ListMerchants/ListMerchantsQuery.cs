@@ -2,4 +2,4 @@
 
 namespace Merchant.Application.Features.Queries.ListMerchants;
 
-public record ListMerchantsQuery(int Skip = PageBounds.DefaultSkip, int Take = PageBounds.DefaultTake);
+public record ListMerchantsQuery(int Skip = PageBounds.DefaultSkip, int Take = PageBounds.DefaultTake, string? Search = null);
