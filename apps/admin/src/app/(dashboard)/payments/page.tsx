@@ -143,11 +143,12 @@ export default function PaymentsPage() {
           ))}
         </select>
 
-        <div className="flex flex-wrap gap-2">
-          {["All", "Pending", "Authorized", "Captured"].map((s) => (
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by status">
+          {statuses.map((s) => (
             <button
               key={s}
               onClick={() => { setStatusFilter(s); setSkip(0) }}
+              aria-pressed={statusFilter === s}
               className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                 statusFilter === s
                   ? "bg-primary text-primary-foreground"
@@ -160,12 +161,7 @@ export default function PaymentsPage() {
         </div>
       </div>
 
-      {error && !loading && (
-        <div className="rounded-xl border border-destructive/50 bg-destructive/10 p-6 text-destructive">
-          <p className="font-medium">{error}</p>
-        </div>
-      )}
-      {!error && !selectedMerchantId && merchants.length === 0 && !loading ? (
+      {!selectedMerchantId && merchants.length === 0 && !loading ? (
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-16 text-center">
           <CreditCard className="mb-3 h-8 w-8 text-muted-foreground" />
           <p className="font-medium">No merchants found</p>

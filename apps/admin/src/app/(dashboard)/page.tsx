@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Store, CreditCard, BookOpen, Banknote } from "lucide-react"
+import { Store, CheckCircle2, Clock, Ban } from "lucide-react"
 import { StatsCard } from "@paymentswitch/ui"
 import { RecentMerchants } from "@paymentswitch/ui"
 import type { MerchantDto, UserDto } from "@paymentswitch/shared"
@@ -115,19 +115,19 @@ export default function DashboardPage() {
         <StatsCard
           title="Active"
           value={stats?.active ?? 0}
-          icon={CreditCard}
+          icon={CheckCircle2}
           description="Merchants currently processing"
         />
         <StatsCard
           title="Pending"
           value={stats?.pending ?? 0}
-          icon={BookOpen}
+          icon={Clock}
           description="Awaiting activation"
         />
         <StatsCard
           title="Suspended"
           value={stats?.suspended ?? 0}
-          icon={Banknote}
+          icon={Ban}
           description="Temporarily disabled"
         />
       </div>

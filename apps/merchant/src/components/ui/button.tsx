@@ -47,11 +47,13 @@ export function Button({
   ...props
 }: ButtonProps) {
   const showSpinner = pending
+  const accessibleName = iconOnly && typeof children === "string" && !props["aria-label"] ? (children as string) : undefined
   return (
     <button
       type={type}
       disabled={disabled || pending}
       aria-busy={pending || undefined}
+      aria-label={accessibleName}
       className={cn(
         "inline-flex shrink-0 items-center justify-center font-medium transition-colors",
         "disabled:pointer-events-none disabled:opacity-50",

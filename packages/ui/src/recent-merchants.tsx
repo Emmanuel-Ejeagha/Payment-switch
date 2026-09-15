@@ -1,3 +1,4 @@
+import Link from "next/link"
 import { Store } from "lucide-react"
 import type { MerchantDto } from "@paymentswitch/shared"
 import { StatusBadge } from "./status-badge"
@@ -27,13 +28,13 @@ export function RecentMerchants({ merchants }: RecentMerchantsProps) {
       </div>
       <div className="divide-y">
         {merchants.map((m) => (
-          <div key={m.id} className="flex items-center justify-between px-6 py-3">
+          <Link key={m.id} href={`/merchants/${m.id}`} className="flex items-center justify-between px-6 py-3 transition-colors hover:bg-muted/50">
             <div>
               <p className="text-sm font-medium">{m.businessName}</p>
               <p className="text-xs text-muted-foreground">{m.email}</p>
             </div>
             <StatusBadge status={m.status} />
-          </div>
+          </Link>
         ))}
       </div>
     </div>
