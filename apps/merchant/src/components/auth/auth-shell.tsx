@@ -48,9 +48,9 @@ export function AuthShell({
           src={image.src}
           alt=""
           fill
-          priority
           unoptimized
           sizes="55vw"
+          loading="lazy"
           className="object-cover opacity-45"
         />
         {/* Scrim keeps text contrast fixed regardless of the photo behind it. */}
