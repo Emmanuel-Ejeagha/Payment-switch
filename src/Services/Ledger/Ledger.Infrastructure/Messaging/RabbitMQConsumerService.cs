@@ -150,8 +150,10 @@ public class RabbitMQConsumerService : BackgroundService
                     var result = await ProcessEventAsync(scope, eventType, body, correlationId, cancellationToken);
                     if (result.IsFailure)
                     {
+                        var failure = string.Join("; ", result.Errors.Select(e => e.Message));
                         _logger.LogWarning("Event {EventType} ({MessageId}) failed: {Errors}",
-                            eventType, messageId, string.Join("; ", result.Errors.Select(e => e.Message)));
+                            eventType, messageId, failure);
+                        await RecordFailureAsync(messageId, eventType, body, failure, cancellationToken);
                         await HandleFailureAsync(ea, messageId, cancellationToken);
                         return;
                     }
@@ -248,6 +250,34 @@ public class RabbitMQConsumerService : BackgroundService
             default:
                 _logger.LogWarning("Unknown event type: {EventType}", eventType);
                 return Result.Success();
+        }
+    }
+
+    private async Task RecordFailureAsync(
+        string messageId,
+        string eventType,
+        string body,
+        string error,
+        CancellationToken cancellationToken)
+    {
+        // Best-effort audit: the claim scope rolls back on business failure,
+        // so record the failure here instead. Must never break redelivery.
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var row = await db.InboxMessages.FirstOrDefaultAsync(m => m.MessageId == messageId, cancellationToken);
+            if (row is null)
+            {
+                row = new InboxMessage(messageId, eventType, body);
+                db.InboxMessages.Add(row);
+            }
+            row.MarkAsFailed(error);
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to record inbox failure for {MessageId}", messageId);
         }
     }
 

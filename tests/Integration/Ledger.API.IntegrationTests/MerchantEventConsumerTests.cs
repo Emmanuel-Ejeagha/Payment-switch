@@ -56,6 +56,33 @@ public class MerchantEventConsumerTests : IClassFixture<LedgerApiFactory>
         }
     }
 
+    [Fact]
+    public async Task DuplicateMerchantOnboardedDelivery_ConvergesOnSingleAccount()
+    {
+        // The same onboarding delivered twice (redelivery or parallel consume)
+        // must not duplicate the account nor strand the message in retry/DLQ.
+        var merchantId = Guid.NewGuid();
+        var messageId = Guid.NewGuid().ToString();
+        var payload = JsonSerializer.Serialize(new { MerchantId = merchantId });
+
+        await Task.WhenAll(
+            PublishToMerchantEventsAsync(messageId, payload),
+            PublishToMerchantEventsAsync(messageId, payload));
+
+        await WaitUntilAsync(async () =>
+        {
+            using var scope = _factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            return await db.InboxMessages.AnyAsync(m => m.MessageId == messageId && m.ProcessedAt != null);
+        });
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            Assert.Equal(1, await db.LedgerAccounts.CountAsync(a => a.MerchantId == merchantId));
+        }
+    }
+
     private async Task PublishToMerchantEventsAsync(string messageId, string payload)
     {
         using var scope = _factory.Services.CreateScope();
