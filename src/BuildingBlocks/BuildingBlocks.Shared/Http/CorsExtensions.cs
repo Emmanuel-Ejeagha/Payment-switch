@@ -24,6 +24,22 @@ public static class CorsExtensions
     public static IServiceCollection AddPaymentSwitchCors(this IServiceCollection services, IConfiguration configuration)
     {
         var origins = ResolveOrigins(configuration);
+        var env = configuration["ASPNETCORE_ENVIRONMENT"]
+            ?? Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")
+            ?? Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT");
+
+        if (string.Equals(env, "Production", StringComparison.OrdinalIgnoreCase))
+        {
+            if (origins.Length == 0 || origins.SequenceEqual(DefaultDevOrigins))
+                throw new InvalidOperationException("Cors:AllowedOrigins must be explicitly configured in Production (no localhost fallback).");
+            foreach (var origin in origins)
+            {
+                if (!Uri.TryCreate(origin, UriKind.Absolute, out var uri) || (uri.Scheme != "https" && uri.Scheme != "http"))
+                    throw new InvalidOperationException($"Cors origin '{origin}' must be an absolute URL.");
+                if (uri.Scheme != "https")
+                    throw new InvalidOperationException($"Cors origin '{origin}' must use https in Production.");
+            }
+        }
 
         return services.AddCors(options =>
         {
