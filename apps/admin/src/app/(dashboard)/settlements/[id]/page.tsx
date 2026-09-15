@@ -17,24 +17,43 @@ export default function SettlementDetailPage() {
   const [batch, setBatch] = useState<SettlementBatchDto | null>(null)
   const [merchants, setMerchants] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    async function load() {
+  async function loadBatch() {
+    setLoading(true)
+    setError(null)
+    try {
       const res = await fetch(apiUrl(`/api/proxy/settlement/api/v1/settlement/${id}`))
-      if (res.ok) setBatch(await res.json())
+      if (res.ok) {
+        setBatch(await res.json())
+      } else if (res.status === 404) {
+        setBatch(null)
+      } else {
+        setError(`Failed to load settlement (${res.status})`)
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load settlement")
+    } finally {
       setLoading(false)
     }
-    load()
+  }
+
+  useEffect(() => {
+    loadBatch()
   }, [id])
 
   useEffect(() => {
     async function loadMerchants() {
-      const res = await fetch(apiUrl("/api/proxy/merchant/api/v1/merchants?skip=0&take=100"))
-      if (res.ok) {
-        const list: MerchantDto[] = await res.json()
-        const map: Record<string, string> = {}
-        list.forEach((m) => { map[m.id] = m.businessName })
-        setMerchants(map)
+      try {
+        const res = await fetch(apiUrl("/api/proxy/merchant/api/v1/merchants?skip=0&take=100"))
+        if (res.ok) {
+          const list: MerchantDto[] = await res.json()
+          const map: Record<string, string> = {}
+          list.forEach((m) => { map[m.id] = m.businessName })
+          setMerchants(map)
+        }
+      } catch {
+        // merchant names are optional, ignore
       }
     }
     loadMerchants()
@@ -42,6 +61,21 @@ export default function SettlementDetailPage() {
 
   if (loading) {
     return <div className="h-64 animate-pulse rounded-xl bg-muted" />
+  }
+
+  if (error) {
+    return (
+      <div role="alert" className="rounded-xl border border-destructive/50 bg-destructive/10 p-6 text-destructive">
+        <p className="font-medium">Failed to load settlement</p>
+        <p className="mt-1 text-sm">{error}</p>
+        <button
+          onClick={() => loadBatch()}
+          className="mt-3 rounded-lg bg-destructive px-3 py-1.5 text-sm font-medium text-destructive-foreground hover:bg-destructive/90"
+        >
+          Retry
+        </button>
+      </div>
+    )
   }
 
   if (!batch) {

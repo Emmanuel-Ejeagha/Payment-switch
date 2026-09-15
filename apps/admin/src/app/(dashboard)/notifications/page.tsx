@@ -20,22 +20,36 @@ const statusColors: Record<string, string> = {
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<NotificationDto[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [skip, setSkip] = useState(0)
   const [statusFilter, setStatusFilter] = useState("")
   const [channelFilter, setChannelFilter] = useState("")
   const take = 10
 
-  useEffect(() => {
-    async function load() {
-      setLoading(true)
+  async function loadData() {
+    setLoading(true)
+    setError(null)
+    try {
       const params = new URLSearchParams({ skip: String(skip), take: String(take) })
       if (statusFilter) params.set("status", statusFilter)
       if (channelFilter) params.set("channel", channelFilter)
       const res = await fetch(apiUrl(`/api/proxy/notification/api/v1/notifications?${params}`))
-      if (res.ok) setNotifications(await res.json())
+      if (res.ok) {
+        setNotifications(await res.json())
+      } else {
+        setError(`Failed to load notifications (${res.status})`)
+        setNotifications([])
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load notifications")
+      setNotifications([])
+    } finally {
       setLoading(false)
     }
-    load()
+  }
+
+  useEffect(() => {
+    loadData()
   }, [skip, statusFilter, channelFilter])
 
   return (
@@ -74,6 +88,17 @@ export default function NotificationsPage() {
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="h-24 animate-pulse rounded-xl bg-muted" />
           ))}
+        </div>
+      ) : error ? (
+        <div role="alert" className="rounded-xl border border-destructive/50 bg-destructive/10 p-6 text-destructive">
+          <p className="font-medium">Failed to load notifications</p>
+          <p className="mt-1 text-sm">{error}</p>
+          <button
+            onClick={() => loadData()}
+            className="mt-3 rounded-lg bg-destructive px-3 py-1.5 text-sm font-medium text-destructive-foreground hover:bg-destructive/90"
+          >
+            Retry
+          </button>
         </div>
       ) : notifications.length === 0 ? (
         <div className="flex flex-col items-center rounded-xl border border-dashed py-16 text-center">
