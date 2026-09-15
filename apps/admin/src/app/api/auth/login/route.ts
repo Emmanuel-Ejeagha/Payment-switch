@@ -40,7 +40,7 @@ export async function POST(request: Request) {
   }
 
   const isSecure = process.env.NODE_ENV === "production"
-  const response = NextResponse.json(data)
+  const response = NextResponse.json({ ok: true })
   response.cookies.set("access_token", data.accessToken as string, {
     httpOnly: true,
     secure: isSecure,
