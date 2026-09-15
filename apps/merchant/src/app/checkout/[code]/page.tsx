@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { useParams } from "next/navigation"
 import Link from "next/link"
 import { CheckCircle2, CreditCard, Lock, ShieldCheck, XCircle } from "lucide-react"
@@ -40,6 +40,32 @@ function brandOf(value: string) {
   return null
 }
 
+export function luhnValid(number: string): boolean {
+  const digits = number.replace(/\D/g, "")
+  if (!digits || digits.length < 13 || digits.length > 19) return false
+  let sum = 0
+  let alternate = false
+  for (let i = digits.length - 1; i >= 0; i--) {
+    let n = parseInt(digits[i]!, 10)
+    if (alternate) {
+      n *= 2
+      if (n > 9) n -= 9
+    }
+    sum += n
+    alternate = !alternate
+  }
+  return sum % 10 === 0
+}
+
+export function isExpiryValid(month: number, year: number): boolean {
+  if (month < 1 || month > 12) return false
+  const now = new Date()
+  const normalizedYear = year < 100 ? 2000 + year : year
+  const currentYear = now.getFullYear()
+  const currentMonth = now.getMonth() + 1
+  return normalizedYear > currentYear || (normalizedYear === currentYear && month >= currentMonth)
+}
+
 function CheckoutShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-surface px-4 py-10">
@@ -77,6 +103,7 @@ export default function HostedCheckoutPage() {
   const [cvc, setCvc] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [result, setResult] = useState<{ intentId: string; status: string } | null>(null)
+  const idempotencyKeyRef = useRef<string>(crypto.randomUUID())
 
   useEffect(() => {
     async function load() {
@@ -101,6 +128,20 @@ export default function HostedCheckoutPage() {
     setSubmitting(true)
     setError(null)
     try {
+      const digits = cardNumber.replace(/\s+/g, "")
+      if (!digits) {
+        setError("Enter your card number")
+        return
+      }
+      if (digits.length < 13 || digits.length > 19) {
+        setError("Enter a valid card number (13-19 digits)")
+        return
+      }
+      if (!luhnValid(digits)) {
+        setError("Card number failed checksum")
+        return
+      }
+
       const [rawMonth, rawYear] = expiry.split("/").map((s) => parseInt(s.trim(), 10))
       if (!rawMonth || !rawYear || rawMonth < 1 || rawMonth > 12) {
         setError("Enter expiry as MM/YY")
@@ -108,6 +149,10 @@ export default function HostedCheckoutPage() {
       }
       // Accept both MM/YY and MM/YYYY; only two-digit years need the century added.
       const expiryYear = rawYear < 100 ? 2000 + rawYear : rawYear
+      if (!isExpiryValid(rawMonth, rawYear)) {
+        setError("Card has expired")
+        return
+      }
 
       if (!/^\d{3,4}$/.test(cvc)) {
         setError("Enter the 3 or 4 digit security code")
@@ -137,7 +182,7 @@ export default function HostedCheckoutPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Idempotency-Key": crypto.randomUUID(),
+          "Idempotency-Key": idempotencyKeyRef.current,
         },
         body: JSON.stringify({ cardToken: token, securityCode: cvc }),
       })
@@ -148,6 +193,10 @@ export default function HostedCheckoutPage() {
       }
       const data = await payRes.json()
       setResult({ intentId: data.intentId, status: data.status })
+      // Next attempt gets a fresh key so retries of this attempt stay idempotent.
+      idempotencyKeyRef.current = crypto.randomUUID()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Payment failed — please try again")
     } finally {
       setSubmitting(false)
     }
