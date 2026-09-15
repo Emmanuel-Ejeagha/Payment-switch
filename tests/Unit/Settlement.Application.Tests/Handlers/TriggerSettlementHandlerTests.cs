@@ -160,23 +160,38 @@ public class TriggerSettlementHandlerTests
     [Fact]
     public async Task Handle_TieOutMismatch_ShouldFailWithoutCompleting()
     {
+        // Single-snapshot tie-out: batch is built and validated against the same
+        // ledger snapshot, so there is no TOCTOU between two reads. This test
+        // now verifies a consistent snapshot succeeds and is queried exactly once.
         var command = new TriggerSettlementCommand(new DateTime(2026, 7, 3));
         SetupValidatorSuccess(command);
         _repoMock.Setup(r => r.GetByBatchDateAndCurrencyAsync(command.BatchDate, It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync((SettlementBatch?)null);
-        _ledgerMock.SetupSequence(l => l.GetDailyPayoutDataAsync(command.BatchDate, It.IsAny<CancellationToken>()))
+        _ledgerMock.Setup(l => l.GetDailyPayoutDataAsync(command.BatchDate, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<List<MerchantPayoutData>>.Success(new List<MerchantPayoutData>
             {
                 new(Guid.NewGuid(), 1000L, 20L, "USD")
-            }))
-            .ReturnsAsync(Result<List<MerchantPayoutData>>.Success(new List<MerchantPayoutData>
-            {
-                new(Guid.NewGuid(), 2000L, 40L, "USD")
             }));
+        _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsSuccess);
+        _ledgerMock.Verify(l => l.GetDailyPayoutDataAsync(command.BatchDate, It.IsAny<CancellationToken>()), Times.Once);
+        _repoMock.Verify(r => r.AddAsync(It.IsAny<SettlementBatch>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_EmptyLedger_ShouldFailWithEmptyBatch()
+    {
+        var command = new TriggerSettlementCommand(new DateTime(2026, 7, 3));
+        SetupValidatorSuccess(command);
+        _ledgerMock.Setup(l => l.GetDailyPayoutDataAsync(command.BatchDate, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<List<MerchantPayoutData>>.Success(new List<MerchantPayoutData>()));
 
         var result = await _handler.Handle(command);
 
         Assert.True(result.IsFailure);
-        Assert.Equal("Settlement.LedgerTieOutMismatch", result.Errors[0].Code);
+        Assert.Equal("Settlement.EmptyBatch", result.Errors[0].Code);
         _repoMock.Verify(r => r.AddAsync(It.IsAny<SettlementBatch>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 

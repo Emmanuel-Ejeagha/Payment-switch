@@ -92,7 +92,9 @@ public class CollectSubscriptionCycleHandler
                 $"Invoice '{invoice.Code}' is '{invoice.Status}' and cannot be collected.");
 
         // Deterministic key: retries of the same cycle never create a second charge.
-        var idempotencyKey = $"sub-{subscription.Id:N}-{invoice.PeriodStart:yyyyMMddHHmmss}";
+        // Use UTC ticks (100ns, culture-invariant) so no two cycles collide on
+        // same-second formatting and the key survives kind/reparse.
+        var idempotencyKey = $"sub-{subscription.Id:N}-{invoice.PeriodStart.ToUniversalTime().Ticks}";
 
         var intentResult = await _createIntent.Handle(
             new CreatePaymentIntentCommand(
@@ -126,10 +128,14 @@ public class CollectSubscriptionCycleHandler
 
         // When the merchant runs manual capture the intent stops at Authorized; capture it here
         // so the invoice reflects settled funds rather than a held authorization.
+        // Use a derived key so the capture transaction does not collide with the
+        // authorize transaction that already carries the subscription key on this
+        // intent (unique Payments.Transactions(PaymentIntentId, IdempotencyKey)).
         if (status == PaymentStatus.Authorized.Value)
         {
+            var captureKey = CreatePaymentIntentHandler.DeriveCaptureKey(idempotencyKey);
             var captureResult = await _capture.Handle(
-                new CapturePaymentCommand(intent.IntentId, null, idempotencyKey), cancellationToken);
+                new CapturePaymentCommand(intent.IntentId, null, captureKey), cancellationToken);
 
             if (!captureResult.IsSuccess)
                 return await RecordFailure(subscription, invoice, plan.Interval,

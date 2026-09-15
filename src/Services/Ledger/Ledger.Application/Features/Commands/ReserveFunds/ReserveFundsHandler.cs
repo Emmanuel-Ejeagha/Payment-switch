@@ -48,7 +48,7 @@ public class ReserveFundsHandler
         {
             var amount = new Money(command.Amount, command.Currency);
             var correlationId = new CorrelationId(command.CorrelationId);
-            account.ReserveFunds(amount, correlationId);
+            account.ReserveFunds(amount, correlationId, command.EventOccurredOn);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             await _unitOfWork.CommitAsync(cancellationToken);
         }
@@ -86,7 +86,7 @@ public class ReserveFundsHandler
         {
             var amount = new Money(command.Amount, command.Currency);
             var correlationId = new CorrelationId(command.CorrelationId);
-            account.ReserveFunds(amount, correlationId);
+            account.ReserveFunds(amount, correlationId, command.EventOccurredOn);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             await _unitOfWork.CommitAsync(cancellationToken);
         }

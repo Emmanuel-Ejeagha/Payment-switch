@@ -18,7 +18,7 @@ public class JournalEntry : BaseEntity
 
     private JournalEntry() : base() { }
 
-    public JournalEntry(EntryType type, GlAccountCode debitAccount, GlAccountCode creditAccount, Money amount, string description, CorrelationId correlationId) : base()
+    public JournalEntry(EntryType type, GlAccountCode debitAccount, GlAccountCode creditAccount, Money amount, string description, CorrelationId correlationId, DateTime? eventOccurredOn = null) : base()
     {
         if (debitAccount == creditAccount)
             throw new ArgumentException("Debit and credit accounts must differ.", nameof(creditAccount));
@@ -29,6 +29,11 @@ public class JournalEntry : BaseEntity
         Amount = amount ?? throw new ArgumentNullException(nameof(amount));
         Description = description ?? throw new ArgumentNullException(nameof(description));
         CorrelationId = correlationId ?? throw new ArgumentNullException(nameof(correlationId));
-        Timestamp = DateTime.UtcNow;
+        // Use the payment event's business date for settlement grouping, not the
+        // posting instant, so a capture that posts one second past midnight
+        // still settles on its event date. Fallback to UtcNow for legacy rows.
+        Timestamp = eventOccurredOn.HasValue && eventOccurredOn.Value != default
+            ? DateTime.SpecifyKind(eventOccurredOn.Value, DateTimeKind.Utc)
+            : DateTime.UtcNow;
     }
 }
