@@ -43,7 +43,7 @@ public class ReleaseFundsHandler
         {
             var amount = new Money(command.Amount, command.Currency);
             var correlationId = new CorrelationId(command.CorrelationId);
-            account.ReleaseFunds(amount, correlationId);
+            account.ReleaseFunds(amount, correlationId, command.EventOccurredOn);
         }
         catch (InvalidOperationException ex)
         {

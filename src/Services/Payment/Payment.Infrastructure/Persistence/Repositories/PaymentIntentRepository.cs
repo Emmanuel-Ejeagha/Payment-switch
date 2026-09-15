@@ -25,6 +25,7 @@ public class PaymentIntentRepository : IPaymentIntentRepository
     public async Task<PaymentIntent?> GetByIdempotencyKeyAsync(Guid merchantId, string idempotencyKey, CancellationToken cancellationToken = default)
     {
         return await _context.PaymentIntents
+            .Include(p => p.Transactions)
             .FirstOrDefaultAsync(p => p.MerchantId == merchantId && p.IdempotencyKey == new IdempotencyKey(idempotencyKey), cancellationToken);
     }
 

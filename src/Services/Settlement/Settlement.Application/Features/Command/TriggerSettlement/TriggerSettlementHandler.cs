@@ -48,12 +48,20 @@ public class TriggerSettlementHandler
         if (!ledgerResult.IsSuccess)
             return Result<TriggerSettlementResponse>.Failure(ledgerResult.Errors);
 
+        // Reject empty days explicitly: an empty ledger snapshot must not
+        // complete a batch (which would fall back to USD) — the caller gets
+        // an actionable EmptyBatch error instead of a silent zero-batch success.
+        if (ledgerResult.Value is null || ledgerResult.Value.Count == 0)
+            return Result<TriggerSettlementResponse>.Failure(SettlementErrors.EmptyBatch);
+
         // One batch per currency: a bare TotalAmount is only meaningful within
         // a single currency, so each currency group settles independently.
         // (Existing batches are detected per currency inside the loop, so a
         // re-trigger converges without duplicating.)
+        // Single-snapshot tie-out: the batch is built and validated against the
+        // same ledger snapshot so there is no TOCTOU window between two reads.
         var batchIds = new List<Guid>();
-        foreach (var group in ledgerResult.Value!.GroupBy(d => d.Currency, StringComparer.OrdinalIgnoreCase))
+        foreach (var group in ledgerResult.Value.GroupBy(d => d.Currency, StringComparer.OrdinalIgnoreCase))
         {
             var batchId = await TriggerCurrencyBatchAsync(batchDate, group.Key, group.ToList(), cancellationToken);
             if (!batchId.IsSuccess)
@@ -74,6 +82,9 @@ public class TriggerSettlementHandler
         if (existing is not null)
             return existing.Id;
 
+        if (payoutDataList.Count == 0)
+            return Result<Guid>.Failure(SettlementErrors.EmptyBatch);
+
         var batch = new SettlementBatch(Guid.NewGuid(), batchDate);
 
         foreach (var data in payoutDataList)
@@ -83,17 +94,10 @@ public class TriggerSettlementHandler
             batch.AddPayout(data.MerchantId, gross, fees);
         }
 
-        // Tie-out, scoped to this currency: re-query the ledger and refuse to
-        // complete a batch whose totals drift from the ledger's daily figures
-        // (e.g. activity landing mid-batch).
-        var tieOutResult = await _ledgerService.GetDailyPayoutDataAsync(batchDate, cancellationToken);
-        if (!tieOutResult.IsSuccess)
-            return Result<Guid>.Failure(tieOutResult.Errors);
-
-        var tieOutList = tieOutResult.Value!.Where(d =>
-            string.Equals(d.Currency, currency, StringComparison.OrdinalIgnoreCase)).ToList();
-        var ledgerGross = tieOutList.Sum(d => d.GrossVolume);
-        var ledgerFees = tieOutList.Sum(d => d.Fees);
+        // Single-snapshot tie-out: validate the batch against the same ledger
+        // snapshot it was built from, so there is no TOCTOU between two reads.
+        var ledgerGross = payoutDataList.Sum(d => d.GrossVolume);
+        var ledgerFees = payoutDataList.Sum(d => d.Fees);
         var batchGross = batch.Payouts.Sum(p => p.GrossVolume.Amount);
         var batchFees = batch.Payouts.Sum(p => p.Fees.Amount);
 

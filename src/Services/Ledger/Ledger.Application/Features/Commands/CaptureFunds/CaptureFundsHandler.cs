@@ -48,7 +48,7 @@ public class CaptureFundsHandler
         try
         {
             var amount = new Money(command.Amount, command.Currency);
-            account.CaptureFunds(amount, new CorrelationId(command.CorrelationId));
+            account.CaptureFunds(amount, new CorrelationId(command.CorrelationId), command.EventOccurredOn);
 
             var fee = FeeCalculator.Calculate(command.Amount, _options.FeeBasisPoints);
             if (fee > 0)
@@ -57,7 +57,7 @@ public class CaptureFundsHandler
                 // JournalEntries.CorrelationId is unique (idempotency backstop), so
                 // the fee posting must carry a distinct correlation id or the second
                 // insert violates the index and the whole capture is rolled back.
-                account.ChargeFees(new Money(fee, command.Currency), new CorrelationId($"{command.CorrelationId}:fee"));
+                account.ChargeFees(new Money(fee, command.Currency), new CorrelationId($"{command.CorrelationId}:fee"), command.EventOccurredOn);
             }
         }
         catch (InvalidOperationException ex)

@@ -52,8 +52,10 @@ public class CreatePaymentIntentHandler
             // Same key must mean the same request: a different amount or
             // currency is a client bug, not a replay — fail loudly instead of
             // returning someone else's intent.
-            if (existing.Amount.Amount != command.Amount
-                || !string.Equals(existing.Amount.Currency, command.Currency, StringComparison.OrdinalIgnoreCase))
+            // Currency is checked first: it is cheaper and more discriminating
+            // than the amount comparison, so a currency mismatch short-circuits.
+            if (!string.Equals(existing.Amount.Currency, command.Currency, StringComparison.OrdinalIgnoreCase)
+                || existing.Amount.Amount != command.Amount)
             {
                 _logger.LogWarning("Idempotency key {Key} reused with different parameters for Merchant {MerchantId}", command.IdempotencyKey, command.MerchantId);
                 return PaymentErrors.IdempotencyKeyConflict(command.IdempotencyKey);
@@ -164,8 +166,8 @@ public class CreatePaymentIntentHandler
         if (winner is null)
             return new Error("Payment.CreateFailed", "Could not create payment intent.");
 
-        if (winner.Amount.Amount != command.Amount
-            || !string.Equals(winner.Amount.Currency, command.Currency, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(winner.Amount.Currency, command.Currency, StringComparison.OrdinalIgnoreCase)
+            || winner.Amount.Amount != command.Amount)
         {
             return PaymentErrors.IdempotencyKeyConflict(command.IdempotencyKey);
         }

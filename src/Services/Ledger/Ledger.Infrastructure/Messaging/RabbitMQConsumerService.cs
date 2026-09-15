@@ -222,28 +222,28 @@ public class RabbitMQConsumerService : BackgroundService
                 var reserveHandler = scope.ServiceProvider.GetRequiredService<ReserveFundsHandler>();
                 return await reserveHandler.Handle(
                     new ReserveFundsCommand(authEvent.MerchantId, authEvent.Amount.Amount, authEvent.Amount.Currency,
-                        correlationId ?? $"PaymentAuth:{authEvent.IntentId}"), cancellationToken);
+                        correlationId ?? $"PaymentAuth:{authEvent.IntentId}", authEvent.OccurredOn), cancellationToken);
 
             case "PaymentCapturedDomainEvent":
                 var captureEvent = JsonSerializer.Deserialize<PaymentCapturedEvent>(body)!;
                 var captureHandler = scope.ServiceProvider.GetRequiredService<CaptureFundsHandler>();
                 return await captureHandler.Handle(
                     new CaptureFundsCommand(captureEvent.MerchantId, captureEvent.Amount.Amount, captureEvent.Amount.Currency,
-                        correlationId ?? $"PaymentCapt:{captureEvent.IntentId}"), cancellationToken);
+                        correlationId ?? $"PaymentCapt:{captureEvent.IntentId}", captureEvent.OccurredOn), cancellationToken);
 
             case "PaymentRefundedDomainEvent":
                 var refundEvent = JsonSerializer.Deserialize<PaymentRefundedEvent>(body)!;
                 var refundHandler = scope.ServiceProvider.GetRequiredService<RefundFundsHandler>();
                 return await refundHandler.Handle(
                     new RefundFundsCommand(refundEvent.MerchantId, refundEvent.Amount.Amount, refundEvent.Amount.Currency,
-                        correlationId ?? $"PaymentRef:{refundEvent.IntentId}"), cancellationToken);
+                        correlationId ?? $"PaymentRef:{refundEvent.IntentId}", refundEvent.OccurredOn), cancellationToken);
 
             case "PaymentVoidedDomainEvent":
                 var voidEvent = JsonSerializer.Deserialize<PaymentVoidedEvent>(body)!;
                 var releaseHandler = scope.ServiceProvider.GetRequiredService<ReleaseFundsHandler>();
                 return await releaseHandler.Handle(
                     new ReleaseFundsCommand(voidEvent.MerchantId, voidEvent.Amount.Amount, voidEvent.Amount.Currency,
-                        correlationId ?? $"PaymentVoid:{voidEvent.IntentId}"), cancellationToken);
+                        correlationId ?? $"PaymentVoid:{voidEvent.IntentId}", voidEvent.OccurredOn), cancellationToken);
 
             default:
                 _logger.LogWarning("Unknown event type: {EventType}", eventType);

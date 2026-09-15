@@ -55,8 +55,14 @@ public class SettlementBatch : AggregateRoot
         if (Status == SettlementStatus.Completed)
             throw new InvalidOperationException("Batch is already completed.");
 
+        if (_payouts.Count == 0)
+            throw new InvalidOperationException("Cannot complete an empty settlement batch.");
+
+        if (Currency is null)
+            throw new InvalidOperationException("Cannot complete a batch with no currency.");
+
         Status = SettlementStatus.Completed;
         CompletedAt = DateTime.UtcNow;
-        AddDomainEvent(new SettlementBatchCompletedEvent(Id, BatchDate, TotalAmount, Currency ?? "USD"));
+        AddDomainEvent(new SettlementBatchCompletedEvent(Id, BatchDate, TotalAmount, Currency));
     }
 }
