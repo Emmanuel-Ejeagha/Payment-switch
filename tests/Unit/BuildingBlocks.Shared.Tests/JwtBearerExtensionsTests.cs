@@ -212,4 +212,39 @@ public class JwtBearerExtensionsTests
 
         Assert.Single(options.TokenValidationParameters.IssuerSigningKeys);
     }
+
+    [Fact]
+    public void AddPaymentSwitchJwtBearer_RotationWindow_OldTokenVerifiesDuringGrace_AndFailsAfter()
+    {
+        // Mint a token with the previous secret (simulating a token issued before rotation)
+        var previousKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(PreviousSecret));
+        var previousCreds = new SigningCredentials(previousKey, SecurityAlgorithms.HmacSha256);
+        var token = new JwtSecurityToken(
+            issuer: "IdentityService",
+            audience: "PaymentSwitch",
+            claims: new[] { new Claim(ClaimTypes.NameIdentifier, "user-1") },
+            expires: DateTime.UtcNow.AddMinutes(5),
+            signingCredentials: previousCreds);
+        var rawToken = new JwtSecurityTokenHandler().WriteToken(token);
+
+        // During grace window: both keys are configured — old token must verify
+        var graceConfig = BuildConfig(
+            ("Jwt:Secret", CurrentSecret),
+            ("Jwt:PreviousSecret", PreviousSecret),
+            ("Jwt:Issuer", "IdentityService"),
+            ("Jwt:Audience", "PaymentSwitch"));
+        var graceOptions = GetOptions(graceConfig);
+        var handler = new JwtSecurityTokenHandler();
+        var principal = handler.ValidateToken(rawToken, graceOptions.TokenValidationParameters, out _);
+        Assert.True(principal.Identity!.IsAuthenticated);
+
+        // After window: PreviousSecret removed — old token must be rejected
+        var postConfig = BuildConfig(
+            ("Jwt:Secret", CurrentSecret),
+            ("Jwt:Issuer", "IdentityService"),
+            ("Jwt:Audience", "PaymentSwitch"));
+        var postOptions = GetOptions(postConfig);
+        Assert.Throws<SecurityTokenSignatureKeyNotFoundException>(() =>
+            handler.ValidateToken(rawToken, postOptions.TokenValidationParameters, out _));
+    }
 }
