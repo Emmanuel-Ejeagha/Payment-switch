@@ -1,53 +1,27 @@
 using BuildingBlocks.Shared;
+using BuildingBlocks.Shared.ValueObjects;
 
 namespace Ledger.Domain.ValueObjects;
 
 /// <summary>
-/// ISO 4217 currency metadata: the minor-unit exponent (digits after the decimal
-/// separator) used to convert between major and minor units. Most currencies are
-/// 2-decimal; a handful use 0 (JPY, KRW, CLP, ISK, VND) or 3 (KWD, BHD, OMR, JOD,
-/// TND, LYD, IQD). Unknown codes fall back to the ISO 4217 default of 2 so a new
-/// currency never silently mis-scales.
+/// Ledger-local facade over the shared <see cref="BuildingBlocks.Shared.ValueObjects.CurrencyInfo"/>
+/// so existing domain references keep compiling while the exponent table lives once in BuildingBlocks.
 /// </summary>
 public class CurrencyInfo : ValueObject
 {
-    private const int DefaultExponent = 2;
+    private readonly BuildingBlocks.Shared.ValueObjects.CurrencyInfo _inner;
 
-    private static readonly IReadOnlyDictionary<string, int> Exponents =
-        new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["JPY"] = 0,
-            ["KRW"] = 0,
-            ["CLP"] = 0,
-            ["ISK"] = 0,
-            ["VND"] = 0,
-            ["KWD"] = 3,
-            ["BHD"] = 3,
-            ["OMR"] = 3,
-            ["JOD"] = 3,
-            ["TND"] = 3,
-            ["LYD"] = 3,
-            ["IQD"] = 3,
-        };
-
-    public string Code { get; }
-    public int MinorUnitsExponent { get; }
-
-    private CurrencyInfo(string code, int minorUnitsExponent)
+    private CurrencyInfo(BuildingBlocks.Shared.ValueObjects.CurrencyInfo inner)
     {
-        Code = code;
-        MinorUnitsExponent = minorUnitsExponent;
+        _inner = inner;
     }
+
+    public string Code => _inner.Code;
+    public int MinorUnitsExponent => _inner.MinorUnitsExponent;
 
     public static CurrencyInfo Lookup(string code)
     {
-        if (string.IsNullOrWhiteSpace(code) || code.Length != 3)
-            throw new ArgumentException("Currency code must be a 3-letter ISO code.", nameof(code));
-
-        var normalized = code.ToUpperInvariant();
-        return Exponents.TryGetValue(normalized, out var exponent)
-            ? new CurrencyInfo(normalized, exponent)
-            : new CurrencyInfo(normalized, DefaultExponent);
+        return new CurrencyInfo(BuildingBlocks.Shared.ValueObjects.CurrencyInfo.Lookup(code));
     }
 
     /// <summary>
