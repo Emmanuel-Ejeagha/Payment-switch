@@ -27,18 +27,10 @@ public class OutboxInterceptor : SaveChangesInterceptor
     /// Event types with a real RabbitMQ consumer. Everything else is only ever
     /// delivered in-process (webhooks) or carries no cross-service value, so it
     /// is not written to the outbox — publishing it would drop it into a void.
-    /// See docs/messaging-registry.md.
+    /// See docs/messaging-registry.md and the shared <see cref="PaymentEventChannels"/>.
     /// </summary>
-    private static readonly HashSet<string> PublishedEventTypes = new()
-    {
-        "PaymentIntentCreatedDomainEvent",
-        "PaymentAuthorizedDomainEvent",
-        "PaymentCapturedDomainEvent",
-        "PaymentRefundedDomainEvent",
-        "PaymentVoidedDomainEvent",
-        "PaymentFailedDomainEvent",
-        "PaymentExpiredDomainEvent"
-    };
+    internal static readonly HashSet<string> PublishedEventTypes =
+        new(PaymentEventChannels.PublishedPaymentEvents);
 
     private readonly ICorrelationIdProvider _correlationIdProvider;
 

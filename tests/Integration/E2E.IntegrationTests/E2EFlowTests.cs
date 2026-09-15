@@ -117,8 +117,13 @@ public class E2EFlowTests : IClassFixture<E2EFactory>
             return account is { PendingBalance: 10000, ReservedBalance: 10000 };
         }, "ledger reserve of 10000 for the authorized payment");
 
-        // 9. Capture the authorized payment.
-        var captureResponse = await paymentInternal.PostAsJsonAsync($"/api/v1/payments/{intent.IntentId}/capture", new { });
+        // 9. Capture the authorized payment (idempotency key is required; NULL bypasses unique index).
+        var captureRequest = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/payments/{intent.IntentId}/capture")
+        {
+            Content = JsonContent.Create(new { })
+        };
+        captureRequest.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString("N"));
+        var captureResponse = await paymentInternal.SendAsync(captureRequest);
         captureResponse.EnsureSuccessStatusCode();
         var capture = await captureResponse.Content.ReadFromJsonAsync<CapturePaymentResponse>();
         Assert.Equal("Captured", capture!.Status);

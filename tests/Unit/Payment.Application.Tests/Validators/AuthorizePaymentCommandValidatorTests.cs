@@ -9,15 +9,39 @@ public class AuthorizePaymentCommandValidatorTests
     [Fact]
     public void ValidCommand_Passes()
     {
-        var result = _validator.Validate(new AuthorizePaymentCommand(Guid.NewGuid(), "4242", "Visa", null));
+        var result = _validator.Validate(new AuthorizePaymentCommand(Guid.NewGuid(), "4242", "Visa", "idem-key-123"));
 
         Assert.True(result.IsValid);
     }
 
     [Fact]
+    public void NullIdempotencyKey_Fails()
+    {
+        var result = _validator.Validate(new AuthorizePaymentCommand(Guid.NewGuid(), "4242", "Visa", null));
+
+        Assert.Contains(result.Errors, e => e.PropertyName == "IdempotencyKey");
+    }
+
+    [Fact]
+    public void EmptyIdempotencyKey_Fails()
+    {
+        var result = _validator.Validate(new AuthorizePaymentCommand(Guid.NewGuid(), "4242", "Visa", ""));
+
+        Assert.Contains(result.Errors, e => e.PropertyName == "IdempotencyKey");
+    }
+
+    [Fact]
+    public void InvalidCharactersIdempotencyKey_Fails()
+    {
+        var result = _validator.Validate(new AuthorizePaymentCommand(Guid.NewGuid(), "4242", "Visa", "bad:key!"));
+
+        Assert.Contains(result.Errors, e => e.PropertyName == "IdempotencyKey");
+    }
+
+    [Fact]
     public void EmptyIntentId_Fails()
     {
-        var result = _validator.Validate(new AuthorizePaymentCommand(Guid.Empty, "4242", "Visa", null));
+        var result = _validator.Validate(new AuthorizePaymentCommand(Guid.Empty, "4242", "Visa", "idem-key-123"));
 
         Assert.Contains(result.Errors, e => e.PropertyName == "IntentId");
     }

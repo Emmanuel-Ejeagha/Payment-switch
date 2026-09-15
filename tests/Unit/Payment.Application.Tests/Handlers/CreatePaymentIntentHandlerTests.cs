@@ -185,6 +185,33 @@ public class CreatePaymentIntentHandlerTests
         Assert.Contains(result.Errors, e => e.Code == "Amount");
     }
 
+    [Fact]
+    public async Task Handle_AutoCapture_ShouldThreadDerivedCaptureKey()
+    {
+        var command = new CreatePaymentIntentCommand(Guid.NewGuid(), 100, "USD", "Card", "1234", "Visa", "base-key-123");
+        SetupValidatorSuccess(command);
+        _repoMock.Setup(r => r.GetByIdempotencyKeyAsync(command.MerchantId, command.IdempotencyKey, It.IsAny<CancellationToken>())).ReturnsAsync((PaymentIntent?)null);
+        SetupMerchantConfig(autoCapture: true);
+        _gatewayMock.Setup(g => g.AuthorizeAsync(command.MerchantId, It.IsAny<Money>(), It.IsAny<CardDetails?>(), It.IsAny<CardSecurityCode?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<GatewayResponse>.Success(new GatewayResponse(true, "AUTH123", "GW-1", null)));
+        PaymentIntent? captured = null;
+        _repoMock.Setup(r => r.AddAsync(It.IsAny<PaymentIntent>(), It.IsAny<CancellationToken>()))
+            .Callback<PaymentIntent, CancellationToken>((intent, _) => captured = intent)
+            .Returns(Task.CompletedTask);
+        _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(captured);
+        var authTx = captured!.Transactions.Single(t => t.Type == Payment.Domain.Enums.TransactionType.Authorization);
+        var capTx = captured.Transactions.Single(t => t.Type == Payment.Domain.Enums.TransactionType.Capture);
+        Assert.Equal("base-key-123", authTx.IdempotencyKey);
+        Assert.Equal("base-key-123-capture", capTx.IdempotencyKey);
+        // Distinct keys so the unique (PaymentIntentId, IdempotencyKey) index is not violated.
+        Assert.NotEqual(authTx.IdempotencyKey, capTx.IdempotencyKey);
+    }
+
     private void SetupValidatorSuccess(CreatePaymentIntentCommand command) =>
         _validatorMock.Setup(v => v.ValidateAsync(command, It.IsAny<CancellationToken>())).ReturnsAsync(new ValidationResult());
 

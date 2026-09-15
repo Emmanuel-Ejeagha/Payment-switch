@@ -133,7 +133,7 @@ public class CreatePaymentIntentHandler
             intent.Authorize(authCode, gatewayRef, idempotencyKey.Value, gwResponse.ProviderName);
 
             if (configResult.Value!.AutoCapture)
-                intent.Capture();
+                intent.Capture(idempotencyKey: DeriveCaptureKey(idempotencyKey.Value));
         }
 
         await _unitOfWork.BeginTransactionAsync(cancellationToken);
@@ -186,4 +186,12 @@ public class CreatePaymentIntentHandler
         "MobileMoney" => PaymentMethod.MobileMoney,
         _ => throw new ArgumentException($"Unknown payment method: {method}")
     };
+
+    internal static string DeriveCaptureKey(string baseKey)
+    {
+        const string suffix = "-capture";
+        if (baseKey.Length + suffix.Length <= IdempotencyKey.MaxLength)
+            return baseKey + suffix;
+        return baseKey.Substring(0, IdempotencyKey.MaxLength - suffix.Length) + suffix;
+    }
 }

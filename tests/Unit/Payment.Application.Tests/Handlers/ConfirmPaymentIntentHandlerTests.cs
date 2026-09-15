@@ -191,6 +191,30 @@ public class ConfirmPaymentIntentHandlerTests
         return intent;
     }
 
+    [Fact]
+    public async Task Handle_AutoCapture_ShouldThreadDerivedCaptureKey()
+    {
+        var intent = CreateRequiresActionIntent();
+        var command = new ConfirmPaymentIntentCommand(intent.MerchantId, intent.Id, "confirm-base-123");
+        SetupValidatorSuccess(command);
+        SetupMerchantConfig(autoCapture: true);
+        _repoMock.Setup(r => r.GetByIdAsync(intent.Id, It.IsAny<CancellationToken>())).ReturnsAsync(intent);
+        _gatewayMock.Setup(g => g.ConfirmChallengeAsync(intent.MerchantId, intent.Amount, intent.CardDetails, intent.GatewayReference!.Value, It.IsAny<CardSecurityCode?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<GatewayResponse>.Success(new GatewayResponse(true, "AUTH-3DS", intent.GatewayReference!.Value, null)));
+        _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Captured", result.Value!.Status);
+        var capTx = intent.Transactions.Single(t => t.Type == Payment.Domain.Enums.TransactionType.Capture);
+        Assert.Equal("confirm-base-123-capture", capTx.IdempotencyKey);
+        var authTx = intent.Transactions.Single(t => t.Type == Payment.Domain.Enums.TransactionType.Authorization);
+        // The authorize leg carries the confirm key itself; capture derives from it.
+        Assert.Equal("confirm-base-123", authTx.IdempotencyKey);
+        Assert.NotEqual(authTx.IdempotencyKey, capTx.IdempotencyKey);
+    }
+
     private void SetupMerchantConfig(bool autoCapture) =>
         _merchantServiceMock.Setup(m => m.GetMerchantConfigAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<MerchantConfig>.Success(new MerchantConfig("https://hook.test", autoCapture)));
