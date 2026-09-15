@@ -184,6 +184,35 @@ public class BrokerFlowTests : IClassFixture<LedgerApiFactory>
     }
 
     [Fact]
+    public async Task PoisonMessage_RecordsInboxFailureInsteadOfVanishing()
+    {
+        // A void for an unknown merchant can never succeed: the failure must
+        // be recorded on the inbox row (attempts + error) rather than dropped.
+        var merchantId = Guid.NewGuid();
+        var messageId = Guid.NewGuid().ToString();
+        var payload = JsonSerializer.Serialize(new PaymentVoidedEvent(
+            Guid.NewGuid(), merchantId, new MoneyPayload(1000, "USD")));
+        await PublishToPaymentEventsAsync(messageId, payload, "PaymentVoidedDomainEvent");
+
+        await WaitUntilAsync(async () =>
+        {
+            using var scope = _factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var row = await db.InboxMessages.FirstOrDefaultAsync(m => m.MessageId == messageId);
+            return row is not null && row.State == InboxState.Failed && row.Attempts >= 1;
+        });
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var row = await db.InboxMessages.FirstAsync(m => m.MessageId == messageId);
+            Assert.Equal(InboxState.Failed, row.State);
+            Assert.True(row.Attempts >= 1);
+            Assert.False(string.IsNullOrWhiteSpace(row.LastError));
+        }
+    }
+
+    [Fact]
     public async Task RedeliveredMessage_AfterCrashBeforeMarkProcessed_DoesNotDoublePost()
     {
         // Simulate a crash AFTER the posting is committed but BEFORE the inbox row
