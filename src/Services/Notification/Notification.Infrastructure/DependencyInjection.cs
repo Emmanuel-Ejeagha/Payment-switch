@@ -70,7 +70,12 @@ public static class DependencyInjection
         .AddGrpcResilienceInterceptor()
         .AddServiceTokenAuthentication();
 
-        services.Configure<SmtpSettings>(configuration.GetSection("Smtp"));
+        var isProduction = string.Equals(
+            configuration["ASPNETCORE_ENVIRONMENT"] ?? Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"),
+            "Production", StringComparison.OrdinalIgnoreCase);
+        services.AddValidatedOptions<SmtpSettings>(configuration, "Smtp",
+            s => !isProduction || !string.IsNullOrWhiteSpace(s.Host),
+            "Smtp:Host must be configured in Production");
         services.Configure<SmsSettings>(configuration.GetSection("Sms"));
 
         return services;
