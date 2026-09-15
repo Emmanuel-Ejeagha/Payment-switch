@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { ACCESS_TOKEN_MAX_AGE, REFRESH_TOKEN_MAX_AGE } from "@/lib/auth"
 
 export async function POST(request: Request) {
   const body = await request.json()
@@ -33,14 +34,14 @@ export async function POST(request: Request) {
     secure: isSecure,
     sameSite: "lax",
     path: "/",
-    maxAge: 60 * 60,
+    maxAge: ACCESS_TOKEN_MAX_AGE,
   })
   response.cookies.set("refresh_token", data.refreshToken as string, {
     httpOnly: true,
     secure: isSecure,
     sameSite: "lax",
     path: "/",
-    maxAge: 60 * 60 * 24 * 7,
+    maxAge: REFRESH_TOKEN_MAX_AGE,
   })
 
   return response
