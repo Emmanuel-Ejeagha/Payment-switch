@@ -14,19 +14,34 @@ function formatAmount(amount: number) {
 export default function SettlementsPage() {
   const [batches, setBatches] = useState<SettlementBatchDto[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [skip, setSkip] = useState(0)
   const take = 10
   const [triggering, setTriggering] = useState(false)
   const [triggerResult, setTriggerResult] = useState<string | null>(null)
 
-  useEffect(() => {
-    async function load() {
+  async function loadData() {
+    setLoading(true)
+    setError(null)
+    try {
       const params = new URLSearchParams({ skip: String(skip), take: String(take) })
       const res = await fetch(apiUrl(`/api/proxy/settlement/api/v1/settlement?${params}`))
-      if (res.ok) setBatches(await res.json())
+      if (res.ok) {
+        setBatches(await res.json())
+      } else {
+        setError(`Failed to load settlements (${res.status})`)
+        setBatches([])
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load settlements")
+      setBatches([])
+    } finally {
       setLoading(false)
     }
-    load()
+  }
+
+  useEffect(() => {
+    loadData()
   }, [skip])
 
   const handleTrigger = async () => {
@@ -86,6 +101,17 @@ export default function SettlementsPage() {
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="h-20 animate-pulse rounded-xl bg-muted" />
           ))}
+        </div>
+      ) : error ? (
+        <div role="alert" className="rounded-xl border border-destructive/50 bg-destructive/10 p-6 text-destructive">
+          <p className="font-medium">Failed to load settlements</p>
+          <p className="mt-1 text-sm">{error}</p>
+          <button
+            onClick={() => loadData()}
+            className="mt-3 rounded-lg bg-destructive px-3 py-1.5 text-sm font-medium text-destructive-foreground hover:bg-destructive/90"
+          >
+            Retry
+          </button>
         </div>
       ) : batches.length === 0 ? (
         <div className="flex flex-col items-center rounded-xl border border-dashed py-16 text-center">
