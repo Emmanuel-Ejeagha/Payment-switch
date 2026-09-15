@@ -1,5 +1,6 @@
 using Ledger.Application.Interfaces;
 using Ledger.Domain.Entities;
+using Ledger.Domain.Enums;
 using Ledger.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -51,23 +52,31 @@ public class ReconciliationService : IReconciliationService
         long reserved = 0, pending = 0, available = 0;
         foreach (var entry in account.Journal)
         {
-            switch (entry.Description)
+            // Recompute strictly from GL legs, not description strings: a swapped
+            // debit/credit pair with the same description must not tie out.
+            if (entry.DebitAccount == GlAccountCode.Cash && entry.CreditAccount == GlAccountCode.Reserve)
             {
-                case "Funds reserved":
-                    reserved += entry.Amount.Amount;
-                    pending += entry.Amount.Amount;
-                    break;
-                case "Funds captured":
-                    reserved -= entry.Amount.Amount;
-                    pending -= entry.Amount.Amount;
-                    available += entry.Amount.Amount;
-                    break;
-                case "Funds refunded":
-                    available -= entry.Amount.Amount;
-                    break;
-                case "Processing fees":
-                    available -= entry.Amount.Amount;
-                    break;
+                reserved += entry.Amount.Amount;
+                pending += entry.Amount.Amount;
+            }
+            else if (entry.DebitAccount == GlAccountCode.Reserve && entry.CreditAccount == GlAccountCode.MerchantLiability)
+            {
+                reserved -= entry.Amount.Amount;
+                pending -= entry.Amount.Amount;
+                available += entry.Amount.Amount;
+            }
+            else if (entry.DebitAccount == GlAccountCode.Reserve && entry.CreditAccount == GlAccountCode.Cash)
+            {
+                reserved -= entry.Amount.Amount;
+                pending -= entry.Amount.Amount;
+            }
+            else if (entry.DebitAccount == GlAccountCode.MerchantLiability && entry.CreditAccount == GlAccountCode.Cash)
+            {
+                available -= entry.Amount.Amount;
+            }
+            else if (entry.DebitAccount == GlAccountCode.MerchantLiability && entry.CreditAccount == GlAccountCode.FeesIncome)
+            {
+                available -= entry.Amount.Amount;
             }
         }
 
