@@ -83,7 +83,7 @@ public class ConfirmPaymentIntentHandler
             intent.ConfirmAction(authCode, gatewayRef, command.IdempotencyKey, gwResponse.ProviderName);
 
             if (configResult.Value!.AutoCapture)
-                intent.Capture();
+                intent.Capture(idempotencyKey: DeriveCaptureKey(command.IdempotencyKey));
         }
         catch (InvalidOperationException)
         {
@@ -109,5 +109,13 @@ public class ConfirmPaymentIntentHandler
     {
         string? clientSecret = intent.Transactions.LastOrDefault(t => t.Type == TransactionType.Capture)?.Id.ToString();
         return new ConfirmPaymentIntentResponse(intent.Id, intent.Status.Value, clientSecret);
+    }
+
+    internal static string DeriveCaptureKey(string baseKey)
+    {
+        const string suffix = "-capture";
+        if (baseKey.Length + suffix.Length <= Payment.Domain.ValueObjects.IdempotencyKey.MaxLength)
+            return baseKey + suffix;
+        return baseKey.Substring(0, Payment.Domain.ValueObjects.IdempotencyKey.MaxLength - suffix.Length) + suffix;
     }
 }

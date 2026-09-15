@@ -9,7 +9,7 @@ public class CapturePaymentCommandValidatorTests
     [Fact]
     public void ValidCommandWithNullAmount_Passes()
     {
-        var result = _validator.Validate(new CapturePaymentCommand(Guid.NewGuid(), null));
+        var result = _validator.Validate(new CapturePaymentCommand(Guid.NewGuid(), null, "idem-key-123"));
 
         Assert.True(result.IsValid);
     }
@@ -17,15 +17,23 @@ public class CapturePaymentCommandValidatorTests
     [Fact]
     public void ValidCommandWithAmount_Passes()
     {
-        var result = _validator.Validate(new CapturePaymentCommand(Guid.NewGuid(), 10000));
+        var result = _validator.Validate(new CapturePaymentCommand(Guid.NewGuid(), 10000, "idem-key-123"));
 
         Assert.True(result.IsValid);
     }
 
     [Fact]
+    public void NullIdempotencyKey_Fails()
+    {
+        var result = _validator.Validate(new CapturePaymentCommand(Guid.NewGuid(), null, null));
+
+        Assert.Contains(result.Errors, e => e.PropertyName == "IdempotencyKey");
+    }
+
+    [Fact]
     public void EmptyIntentId_Fails()
     {
-        var result = _validator.Validate(new CapturePaymentCommand(Guid.Empty, null));
+        var result = _validator.Validate(new CapturePaymentCommand(Guid.Empty, null, "idem-key-123"));
 
         Assert.Contains(result.Errors, e => e.PropertyName == "IntentId");
     }
@@ -35,7 +43,7 @@ public class CapturePaymentCommandValidatorTests
     [InlineData(-5)]
     public void NonPositiveAmount_Fails(long amount)
     {
-        var result = _validator.Validate(new CapturePaymentCommand(Guid.NewGuid(), amount));
+        var result = _validator.Validate(new CapturePaymentCommand(Guid.NewGuid(), amount, "idem-key-123"));
 
         Assert.Contains(result.Errors, e => e.PropertyName == "Amount");
     }

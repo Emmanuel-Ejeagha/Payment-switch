@@ -105,10 +105,8 @@ public class RabbitMQConsumerService : BackgroundService
         await _channel.QueueBindAsync(_dlq, _dlxExchange, "#", null, cancellationToken: cancellationToken);
 
         await _channel.QueueDeclareAsync(_queueName, durable: true, exclusive: false, autoDelete: false, cancellationToken: cancellationToken);
-        await _channel.QueueBindAsync(_queueName, _sourceExchange, "PaymentAuthorizedDomainEvent", null, cancellationToken: cancellationToken);
-        await _channel.QueueBindAsync(_queueName, _sourceExchange, "PaymentCapturedDomainEvent", null, cancellationToken: cancellationToken);
-        await _channel.QueueBindAsync(_queueName, _sourceExchange, "PaymentRefundedDomainEvent", null, cancellationToken: cancellationToken);
-        await _channel.QueueBindAsync(_queueName, _sourceExchange, "PaymentVoidedDomainEvent", null, cancellationToken: cancellationToken);
+        foreach (var routingKey in PaymentEventChannels.LedgerBoundPaymentEvents)
+            await _channel.QueueBindAsync(_queueName, _sourceExchange, routingKey, null, cancellationToken: cancellationToken);
 
         var consumer = new AsyncEventingBasicConsumer(_channel);
         consumer.ReceivedAsync += async (sender, ea) =>

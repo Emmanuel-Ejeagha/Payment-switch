@@ -34,6 +34,8 @@ public class OutboxPublisherService : BackgroundService
             "outbox publisher");
     }
 
+    private const int BatchSize = 10;
+
     private async Task ProcessOutbox(CancellationToken cancellationToken)
     {
         using var scope = _scopeFactory.CreateScope();
@@ -43,8 +45,22 @@ public class OutboxPublisherService : BackgroundService
         var leaseToken = Guid.NewGuid();
         var leaseUntil = DateTime.UtcNow.Add(_leaseDuration);
 
-        await db.OutboxMessages
+        var candidateIds = await db.OutboxMessages
             .Where(m => !m.Processed && (m.LeaseExpiresAt == null || m.LeaseExpiresAt < DateTime.UtcNow))
+            .OrderBy(m => m.OccurredOn)
+            .ThenBy(m => m.Id)
+            .Take(BatchSize)
+            .Select(m => m.Id)
+            .ToListAsync(cancellationToken);
+
+        if (candidateIds.Count == 0)
+        {
+            OutboxMetrics.SetBacklog(await db.OutboxMessages.CountAsync(m => !m.Processed, cancellationToken));
+            return;
+        }
+
+        await db.OutboxMessages
+            .Where(m => candidateIds.Contains(m.Id))
             .ExecuteUpdateAsync(
                 s => s.SetProperty(m => m.LeaseToken, leaseToken)
                       .SetProperty(m => m.LeaseExpiresAt, leaseUntil),
@@ -55,7 +71,8 @@ public class OutboxPublisherService : BackgroundService
             var messages = await db.OutboxMessages
                 .Where(m => m.LeaseToken == leaseToken)
                 .OrderBy(m => m.OccurredOn)
-                .Take(10)
+                .ThenBy(m => m.Id)
+                .Take(BatchSize)
                 .ToListAsync(cancellationToken);
 
             if (messages.Count == 0)
