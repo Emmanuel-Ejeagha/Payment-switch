@@ -9,11 +9,11 @@ export interface PaymentEvent {
   timestamp: string
 }
 
-async function getAccessToken(): Promise<string> {
+async function getAccessToken(): Promise<string | null> {
   const res = await fetch("/api/auth/token")
-  if (!res.ok) throw new Error("Not authenticated")
+  if (!res.ok) return null
   const data = (await res.json()) as { accessToken?: string }
-  return data.accessToken ?? ""
+  return data.accessToken ?? null
 }
 
 export function useNotifications() {
@@ -22,41 +22,57 @@ export function useNotifications() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const conn = new signalR.HubConnectionBuilder()
-      .withUrl(
-        `${process.env.NEXT_PUBLIC_API_URL}/notification/hubs/payment-notifications`,
-        {
-          withCredentials: false,
-          accessTokenFactory: getAccessToken,
-        }
-      )
-      .withAutomaticReconnect()
-      .configureLogging(signalR.LogLevel.Warning)
-      .build()
+    let cancelled = false
+    let conn: signalR.HubConnection | null = null
 
-    conn.on("PaymentEvent", (event: PaymentEvent) => {
-      setEvents((prev) => [event, ...prev])
-    })
+    async function init() {
+      const token = await getAccessToken()
+      if (cancelled) return
+      if (!token) {
+        setError(null)
+        setConnected(false)
+        return
+      }
 
-    conn.onreconnecting(() => setConnected(false))
-    conn.onreconnected(() => setConnected(true))
-    conn.onclose(() => setConnected(false))
+      conn = new signalR.HubConnectionBuilder()
+        .withUrl(
+          `${process.env.NEXT_PUBLIC_API_URL}/notification/hubs/payment-notifications`,
+          {
+            withCredentials: false,
+            accessTokenFactory: () => token,
+          }
+        )
+        .withAutomaticReconnect()
+        .configureLogging(signalR.LogLevel.Warning)
+        .build()
 
-    async function start() {
+      conn.on("PaymentEvent", (event: PaymentEvent) => {
+        setEvents((prev) => [event, ...prev])
+      })
+
+      conn.onreconnecting(() => setConnected(false))
+      conn.onreconnected(() => setConnected(true))
+      conn.onclose(() => setConnected(false))
+
       try {
         await conn.start()
-        setConnected(true)
-        setError(null)
+        if (!cancelled) {
+          setConnected(true)
+          setError(null)
+        }
       } catch (err) {
-        setConnected(false)
-        setError(err instanceof Error ? err.message : "Connection failed")
+        if (!cancelled) {
+          setConnected(false)
+          setError(err instanceof Error ? err.message : "Connection failed")
+        }
       }
     }
 
-    start()
+    init()
 
     return () => {
-      conn.stop()
+      cancelled = true
+      conn?.stop()
     }
   }, [])
 

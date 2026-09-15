@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server"
 import { cookies } from "next/headers"
+import { ACCESS_TOKEN_MAX_AGE, REFRESH_TOKEN_MAX_AGE } from "@/lib/auth"
 
 const isSecure = process.env.NODE_ENV === "production"
 
 async function refresh() {
   const cookieStore = await cookies()
-  const accessToken = cookieStore.get("access_token")?.value
   const refreshToken = cookieStore.get("refresh_token")?.value
 
   if (!refreshToken) {
@@ -18,7 +18,6 @@ async function refresh() {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}),
       },
       body: JSON.stringify({ refreshToken }),
     })
@@ -42,14 +41,14 @@ async function refresh() {
     secure: isSecure,
     sameSite: "lax",
     path: "/",
-    maxAge: 60 * 15,
+    maxAge: ACCESS_TOKEN_MAX_AGE,
   })
   response.cookies.set("refresh_token", data.refreshToken, {
     httpOnly: true,
     secure: isSecure,
     sameSite: "lax",
     path: "/",
-    maxAge: 60 * 60 * 24 * 7,
+    maxAge: REFRESH_TOKEN_MAX_AGE,
   })
   return { response, ok: true }
 }
