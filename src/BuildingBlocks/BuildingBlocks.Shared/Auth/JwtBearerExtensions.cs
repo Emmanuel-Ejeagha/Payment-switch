@@ -68,7 +68,8 @@ public static class JwtBearerExtensions
                     ValidAlgorithms = new[] { SecurityAlgorithms.HmacSha256 },
                     ValidIssuer = jwt["Issuer"],
                     ValidAudience = jwt["Audience"],
-                    IssuerSigningKeys = signingKeys
+                    IssuerSigningKeys = signingKeys,
+                    ClockSkew = TimeSpan.FromSeconds(30)
                 };
 
                 configure?.Invoke(options);
