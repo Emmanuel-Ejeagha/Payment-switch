@@ -87,37 +87,60 @@ always an integer in minor units (never a float).
 
 ## Verification sample (C#)
 
-Merchants verify a delivery by recomputing the signature with their secret and
-comparing in constant time. Reference implementation:
+Merchants verify a delivery by recomputing the signature **over the
+sender-supplied timestamp** with their secret and comparing in constant time.
+Reference implementation (mirrors `WebhookSignature.VerifyWithRotation` +
+`WebhookReceiver.Validate` in `Payment.Infrastructure.Services`):
 
 ```csharp
+using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 
-static bool Verify(string secret, byte[] payload, string timestamp, string signature)
+static string Sign(string secret, byte[] payload, string timestamp)
 {
-    if (string.IsNullOrWhiteSpace(signature) || !signature.StartsWith("sha256="))
-        return false;
-
     var body = Encoding.UTF8.GetBytes($"{timestamp}.{Convert.ToBase64String(payload)}");
     using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secret));
-    var expected = Convert.ToHexString(hmac.ComputeHash(body)).ToLowerInvariant();
-    var provided = signature[7..];
+    return "sha256=" + Convert.ToHexString(hmac.ComputeHash(body)).ToLowerInvariant();
+}
 
-    return CryptographicOperations.FixedTimeEquals(
-        Convert.FromHexString(expected),
-        Convert.FromHexString(provided));
+static bool Verify(string secret, byte[] payload, string timestamp, string signature,
+    TimeSpan maxAge)
+{
+    // 1. timestamp freshness: reject if |now - timestamp| > tolerance (5 min).
+    if (!long.TryParse(timestamp, out var ts)) return false;
+    if (Math.Abs(DateTimeOffset.UtcNow.ToUnixTimeSeconds() - ts) > maxAge.TotalSeconds)
+        return false;
+    // 2. signature match (constant time) over the SUPPLIED timestamp.
+    var expected = Sign(secret, payload, timestamp);
+    if (expected.Length != signature.Length || !signature.StartsWith("sha256="))
+        return false;
+    try
+    {
+        return CryptographicOperations.FixedTimeEquals(
+            Convert.FromHexString(expected[7..]),
+            Convert.FromHexString(signature[7..]));
+    }
+    catch (FormatException) { return false; }
 }
 
 // Recommended checks, in order:
-// 1. timestamp freshness: reject if now - timestamp > tolerance (e.g. 5 min).
-// 2. idempotency: skip already-processed X-PaymentSwitch-Delivery ids.
-// 3. signature match against current secret, then previous secret (rotation).
+// 1. freshness: reject if |now - timestamp| > 5 min (both past and future).
+// 2. signature against current secret, then previous secret while inside the
+//    rotation grace window (deliveries are signed with the previous secret
+//    during the window — see docs/secrets.md / TASK-006).
+// 3. idempotency: skip already-processed X-PaymentSwitch-Delivery ids. Claim
+//    the id ONLY after the signature verifies, and persist it (DB/Redis) so a
+//    restart cannot reprocess. The in-memory reference is
+//    `InMemoryDeliveryIdStore` (72h TTL, covers retry + manual replay).
 ```
 
-The repository also exposes `WebhookSignature.Verify` in
-`Payment.Infrastructure.Services` with the same semantics, exercised by unit
-tests.
+The repository exposes `WebhookSignature.Verify` (single secret, 5-minute
+default window), `WebhookSignature.VerifyWithRotation` (current + previous
+with grace), and `WebhookReceiver.Validate` (freshness + dual-secret +
+delivery-id claim in one call), all exercised by unit tests. `Compute` stamps
+"now"; verification always recomputes over the supplied timestamp via
+`ComputeWithTimestamp` — never compare against a freshly-stamped signature.
 
 ## Replay and test (merchant dashboard)
 

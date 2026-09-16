@@ -39,11 +39,16 @@ public static class DependencyInjection
         services.AddSingleton<IEventBus, RabbitMQEventBus>();
         services.AddHostedService<OutboxPublisherService>();
 
+        var ledgerGrpcAddress = configuration["Grpc:Ledger:Address"] ?? "http://ledger-api:5001";
+        var ledgerGrpcAllowInsecure = configuration.GetValue<bool>("Grpc:Ledger:AllowInsecure");
+        ServiceTokenExtensions.RequireGrpcTls(configuration, ledgerGrpcAddress, ledgerGrpcAllowInsecure);
+        var ledgerGrpcInsecure = ServiceTokenExtensions.ShouldUseInsecureChannel(ledgerGrpcAddress);
         services.AddGrpcClient<LedgerService.LedgerServiceClient>(o =>
         {
-            o.Address = new Uri(configuration["Grpc:Ledger:Address"] ?? "http://ledger-api:5001");
-            o.ChannelOptionsActions.Add(channel =>
-                channel.UnsafeUseInsecureChannelCallCredentials = true);
+            o.Address = new Uri(ledgerGrpcAddress);
+            if (ledgerGrpcInsecure)
+                o.ChannelOptionsActions.Add(channel =>
+                    channel.UnsafeUseInsecureChannelCallCredentials = true);
         })
         .AddGrpcResilienceInterceptor()
         .AddServiceTokenAuthentication();

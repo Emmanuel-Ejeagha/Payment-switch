@@ -72,15 +72,23 @@ public static class DependencyInjection
         services.AddHostedService<PaymentExpiryWorker>();
         services.AddHostedService<PaymentRetentionService>();
 
-        // The merchant gRPC channel is a documented in-network exception
-        // (TASK-004): port 5001 is never published and the endpoint is gated by
-        // the ServiceOnly policy. Secret delivery is additionally constrained by
-        // encrypt-at-rest (TASK-006).
+        // The merchant gRPC channel defaults to the isolated docker/k8s network
+        // (port 5001 is never published; endpoint is ServiceOnly-gated).
+        // Production requires https unless the in-network exception is
+        // explicitly acknowledged via Grpc:Merchant:AllowInsecure=true
+        // (see docs/tls.md "gRPC service-to-service"). Secret delivery stays
+        // constrained by encrypt-at-rest (TASK-006) + short-lived
+        // service tokens.
+        var merchantGrpcAddress = configuration["Grpc:Merchant:Address"] ?? "http://merchant-api:5001";
+        var merchantGrpcAllowInsecure = configuration.GetValue<bool>("Grpc:Merchant:AllowInsecure");
+        ServiceTokenExtensions.RequireGrpcTls(configuration, merchantGrpcAddress, merchantGrpcAllowInsecure);
+        var merchantGrpcInsecure = ServiceTokenExtensions.ShouldUseInsecureChannel(merchantGrpcAddress);
         services.AddGrpcClient<MerchantService.MerchantServiceClient>(o =>
         {
-            o.Address = new Uri(configuration["Grpc:Merchant:Address"] ?? "http://merchant-api:5001");
-            o.ChannelOptionsActions.Add(channel =>
-                channel.UnsafeUseInsecureChannelCallCredentials = true);
+            o.Address = new Uri(merchantGrpcAddress);
+            if (merchantGrpcInsecure)
+                o.ChannelOptionsActions.Add(channel =>
+                    channel.UnsafeUseInsecureChannelCallCredentials = true);
         })
         .AddGrpcResilienceInterceptor()
         .AddServiceTokenAuthentication();

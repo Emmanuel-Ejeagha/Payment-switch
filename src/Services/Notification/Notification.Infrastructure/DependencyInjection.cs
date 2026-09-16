@@ -57,25 +57,27 @@ public static class DependencyInjection
         services.AddSingleton<IEventBus, RabbitMQEventBus>();
         services.AddScoped<HttpClient>(_ => new HttpClient());
 
-        // The merchant gRPC channel is a documented in-network exception
-        // (TASK-004): port 5001 is never published and the endpoint is gated by
-        // the ServiceOnly policy. Payment events are enriched with the merchant
-        // contact email at consume time so notifications never use a placeholder.
+        // The merchant gRPC channel defaults to the isolated docker/k8s network
+        // (port 5001 is never published; endpoint is ServiceOnly-gated).
+        // Production requires https unless Grpc:Merchant:AllowInsecure=true
+        // (see docs/tls.md "gRPC service-to-service"). Payment events are
+        // enriched with the merchant contact email at consume time so
+        // notifications never use a placeholder.
+        var merchantGrpcAddress = configuration["Grpc:Merchant:Address"] ?? "http://merchant-api:5001";
+        var merchantGrpcAllowInsecure = configuration.GetValue<bool>("Grpc:Merchant:AllowInsecure");
+        ServiceTokenExtensions.RequireGrpcTls(configuration, merchantGrpcAddress, merchantGrpcAllowInsecure);
+        var merchantGrpcInsecure = ServiceTokenExtensions.ShouldUseInsecureChannel(merchantGrpcAddress);
         services.AddGrpcClient<MerchantService.MerchantServiceClient>(o =>
         {
-            o.Address = new Uri(configuration["Grpc:Merchant:Address"] ?? "http://merchant-api:5001");
-            o.ChannelOptionsActions.Add(channel =>
-                channel.UnsafeUseInsecureChannelCallCredentials = true);
+            o.Address = new Uri(merchantGrpcAddress);
+            if (merchantGrpcInsecure)
+                o.ChannelOptionsActions.Add(channel =>
+                    channel.UnsafeUseInsecureChannelCallCredentials = true);
         })
         .AddGrpcResilienceInterceptor()
         .AddServiceTokenAuthentication();
 
-        var isProduction = string.Equals(
-            configuration["ASPNETCORE_ENVIRONMENT"] ?? Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"),
-            "Production", StringComparison.OrdinalIgnoreCase);
-        services.AddValidatedOptions<SmtpSettings>(configuration, "Smtp",
-            s => !isProduction || !string.IsNullOrWhiteSpace(s.Host),
-            "Smtp:Host must be configured in Production");
+        services.Configure<SmtpSettings>(configuration.GetSection("Smtp"));
         services.Configure<SmsSettings>(configuration.GetSection("Sms"));
 
         return services;
