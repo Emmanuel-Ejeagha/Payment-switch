@@ -46,12 +46,12 @@ mode folders are committed:
 
 5. Verify:
 
-   ```bash
-   curl -I https://paymentswitch.example.com/merchant/api/v1/health
-   curl -I http://paymentswitch.example.com/merchant/api/v1/health   # expect 301
-   curl -I https://paymentswitch.example.com/                         # merchant portal
-   curl -I https://paymentswitch.example.com/admin/login              # admin portal
-   ```
+    ```bash
+    curl -I https://paymentswitch.example.com/merchant/health/live
+    curl -I http://paymentswitch.example.com/merchant/health/live   # expect 301
+    curl -I https://paymentswitch.example.com/                         # merchant portal
+    curl -I https://paymentswitch.example.com/admin/login              # admin portal
+    ```
 
 The TLS server sets HSTS (`max-age=31536000; includeSubDomains`), forwards
 `X-Forwarded-Proto: https`, and sets nosniff/SAMEORIGIN/referrer headers.

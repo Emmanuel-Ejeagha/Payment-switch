@@ -47,11 +47,15 @@ the stack consistent. For zero-downtime deployment of a single service,
 ### Verifying a deploy
 
 ```bash
-curl -fsS http://localhost/identity/api/v1/health/live
-curl -fsS http://localhost/merchant/api/v1/health/ready
+curl -fsS http://localhost/identity/health/live
+curl -fsS http://localhost/merchant/health/ready
 curl -I http://localhost/            # merchant portal
 curl -I http://localhost/admin/login # admin portal
 ```
+
+Health lives at `/health/live|ready` on each API (no `/api/v1` prefix);
+nginx strips the `/<service>/` prefix when proxying (Step 8.1). For metrics
+and the full per-API matrix, run `bash infra/smoke/compose-smoke.sh`.
 
 ## 2. TLS (production)
 
@@ -63,10 +67,10 @@ TLS terminates at nginx (see `docs/tls.md`):
 3. Switch nginx to TLS mode in `docker-compose.yml` (mount
    `./infra/nginx/tls:/etc/nginx/tls:ro`) and `docker compose up -d nginx`.
 4. Confirm the redirect + HSTS:
-   ```bash
-   curl -I http://<domain>/identity/api/v1/health   # 301 -> https
-   curl -I https://<domain>/                        # 200
-   ```
+    ```bash
+    curl -I http://<domain>/identity/health/live   # 301 -> https
+    curl -I https://<domain>/                        # 200
+    ```
 
 ### Renewal
 
@@ -116,9 +120,13 @@ docker run --rm -v paymentswitch_prometheus_data:/data -v /var/backups:/backup \
 
 - **Health endpoints:** each API exposes `/health/live` and `/health/ready`
   (nginx proxies them; used by the Docker healthchecks).
-- **Metrics:** Prometheus scrapes `/metrics` from each API (port 8080) and
-  RabbitMQ; Grafana dashboards are provisioned from `infra/grafana`.
-  Alert rules live in `infra/prometheus/alerts.yml` (fired via Alertmanager).
+- **Metrics:** Prometheus scrapes `/metrics` from each API (port 8080,
+  `metrics_path` pinned in `infra/prometheus/prometheus.yml`) and RabbitMQ
+  (`:15692`, via the `rabbitmq_prometheus` plugin enabled in compose/k8s).
+  Verify with `bash infra/smoke/compose-smoke.sh` (per-API health through
+  nginx + per-API exposition on loopback). Grafana dashboards are provisioned
+  from `infra/grafana`. Alert rules live in `infra/prometheus/alerts.yml`
+  (fired via Alertmanager).
 - **Traces:** OpenTelemetry OTLP -> Jaeger (`http://jaeger:4317`).
 - **Logs:** `docker compose logs -f <service>` (structured JSON via Serilog).
   For a tail of everything: `docker compose logs -f --tail=200`.

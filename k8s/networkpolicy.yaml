@@ -153,3 +153,66 @@ spec:
           port: 15672
         - protocol: TCP
           port: 15692
+---
+# Step 8.1: let Prometheus scrape the APIs (:8080/metrics) and RabbitMQ
+# (:15692/metrics). Without this, default-deny leaves every scrape target
+# DOWN once policies are enforced. (Broader selector hardening is Step 9.2.)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus-scrape
+  namespace: payment-switch
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values: [identity-api, merchant-api, payment-api, ledger-api, notification-api, settlement-api, rabbitmq]
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: prometheus
+      ports:
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 15692
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus-egress
+  namespace: payment-switch
+spec:
+  podSelector:
+    matchLabels:
+      app: prometheus
+  policyTypes:
+    - Egress
+  egress:
+    # DNS (service discovery + target names)
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Scrape targets
+    - to:
+        - podSelector:
+            matchExpressions:
+              - key: app
+                operator: In
+                values: [identity-api, merchant-api, payment-api, ledger-api, notification-api, settlement-api, rabbitmq]
+      ports:
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 15692
