@@ -1,4 +1,5 @@
 using Asp.Versioning;
+using BuildingBlocks.Shared.Auth;
 using Ledger.API.Extensions;
 using Ledger.Application.DTOs;
 using Ledger.Application.Features.Commands.RunReconciliation;
@@ -10,19 +11,21 @@ using Microsoft.AspNetCore.Mvc;
 namespace Ledger.API.Controllers;
 
 /// <summary>
-/// Admin-only ledger reconciliation: verifies each account's stored balances
+/// Admin ledger reconciliation: verifies each account's stored balances
 /// against its journal entries and exposes the audit report history.
+/// State-changing runs are Admin-only; report reads are Admin + Support.
 /// </summary>
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/reconciliation")]
-[Authorize(Roles = "Admin")]
+[Authorize]
 public class ReconciliationController : ControllerBase
 {
     /// <summary>
-    /// Run a reconciliation now and persist the audit report.
+    /// Run a reconciliation now and persist the audit report (Admin only).
     /// </summary>
     [HttpPost("run")]
+    [Authorize(Roles = RolePolicies.AdminOnly)]
     [ProducesResponseType(typeof(ReconciliationReportDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Run(
@@ -34,9 +37,10 @@ public class ReconciliationController : ControllerBase
     }
 
     /// <summary>
-    /// Get the most recent reconciliation report.
+    /// Get the most recent reconciliation report (Admin + Support read).
     /// </summary>
     [HttpGet("latest")]
+    [Authorize(Roles = RolePolicies.ReadOnly)]
     [ProducesResponseType(typeof(ReconciliationReportDto), StatusCodes.Status200OK)]
     public async Task<IActionResult> Latest(
         [FromServices] GetLatestReconciliationHandler handler,
@@ -47,9 +51,10 @@ public class ReconciliationController : ControllerBase
     }
 
     /// <summary>
-    /// List reconciliation reports (newest first, paginated).
+    /// List reconciliation reports, newest first, paginated (Admin + Support read).
     /// </summary>
     [HttpGet]
+    [Authorize(Roles = RolePolicies.ReadOnly)]
     [ProducesResponseType(typeof(List<ReconciliationReportDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> List(
         [FromServices] ListReconciliationReportsHandler handler,

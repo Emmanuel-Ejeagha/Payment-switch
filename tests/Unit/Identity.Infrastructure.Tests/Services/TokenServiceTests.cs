@@ -75,6 +75,22 @@ public class TokenServiceTests
     }
 
     [Fact]
+    public void GenerateAccessToken_LegacyLowercaseRole_EmitsCanonical()
+    {
+        var user = new User(Guid.NewGuid(), new Email("test@test.com"), new PasswordHash("hash"), new FullName("Test User"));
+        // Simulate a pre-normalization row (EF materialization bypasses AddRole).
+        typeof(User).GetField("_roles", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
+            .SetValue(user, new List<string> { "admin", "Support" });
+
+        var jwt = new JwtSecurityTokenHandler().ReadJwtToken(_tokenService.GenerateAccessToken(user));
+        var roles = jwt.Claims.Where(c => c.Type == ClaimTypes.Role).Select(c => c.Value).ToList();
+
+        Assert.Contains("Admin", roles);
+        Assert.Contains("Support", roles);
+        Assert.DoesNotContain("admin", roles);
+    }
+
+    [Fact]
     public void GenerateRefreshToken_ShouldReturnNonEmptyString()
     {
         var token = _tokenService.GenerateRefreshToken();
