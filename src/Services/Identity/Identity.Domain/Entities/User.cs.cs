@@ -1,4 +1,5 @@
 ﻿using BuildingBlocks.Shared.Aggregate;
+using BuildingBlocks.Shared.Auth;
 using Identity.Domain.DomainEvents;
 using Identity.Domain.ValueObjects;
 
@@ -32,7 +33,7 @@ public class User : AggregateRoot
         PasswordHash = passwordHash ?? throw new ArgumentNullException(nameof(passwordHash));
         FullName = fullName ?? throw new ArgumentNullException(nameof(fullName));
         IsActive = true;
-        _roles = new List<string> { "Merchant" }; // default role
+        _roles = new List<string> { RoleNames.Merchant }; // default role
         AddDomainEvent(new UserRegisteredDomainEvent(Id, email.Value, fullName.Value));
     }
 
@@ -174,16 +175,32 @@ public class User : AggregateRoot
         LockoutEnd = null;
     }
 
+    /// <summary>
+    /// Adds a role, normalizing to canonical casing (Step 7.5: roles are
+    /// case-insensitive — "admin" and " Admin " both store "Admin", never a
+    /// duplicate). Throws on unknown roles; validate user input with the
+    /// command validator first.
+    /// </summary>
     public void AddRole(string role)
     {
-        if (!_roles.Contains(role))
-            _roles.Add(role);
+        var canonical = RoleNames.Normalize(role)
+            ?? throw new ArgumentException($"Unknown role '{role}'.", nameof(role));
+        if (!HasRole(canonical))
+            _roles.Add(canonical);
     }
 
     public void RemoveRole(string role)
     {
-        _roles.Remove(role);
+        var canonical = RoleNames.Normalize(role);
+        if (canonical is null)
+            return;
+        _roles.RemoveAll(r => string.Equals(r, canonical, StringComparison.OrdinalIgnoreCase));
     }
+
+    /// <summary>Case-insensitive role membership check.</summary>
+    public bool HasRole(string role) =>
+        !string.IsNullOrWhiteSpace(role) &&
+        _roles.Any(r => string.Equals(r, role.Trim(), StringComparison.OrdinalIgnoreCase));
 
     public TokenValue AddRefreshToken(string tokenHash, DateTime expiresAt)
     {

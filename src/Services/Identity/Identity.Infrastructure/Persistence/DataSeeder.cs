@@ -1,3 +1,4 @@
+using BuildingBlocks.Shared.Auth;
 using Identity.Domain.Entities;
 using Identity.Domain.ValueObjects;
 using Microsoft.EntityFrameworkCore;
@@ -24,7 +25,7 @@ public static class DataSeeder
 
         if (existing is not null)
         {
-            if (existing.Roles.Contains("Admin"))
+            if (existing.HasRole(RoleNames.Admin))
             {
                 return;
             }
@@ -39,7 +40,7 @@ public static class DataSeeder
                     "Seed admin email is already registered by an unknown owner. Refusing to grant the Admin role.");
             }
 
-            existing.AddRole("Admin");
+            existing.AddRole(RoleNames.Admin);
             existing.MarkEmailConfirmed();
             dbContext.Entry(existing).Property("Roles").IsModified = true;
             await dbContext.SaveChangesAsync();
@@ -48,7 +49,7 @@ public static class DataSeeder
 
         var hash = BCrypt.Net.BCrypt.HashPassword(adminPassword);
         var user = new User(Guid.NewGuid(), new Email(adminEmail), new PasswordHash(hash), new FullName("Admin User"));
-        user.AddRole("Admin");
+        user.AddRole(RoleNames.Admin);
         user.MarkEmailConfirmed();
 
         dbContext.Users.Add(user);

@@ -1,6 +1,7 @@
 ﻿using Identity.API.Extensions;
 using Identity.Application.Commands.Admin;
 using Identity.Application.Commands.Role;
+using BuildingBlocks.Shared.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -8,7 +9,7 @@ using System.Security.Claims;
 
 namespace Identity.API.Controllers;
 
-[Authorize(Roles = "Admin")]
+[Authorize(Roles = RolePolicies.AdminOnly)]
 [Produces("application/json")]
 [EnableRateLimiting("Strict")]
 public class AdminController : BaseApiController

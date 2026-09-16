@@ -33,7 +33,11 @@ public class TokenService : ITokenService
             new Claim(ClaimTypes.Name, user.FullName.Value),
             new Claim(CustomClaimTypes.EmailVerified, user.EmailConfirmed ? "true" : "false")
         };
-        claims.AddRange(user.Roles.Select(role => new Claim(ClaimTypes.Role, role)));
+        // Step 7.5: emit canonical roles so authorization is case-uniform even
+        // for legacy rows stored before normalization (unknown values pass
+        // through verbatim — no policy references them).
+        claims.AddRange(user.Roles.Select(role =>
+            new Claim(ClaimTypes.Role, RoleNames.Normalize(role) ?? role)));
 
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.Secret));

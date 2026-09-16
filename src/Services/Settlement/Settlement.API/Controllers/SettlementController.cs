@@ -1,4 +1,5 @@
 ﻿using System.Globalization;
+using BuildingBlocks.Shared.Auth;
 using BuildingBlocks.Shared.Paging;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -10,13 +11,15 @@ using Settlement.Application.Features.Queries.ListSettlementBatches;
 
 namespace Settlement.API.Controllers;
 
-[Authorize(Roles = "Admin")]
+[Authorize]
 public class SettlementController : BaseApiController
 {
     /// <summary>
-    /// Manually trigger a settlement batch for a given date.
+    /// Manually trigger a settlement batch for a given date (Admin only —
+    /// moves money).
     /// </summary>
     [HttpPost("trigger")]
+    [Authorize(Roles = RolePolicies.AdminOnly)]
     [ProducesResponseType(typeof(TriggerSettlementResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Trigger(
@@ -28,9 +31,10 @@ public class SettlementController : BaseApiController
     }
 
     /// <summary>
-    /// Get a settlement batch by ID.
+    /// Get a settlement batch by ID (Admin + Support read).
     /// </summary>
     [HttpGet("{id:guid}")]
+    [Authorize(Roles = RolePolicies.ReadOnly)]
     [ProducesResponseType(typeof(SettlementBatchDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(
@@ -42,9 +46,10 @@ public class SettlementController : BaseApiController
     }
 
     /// <summary>
-    /// List settlement batches with optional date filters.
+    /// List settlement batches with optional date filters (Admin + Support read).
     /// </summary>
     [HttpGet]
+    [Authorize(Roles = RolePolicies.ReadOnly)]
     [ProducesResponseType(typeof(List<SettlementBatchDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> List(
         [FromQuery] DateTime? from,
