@@ -1,9 +1,12 @@
-﻿using BuildingBlocks.Shared.Configuration;
+﻿using BuildingBlocks.Shared.Auth;
+using BuildingBlocks.Shared.Configuration;
+using Merchant.Application.Interfaces;
 using Merchant.Infrastructure.Messaging;
 using Merchant.Infrastructure.Outbox;
 using Merchant.Infrastructure.Persistence;
 using Merchant.Infrastructure.Persistence.Repositories;
 using Merchant.Infrastructure.Security;
+using Merchant.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -30,6 +33,11 @@ public static class DependencyInjection
 
         services.AddScoped<IMerchantRepository, MerchantRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+        services.AddServiceTokenProvider(configuration, "Merchant");
+        services.AddOptions<PaymentPurgeOptions>()
+            .Bind(configuration.GetSection(PaymentPurgeOptions.SectionName));
+        services.AddScoped<HttpClient>(_ => new HttpClient { Timeout = TimeSpan.FromSeconds(5) });
+        services.AddScoped<IApiKeyRevocationNotifier, PaymentApiKeyPurgeNotifier>();
         services.AddValidatedOptions<RabbitMQSettings>(configuration, "RabbitMQ",
             s => !string.IsNullOrEmpty(s.HostName),
             "RabbitMQ HostName is required");

@@ -71,7 +71,7 @@ builder.Services.AddSettlementApplication();
 builder.Services.AddSettlementInfrastructure(builder.Configuration);
 
 builder.Services.AddCorrelationId();
-builder.Services.AddPaymentSwitchRateLimiting();
+builder.Services.AddPaymentSwitchRateLimiting(builder.Configuration);
 builder.Services.AddPaymentSwitchVersioning();
 builder.Services.AddPaymentSwitchOutputCache();
 
