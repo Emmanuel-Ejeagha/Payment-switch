@@ -34,6 +34,11 @@ services:
   rabbitmq:
     image: rabbitmq:3-management-alpine
     restart: always
+    # Step 8.1: the prometheus scrape target (rabbitmq:15692, see
+    # infra/prometheus/prometheus.yml) needs the plugin — it is not enabled
+    # in the upstream image by default. The outer entrypoint still runs (CMD
+    # override only) and the inner re-entry keeps RABBITMQ_DEFAULT_* handling.
+    command: ["sh", "-c", "rabbitmq-plugins enable --offline rabbitmq_prometheus && exec docker-entrypoint.sh rabbitmq-server"]
     ports:
       - "127.0.0.1:5672:5672"
       - "127.0.0.1:15672:15672"
