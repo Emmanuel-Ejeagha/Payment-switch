@@ -86,7 +86,7 @@ builder.Services.AddLedgerApplication();
 builder.Services.AddLedgerInfrastructure(builder.Configuration);
 
 builder.Services.AddCorrelationId();
-builder.Services.AddPaymentSwitchRateLimiting();
+builder.Services.AddPaymentSwitchRateLimiting(builder.Configuration);
 builder.Services.AddPaymentSwitchVersioning();
 builder.Services.AddPaymentSwitchOutputCache();
 
