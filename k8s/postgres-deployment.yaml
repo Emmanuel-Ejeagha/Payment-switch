@@ -17,6 +17,10 @@ metadata:
   namespace: payment-switch
 spec:
   replicas: 1
+  # Step 9.4: Recreate (never rolling) — a second Postgres pod must never
+  # run against the same ReadWriteOnce volume (split-brain / mount fight).
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: postgres
