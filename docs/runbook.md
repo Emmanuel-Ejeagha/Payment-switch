@@ -84,28 +84,45 @@ Test renewal with `sudo certbot renew --dry-run`.
 All state lives in the named volumes (`postgres_data`, `rabbitmq_data`,
 `prometheus_data`, `grafana_data`; `redis_data` is cache).
 
-### Postgres (critical)
+### Postgres (critical) — automated job + drill
+
+The `backup` compose service runs `infra/backup/pg-backup.sh` on a daily
+loop: per-database custom-format dumps for all six DBs plus a globals dump,
+a `SHA256SUMS` manifest, `latest-<db>` symlinks, and 14-daily pruning — all
+in the `pgbackups` volume. No schedule to configure; it starts with the
+stack (gated on postgres healthy).
 
 ```bash
-# Full logical dump of every paymentswitch database, hourly/daily:
-docker compose exec -T postgres pg_dump -U paymentswitch -F c -f - -C IdentityDb \
-  | gzip > /var/backups/paymentswitch/identitydb-$(date +%F_%H%M).dump.gz
-# ... repeat for MerchantDb, PaymentDb, LedgerDb, NotificationDb, SettlementDb
+# Inspect recent artifacts:
+docker compose exec backup ls -l /backups | tail
 ```
 
-`pg_dumpall` is a simpler one-shot for the whole instance (superuser):
+A volume alone is not a backup. Sync off-host nightly from the host cron:
 
 ```bash
-docker compose exec -T postgres pg_dumpall -U paymentswitch \
-  | gzip > /var/backups/paymentswitch/pg-dumpall-$(date +%F_%H%M).sql.gz
+# Host crontab: copy the volume contents to object storage daily.
+docker run --rm -v paymentswitch_pgbackups:/data -v /var/backups:/backup \
+  alpine sh -c 'tar czf /backup/pgbackups-$(date +%F).tgz -C /data .'
+# + upload /var/backups/pgbackups-*.tgz to S3 (14 daily + 12 monthly).
 ```
 
-Retention: keep 14 daily + 12 monthly copies off-host (S3/object storage).
-Restore:
+### Restore drill (Step 10.1 — run quarterly)
+
+`infra/backup/restore-drill.sh` proves restorability against a scratch
+container (never the live volume): checksums the manifest, restores every
+`latest-*.dump.gz`, and asserts each database opens with countable core
+tables. Exit 0 = pass.
 
 ```bash
-gunzip -c backup.sql.gz | docker compose exec -T postgres psql -U paymentswitch -d postgres
+# Copy one backup set locally, then:
+bash infra/backup/restore-drill.sh /var/backups/latest-copy
+# Manual single-DB restore (same mechanism the drill uses):
+gunzip -c IdentityDb-<ts>.dump.gz | docker compose exec -T postgres \
+  pg_restore -U paymentswitch -d IdentityDb --no-owner
 ```
+
+Record each drill (date + result + operator) in the ops log. A drill that
+is overdue is an incident: fix backup/restore before it becomes an emergency.
 
 ### RabbitMQ / Prometheus / Grafana
 
