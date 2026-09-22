@@ -51,10 +51,17 @@ spec:
           volumeMounts:
             - name: config
               mountPath: /etc/alertmanager
+            # Step 9.4: persist the notification log + silences across
+            # container restarts (--storage.path had no backing volume).
+            - name: data
+              mountPath: /alertmanager
       volumes:
         - name: config
           configMap:
             name: alertmanager-config
+        - name: data
+          emptyDir:
+            sizeLimit: 1Gi
 ---
 apiVersion: v1
 kind: Service
