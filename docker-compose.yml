@@ -586,12 +586,48 @@ services:
     networks:
       - paymentswitch-network
 
+  # Step 10.1: nightly backup job. Runs pg-backup.sh on a daily loop against
+  # the postgres service and keeps 14 dailies in the pgbackups volume (plus
+  # SHA256SUMS). Uses the postgres image so pg_dump matches the server major
+  # version. Off-host copies are a separate host-cron step (see runbook §3).
+  backup:
+    image: postgres:16-alpine
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+        reservations:
+          cpus: '0.05'
+          memory: 128M
+    environment:
+      - PGHOST=postgres
+      - PGPORT=5432
+      - PGUSER=paymentswitch
+      - PGPASSWORD=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      - BACKUP_DIR=/backups
+      - KEEP_DAILY=14
+    command: ["sh", "-c", "while true; do /backup/pg-backup.sh; sleep 86400; done"]
+    volumes:
+      - ./infra/backup:/backup:ro
+      - pgbackups:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - paymentswitch-network
+
 volumes:
   postgres_data:
   redis_data:
   rabbitmq_data:
   prometheus_data:
   grafana_data:
+  # Step 10.1: nightly backup artifacts (see the backup service below and
+  # infra/backup/). Sync off-host (S3) from the host cron — a volume alone
+  # is not a backup.
+  pgbackups:
 
 networks:
   paymentswitch-network:
