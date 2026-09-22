@@ -204,7 +204,8 @@ automatically — see `docs/deployment.md`.)
 ## 6. k8s / Helm — implemented, not live
 
 The `k8s/` and `helm/` artefacts are validated by CI (`helm lint`, `helm
-template`, YAML parse) but the production runtime is compose. Before relying
+template`, kubeconform on both the manifests and the render) but the
+production runtime is compose. Before relying
 on k8s in production:
 
 - Apply against a staging cluster and validate rollouts/HPA/NetworkPolicies.
