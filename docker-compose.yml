@@ -26,6 +26,13 @@ services:
   redis:
     image: redis:7-alpine
     restart: always
+    # Step 9.3: gate dependents on a real PONG, not container start.
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     volumes:
       - redis_data:/data
     networks:
@@ -39,6 +46,14 @@ services:
     # in the upstream image by default. The outer entrypoint still runs (CMD
     # override only) and the inner re-entry keeps RABBITMQ_DEFAULT_* handling.
     command: ["sh", "-c", "rabbitmq-plugins enable --offline rabbitmq_prometheus && exec docker-entrypoint.sh rabbitmq-server"]
+    # Step 9.3: gate dependents on a live broker (node boot + plugin init on
+    # a cold volume can take a minute — hence the long start period).
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 6
+      start_period: 90s
     ports:
       - "127.0.0.1:5672:5672"
       - "127.0.0.1:15672:15672"
@@ -101,6 +116,14 @@ services:
     restart: always
     ports:
       - "127.0.0.1:5146:8080"
+    # Step 9.3: readiness (Kestrel + migrations + DB + broker) gates the
+    # webs and nginx below, so cold starts order themselves.
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 120s
     environment:
       - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development}
       - ASPNETCORE_URLS=http://0.0.0.0:8080
@@ -130,7 +153,7 @@ services:
       postgres:
         condition: service_healthy
       rabbitmq:
-        condition: service_started
+        condition: service_healthy
     networks:
       - paymentswitch-network
 
@@ -141,6 +164,14 @@ services:
     restart: always
     ports:
       - "127.0.0.1:5237:8080"
+    # Step 9.3: readiness (Kestrel + migrations + DB + broker) gates the
+    # webs and nginx below, so cold starts order themselves.
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 120s
     environment:
       - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development}
       - ASPNETCORE_URLS=http://0.0.0.0:8080
@@ -160,7 +191,7 @@ services:
       postgres:
         condition: service_healthy
       rabbitmq:
-        condition: service_started
+        condition: service_healthy
     networks:
       - paymentswitch-network
 
@@ -171,6 +202,14 @@ services:
     restart: always
     ports:
       - "127.0.0.1:5118:8080"
+    # Step 9.3: readiness (Kestrel + migrations + DB + broker) gates the
+    # webs and nginx below, so cold starts order themselves.
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 120s
     environment:
       - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development}
       - ASPNETCORE_URLS=http://0.0.0.0:8080
@@ -189,7 +228,7 @@ services:
       postgres:
         condition: service_healthy
       rabbitmq:
-        condition: service_started
+        condition: service_healthy
     networks:
       - paymentswitch-network
 
@@ -200,6 +239,14 @@ services:
     restart: always
     ports:
       - "127.0.0.1:5320:8080"
+    # Step 9.3: readiness (Kestrel + migrations + DB + broker) gates the
+    # webs and nginx below, so cold starts order themselves.
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 120s
     environment:
       - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development}
       - ASPNETCORE_URLS=http://0.0.0.0:8080
@@ -218,7 +265,7 @@ services:
       postgres:
         condition: service_healthy
       rabbitmq:
-        condition: service_started
+        condition: service_healthy
     networks:
       - paymentswitch-network
 
@@ -229,6 +276,14 @@ services:
     restart: always
     ports:
       - "127.0.0.1:5281:8080"
+    # Step 9.3: readiness (Kestrel + migrations + DB + broker) gates the
+    # webs and nginx below, so cold starts order themselves.
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 120s
     environment:
       - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development}
       - ASPNETCORE_URLS=http://0.0.0.0:8080
@@ -254,7 +309,7 @@ services:
       postgres:
         condition: service_healthy
       rabbitmq:
-        condition: service_started
+        condition: service_healthy
     networks:
       - paymentswitch-network
 
@@ -265,6 +320,14 @@ services:
     restart: always
     ports:
       - "127.0.0.1:5392:8080"
+    # Step 9.3: readiness (Kestrel + migrations + DB + broker) gates the
+    # webs and nginx below, so cold starts order themselves.
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 120s
     environment:
       - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development}
       - ASPNETCORE_URLS=http://0.0.0.0:8080
@@ -283,7 +346,7 @@ services:
       postgres:
         condition: service_healthy
       rabbitmq:
-        condition: service_started
+        condition: service_healthy
     networks:
       - paymentswitch-network
 
@@ -296,13 +359,27 @@ services:
     restart: always
     environment:
       - NEXT_PUBLIC_API_URL=${FRONTEND_BASE_URL:-http://localhost}
+    # Step 9.3: prove the standalone server is up (see
+    # apps/merchant/src/app/api/health/route.ts).
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 90s
     depends_on:
-      - identity-api
-      - merchant-api
-      - payment-api
-      - ledger-api
-      - notification-api
-      - settlement-api
+      identity-api:
+        condition: service_healthy
+      merchant-api:
+        condition: service_healthy
+      payment-api:
+        condition: service_healthy
+      ledger-api:
+        condition: service_healthy
+      notification-api:
+        condition: service_healthy
+      settlement-api:
+        condition: service_healthy
     networks:
       - paymentswitch-network
 
@@ -315,13 +392,27 @@ services:
     restart: always
     environment:
       - NEXT_PUBLIC_API_URL=${FRONTEND_BASE_URL:-http://localhost}
+    # Step 9.3: prove the standalone server is up (see
+    # apps/admin/src/app/api/health/route.ts).
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:3001/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 90s
     depends_on:
-      - identity-api
-      - merchant-api
-      - payment-api
-      - ledger-api
-      - notification-api
-      - settlement-api
+      identity-api:
+        condition: service_healthy
+      merchant-api:
+        condition: service_healthy
+      payment-api:
+        condition: service_healthy
+      ledger-api:
+        condition: service_healthy
+      notification-api:
+        condition: service_healthy
+      settlement-api:
+        condition: service_healthy
     networks:
       - paymentswitch-network
 
@@ -338,15 +429,31 @@ services:
     ports:
       - "80:80"
       - "443:443"
+    # Step 9.3: prove the ingress serves through to a healthy upstream
+    # (catches bad mounts/routes, not just a running nginx master).
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost/identity/health/live | grep -q Healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 60s
     depends_on:
-      - identity-api
-      - merchant-api
-      - payment-api
-      - ledger-api
-      - notification-api
-      - settlement-api
-      - merchant-web
-      - admin-web
+      identity-api:
+        condition: service_healthy
+      merchant-api:
+        condition: service_healthy
+      payment-api:
+        condition: service_healthy
+      ledger-api:
+        condition: service_healthy
+      notification-api:
+        condition: service_healthy
+      settlement-api:
+        condition: service_healthy
+      merchant-web:
+        condition: service_healthy
+      admin-web:
+        condition: service_healthy
     networks:
       - paymentswitch-network
 
