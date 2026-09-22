@@ -27,7 +27,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: settlement-api
-          image: paymentswitch-settlement:latest
+          image: paymentswitch/settlement-api:latest
           env:
             - name: ConnectionStrings__SettlementDb
               valueFrom:
