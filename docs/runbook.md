@@ -168,6 +168,15 @@ The inbox/outbox are resilient by design (idempotent processing, DLX/DLQ). If
 a consumer is down, restart it; messages accumulate in the queue and drain on
 recovery.
 
+### Settlement nightly job misbehaving
+
+The 01:00 batch is a Hangfire recurring job (`nightly-settlement`); check
+`docker compose logs settlement-api` for the trigger output and tie-out
+result. The HTML dashboard (`/hangfire`) is intentionally unreachable from
+the outside — see "Hangfire in production" in `docs/prod-exposure.md` for why
+and how to inspect it safely. To rerun a date manually, `POST
+/api/v1/settlement/trigger` as Admin (duplicate-safe: one batch per date).
+
 ### Disk filling up
 
 ```bash
