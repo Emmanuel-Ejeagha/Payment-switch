@@ -9,10 +9,10 @@ provisioning, the Compose dev/prod switch, and frontend base URLs.
 The nginx container loads its server blocks from `/etc/nginx/tls/*.conf`. Two
 mode folders are committed:
 
-| Mode | Mount (`nginx.volumes`) | Behaviour |
+| Mode | How | Behaviour |
 |---|---|---|
-| Dev (default) | `./infra/nginx/http:/etc/nginx/tls:ro` | Plain HTTP on `:80` |
-| Prod | `./infra/nginx/tls:/etc/nginx/tls:ro` | HTTP→HTTPS redirect on `:80`, HTTPS on `:443` |
+| Dev (default, `docker compose up -d`) | `./infra/nginx/http:/etc/nginx/tls:ro`, port `:80` only | Plain HTTP on `:80` |
+| Prod (`docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d`) | `./infra/nginx/tls:/etc/nginx/tls:ro`, ports `:80` + `:443` | HTTP→HTTPS redirect on `:80`, HTTPS on `:443` |
 
 ### Provisioning (Let's Encrypt / certbot)
 
@@ -33,16 +33,14 @@ mode folders are committed:
      infra/nginx/tls/certs/privkey.pem
    ```
 
-4. Switch nginx to TLS mode in `docker-compose.yml` and restart:
-
-   ```yaml
-   volumes:
-     - ./infra/nginx/tls:/etc/nginx/tls:ro
-   ```
+4. Bring up the production overlay (Step 9.6) instead of editing the base file:
 
    ```bash
-   docker compose up -d nginx
+   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
    ```
+
+   The overlay publishes `:443` and mounts `./infra/nginx/tls`; the base
+   file stays HTTP-only on `:80`.
 
 5. Verify:
 

@@ -64,8 +64,9 @@ TLS terminates at nginx (see `docs/tls.md`):
 1. Obtain certs with certbot: `sudo certbot certonly --standalone -d <domain>`.
 2. Copy `fullchain.pem` + `privkey.pem` into `infra/nginx/tls/certs/`
    (gitignored).
-3. Switch nginx to TLS mode in `docker-compose.yml` (mount
-   `./infra/nginx/tls:/etc/nginx/tls:ro`) and `docker compose up -d nginx`.
+3. Bring up the production overlay (adds `:443` + the TLS server blocks;
+   plain `docker compose up` stays HTTP-only on `:80`):
+   `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d`.
 4. Confirm the redirect + HSTS:
     ```bash
     curl -I http://<domain>/identity/health/live   # 301 -> https
