@@ -15,9 +15,14 @@ metadata:
   name: allow-api-to-infrastructure
   namespace: payment-switch
 spec:
+  # Step 9.2: select the actual API pods. The previous shared-label
+  # selector matched nothing (pods carry only `app: <name>`), so under enforcement this policy — DNS, DB, broker,
+  # OTLP, SMTP — applied to zero pods.
   podSelector:
-    matchLabels:
-      app.kubernetes.io/part-of: payment-switch
+    matchExpressions:
+      - key: app
+        operator: In
+        values: [identity-api, merchant-api, payment-api, ledger-api, notification-api, settlement-api]
   policyTypes:
     - Ingress
     - Egress
@@ -28,28 +33,6 @@ spec:
           podSelector:
             matchLabels:
               app.kubernetes.io/name: ingress-nginx
-      ports:
-        - protocol: TCP
-          port: 8080
-    # Ingress controller (nginx) traffic to the frontend web apps.
-    - from:
-        - namespaceSelector: {}
-          podSelector:
-            matchLabels:
-              app.kubernetes.io/name: ingress-nginx
-      ports:
-        - protocol: TCP
-          port: 3000
-        - protocol: TCP
-          port: 3001
-    # Frontend web apps reach the APIs for server-side proxy calls.
-    - from:
-        - podSelector:
-            matchLabels:
-              app: merchant-web
-        - podSelector:
-            matchLabels:
-              app: admin-web
       ports:
         - protocol: TCP
           port: 8080
@@ -99,16 +82,67 @@ spec:
           port: 4317
         - protocol: TCP
           port: 4318
-    # SMTP outbound (TLS)
+    # SMTP outbound (TLS). ipBlock peers must not be combined with
+    # pod/namespace selectors (Step 9.2).
     - to:
-        - namespaceSelector: {}
-          ipBlock:
+        - ipBlock:
             cidr: 0.0.0.0/0
       ports:
         - protocol: TCP
           port: 587
         - protocol: TCP
           port: 465
+---
+# Step 9.2: the frontend web apps had no working policy (they matched
+# nothing, so no DNS/API egress and no nginx ingress under enforcement).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-web
+  namespace: payment-switch
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values: [merchant-web, admin-web]
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Ingress controller (nginx) traffic to the frontend web apps.
+    - from:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 3000
+        - protocol: TCP
+          port: 3001
+  egress:
+    # DNS
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # APIs for server-side proxy calls.
+    - to:
+        - podSelector:
+            matchExpressions:
+              - key: app
+                operator: In
+                values: [identity-api, merchant-api, payment-api, ledger-api, notification-api, settlement-api]
+      ports:
+        - protocol: TCP
+          port: 8080
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -122,10 +156,15 @@ spec:
   policyTypes:
     - Ingress
   ingress:
+    # Step 9.2: the old shared-label peer matched no pods, so
+    # no API could reach Postgres under enforcement. Only the APIs need it
+    # (frontends never touch the DB directly).
     - from:
         - podSelector:
-            matchLabels:
-              app.kubernetes.io/part-of: payment-switch
+            matchExpressions:
+              - key: app
+                operator: In
+                values: [identity-api, merchant-api, payment-api, ledger-api, notification-api, settlement-api]
       ports:
         - protocol: TCP
           port: 5432
@@ -142,10 +181,14 @@ spec:
   policyTypes:
     - Ingress
   ingress:
+    # Step 9.2: same unmatched-peer fix as Postgres. Prometheus scrapes :15692 via
+    # the allow-prometheus-scrape policy (kept as the single source there).
     - from:
         - podSelector:
-            matchLabels:
-              app.kubernetes.io/part-of: payment-switch
+            matchExpressions:
+              - key: app
+                operator: In
+                values: [identity-api, merchant-api, payment-api, ledger-api, notification-api, settlement-api]
       ports:
         - protocol: TCP
           port: 5672
@@ -216,3 +259,150 @@ spec:
           port: 8080
         - protocol: TCP
           port: 15692
+---
+# Step 9.2: Redis had no policy at all (default-deny blocks API→6379 under
+# enforcement). Nothing consumes it today (ROADMAP G39), but the service
+# exists, so the intended path is documented and open.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-redis
+  namespace: payment-switch
+spec:
+  podSelector:
+    matchLabels:
+      app: redis
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchExpressions:
+              - key: app
+                operator: In
+                values: [identity-api, merchant-api, payment-api, ledger-api, notification-api, settlement-api]
+      ports:
+        - protocol: TCP
+          port: 6379
+---
+# Step 9.2: Jaeger had no policy — OTLP from the APIs (4317/4318, see the
+# egress rule in allow-api-to-infrastructure) would be dropped on the
+# receiving side under enforcement and traces silently lost.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-jaeger
+  namespace: payment-switch
+spec:
+  podSelector:
+    matchLabels:
+      app: jaeger
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchExpressions:
+              - key: app
+                operator: In
+                values: [identity-api, merchant-api, payment-api, ledger-api, notification-api, settlement-api]
+      ports:
+        - protocol: TCP
+          port: 4317
+        - protocol: TCP
+          port: 4318
+---
+# Step 9.2: Grafana reads Prometheus (:9090, see the provisioned
+# datasource); port-forward access bypasses policy, but pod traffic does not.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-grafana
+  namespace: payment-switch
+spec:
+  podSelector:
+    matchLabels:
+      app: grafana
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    - to:
+        - podSelector:
+            matchLabels:
+              app: prometheus
+      ports:
+        - protocol: TCP
+          port: 9090
+---
+# Step 9.2: Prometheus UI/API (:9090) queried by Grafana.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus-access
+  namespace: payment-switch
+spec:
+  podSelector:
+    matchLabels:
+      app: prometheus
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: grafana
+      ports:
+        - protocol: TCP
+          port: 9090
+---
+# Step 9.2: Alertmanager had no policy — Prometheus could not deliver
+# firing alerts to :9093 under enforcement.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-alertmanager
+  namespace: payment-switch
+spec:
+  podSelector:
+    matchLabels:
+      app: alertmanager
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: prometheus
+      ports:
+        - protocol: TCP
+          port: 9093
+  egress:
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - protocol: TCP
+          port: 587
+        - protocol: TCP
+          port: 465
