@@ -1,0 +1,23 @@
+{{- if .Values.infrastructure.postgres.enabled }}
+# Step 9.5: same init script as k8s/postgres-init-configmap.yaml (and the
+# compose mount): creates all six service databases on first boot. The stock
+# postgres image ignores POSTGRES_MULTIPLE_DATABASES, so the script is the
+# only mechanism that works on both runtimes.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+  namespace: {{ .Values.namespace }}
+data:
+  init-multiple-databases.sh: |
+    #!/bin/bash
+    set -e
+    psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" <<-EOSQL
+      CREATE DATABASE "IdentityDb";
+      CREATE DATABASE "MerchantDb";
+      CREATE DATABASE "PaymentDb";
+      CREATE DATABASE "LedgerDb";
+      CREATE DATABASE "NotificationDb";
+      CREATE DATABASE "SettlementDb";
+    EOSQL
+{{- end }}

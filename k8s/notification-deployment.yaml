@@ -39,11 +39,6 @@ spec:
                 secretKeyRef:
                   name: payment-switch-secret
                   key: Jwt__Secret
-            - name: ServiceToken__Secret
-              valueFrom:
-                secretKeyRef:
-                  name: payment-switch-secret
-                  key: ServiceToken__Secret
             - name: Jwt__PreviousSecret
               valueFrom:
                 secretKeyRef:
@@ -110,6 +105,25 @@ spec:
                 configMapKeyRef:
                   name: payment-switch-config
                   key: Sms__Enabled
+            # Step 9.5: archival sweep tuning (shared keys in payment-switch-config;
+            # per-service business retention: delivered notifications, 90 days).
+            - name: Retention__CleanupIntervalMinutes
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-switch-config
+                  key: Retention__CleanupIntervalMinutes
+            - name: Retention__BatchSize
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-switch-config
+                  key: Retention__BatchSize
+            - name: Retention__MessageRetentionDays
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-switch-config
+                  key: Retention__MessageRetentionDays
+            - name: Retention__BusinessRetentionDays
+              value: "90"
           ports:
             - containerPort: 8080
           resources:
