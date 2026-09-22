@@ -37,7 +37,36 @@ SSH tunnel to `127.0.0.1:<hostport>` — never open the port.
 |---|---|---|
 | Swagger/OpenAPI (`/swagger`, `/v1/swagger.json`) | each API | Disabled when `ASPNETCORE_ENVIRONMENT=Production` (all 6 `Program.cs`); additionally denied at nginx for dev/prod |
 | Prometheus `/metrics` | each API | Must stay on for scraping, so it is **not** disabled; only reachable on the Docker network (Prometheus scrapes `service:8080/metrics`) and host loopback. Public access denied at nginx |
-| Hangfire dashboard (`/hangfire`) | settlement-api | Admin-only JWT gate (TASK-013) + denied at nginx as defense-in-depth |
+| Hangfire dashboard (`/hangfire`) | settlement-api | Admin-only JWT gate (TASK-013) + denied at nginx as defense-in-depth. See "Hangfire in production" below |
+
+## Hangfire in production (Step 8.2)
+
+The dashboard is **404-by-design on every public path**: nginx denies
+`/settlement/hangfire*`, and there is intentionally no BFF/proxy route for
+it. Reasons:
+
+1. **CSRF.** The Next.js BFF proxy translates the `access_token` cookie into
+   a bearer header for arbitrary API paths. Hangfire POSTs (trigger, delete,
+   requeue jobs) carry no anti-forgery token, so any proxied dashboard route
+   would let a malicious site drive job control with an admin's session.
+2. **No browser login flow.** The dashboard gate (`AdminDashboardAuthorizationFilter`)
+   reads the JWT bearer header, which plain browser navigation cannot send.
+   A proxied page would load its shell and then 401 on every data/POST call.
+
+Day-to-day job operations do not need the HTML UI:
+
+- Trigger / inspect batches: `POST /api/v1/settlement/trigger`,
+  `GET /api/v1/settlement/...` (Admin; reads also Support) — audited and
+  covered by the API auth model.
+- Recurring-job health: structured logs (`docker compose logs settlement-api`)
+  plus the `ServiceDown` / outbox-backlog Grafana alerts.
+
+For rare interactive debugging, SSH to the host and work against loopback
+(`http://127.0.0.1:5392/hangfire` with an `Authorization: Bearer <admin-jwt>`
+header, e.g. via `curl` or a header-setting browser extension) — never open
+the port or add an ingress route. A future option (not implemented) is a
+dedicated cookie-auth dashboard login or a read-only dashboard mode; either
+must come with CSRF protection before it may sit behind nginx.
 | Grafana | compose | No published port + required `GRAFANA_ADMIN_PASSWORD` |
 | Jaeger UI | compose | No published port |
 | RabbitMQ management | compose | Loopback-only binding |
