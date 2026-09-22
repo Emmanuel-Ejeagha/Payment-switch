@@ -55,8 +55,8 @@ the UIs/APIs, then export the env vars below:
 Export for the run:
 
 ```bash
-export PAYMENT_BASE_URL=http://localhost:8080     # payment-api public endpoint
-export MERCHANT_BASE_URL=http://localhost:8080    # identity-api login endpoint
+export PAYMENT_BASE_URL=http://localhost/payment      # payment-api via nginx (strips the prefix)
+export MERCHANT_BASE_URL=http://localhost/identity    # identity-api login via nginx
 export API_KEY=sk_test_...
 export MERCHANT_EMAIL=load-owner@example.com
 export MERCHANT_PASSWORD='<owner password>'
@@ -91,8 +91,8 @@ k6 run tests/load/soak.js
 
 | Env var | Default | Meaning |
 |---|---|---|
-| `PAYMENT_BASE_URL` | `http://localhost:8080` | Payment API base |
-| `MERCHANT_BASE_URL` | `http://localhost:8080` | Identity API base for login |
+| `PAYMENT_BASE_URL` | `http://localhost/payment` | Payment API base (nginx route; or `http://127.0.0.1:5118` direct) |
+| `MERCHANT_BASE_URL` | `http://localhost/identity` | Identity API base for login (nginx route; or `http://127.0.0.1:5146` direct) |
 | `API_KEY` | — | Merchant test secret key (`sk_test_...`) |
 | `MERCHANT_EMAIL` / `MERCHANT_PASSWORD` | — | Owner credentials for the capture JWT |
 | `PAYMENT_AMOUNT` | `10000` | Amount in minor units |
