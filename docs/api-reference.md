@@ -53,11 +53,12 @@ Authenticate with `Authorization: Bearer sk_live_...` or `sk_test_...`. The merc
 | POST   | `/v1/payments/intents`    | Secret key    | Create a payment intent                  |
 | GET    | `/v1/payments/{id}`       | Secret key    | Get payment intent details (own merchant only) |
 
-`POST /v1/payments/intents` request body:
+`POST /v1/payments/intents` request body (`amount` is always an integer in
+minor units — 10000 for a hundred dollars; never a float):
 
 ```json
 {
-  "amount": 100.00,
+  "amount": 10000,
   "currency": "USD",
   "paymentMethod": "Card",
   "cardLastFour": "4242",
