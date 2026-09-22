@@ -27,7 +27,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: ledger-api
-          image: paymentswitch-ledger:latest
+          image: paymentswitch/ledger-api:latest
           env:
             - name: ConnectionStrings__LedgerDb
               valueFrom:

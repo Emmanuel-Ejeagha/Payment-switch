@@ -27,7 +27,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: payment-api
-          image: paymentswitch-payment:latest
+          image: paymentswitch/payment-api:latest
           env:
             - name: ConnectionStrings__PaymentDb
               valueFrom:

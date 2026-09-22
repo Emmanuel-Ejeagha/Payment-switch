@@ -96,6 +96,29 @@ The pipeline gates deploys per environment:
   Trivy (HIGH/CRITICAL fail the build), then deploy to the `production` environment, which is
   subject to **environment protection rules** (reviewers/approvals) in the repository settings.
 
+### Image naming convention (Step 9.1)
+
+One convention everywhere: `<registry>/<namespace>/<name>:<tag>` with
+`<name>` in `{identity,merchant,payment,ledger,notification,settlement}-api`
+and `{merchant,admin}-web`.
+
+- **k8s manifests** pin the default `paymentswitch/<name>:latest` (same
+  string the Helm chart renders with defaults). Deployment and container
+  names equal `<name>`, so `kubectl set image deployment/<name>
+  <name>=<image>` always addresses the right container.
+- **Helm chart** defaults to `repository: paymentswitch/<name>`, `tag:
+  latest`; override with `--set global.imageRegistry=<registry>/<namespace>`
+  plus `--set services.<svc>.image.tag=<sha>` (or
+  `...image.repository=` for a different namespace).
+- **CI** builds `ghcr.io/<owner>/<repo>/<name>:<sha>` (+ `:latest`) and
+  deploys with `kubectl set image ...:<sha>` (immutable; `:latest` is
+  dev-convenience only).
+
+Two supported deploy paths: the pipeline's `kubectl set image` (live path,
+with automatic previous-image rollback), or `helm upgrade --install
+--set global.imageRegistry=... --set <svc>.image.tag=<sha>` for
+Helm-managed clusters. Never deploy `:latest` to production.
+
 ### Rollback
 
 Deploys are immutable-sha based, so rollback is a one-line image pin:
