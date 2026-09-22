@@ -38,6 +38,9 @@ SSH tunnel to `127.0.0.1:<hostport>` — never open the port.
 | Swagger/OpenAPI (`/swagger`, `/v1/swagger.json`) | each API | Disabled when `ASPNETCORE_ENVIRONMENT=Production` (all 6 `Program.cs`); additionally denied at nginx for dev/prod |
 | Prometheus `/metrics` | each API | Must stay on for scraping, so it is **not** disabled; only reachable on the Docker network (Prometheus scrapes `service:8080/metrics`) and host loopback. Public access denied at nginx |
 | Hangfire dashboard (`/hangfire`) | settlement-api | Admin-only JWT gate (TASK-013) + denied at nginx as defense-in-depth. See "Hangfire in production" below |
+| Grafana | compose | No published port + required `GRAFANA_ADMIN_PASSWORD` |
+| Jaeger UI | compose | No published port |
+| RabbitMQ management | compose | Loopback-only binding |
 
 ## Hangfire in production (Step 8.2)
 
@@ -67,9 +70,6 @@ header, e.g. via `curl` or a header-setting browser extension) — never open
 the port or add an ingress route. A future option (not implemented) is a
 dedicated cookie-auth dashboard login or a read-only dashboard mode; either
 must come with CSRF protection before it may sit behind nginx.
-| Grafana | compose | No published port + required `GRAFANA_ADMIN_PASSWORD` |
-| Jaeger UI | compose | No published port |
-| RabbitMQ management | compose | Loopback-only binding |
 
 ## Enabling the production posture
 
