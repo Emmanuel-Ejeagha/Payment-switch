@@ -23,8 +23,7 @@
 **/values.dev.yaml
 LICENSE
 README.md
+# Step 9.6: negations that used to re-include VCS metadata into every image
+# context are removed — they leaked repo internals (and possibly credentials
+# from the git config) into layers. The git-dir exclusion above stays absolute.
 !**/.gitignore
-!.git/HEAD
-!.git/config
-!.git/packed-refs
-!.git/refs/heads/**
