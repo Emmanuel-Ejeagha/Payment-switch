@@ -1,0 +1,152 @@
+CROSS-REFERENCE ANALYSIS: Backend .NET API Endpoints vs Frontend Next.js Fetch Calls
+=========================================================================================
+
+BACKEND ENDPOINTS WITHOUT FRONTEND CALLS:
+
+- Service: Identity, Route: api/v1.0/admin/roles, Method: POST
+  Critical: Admin-only role assignment endpoint has no corresponding UI fetch call;
+  accessible only via admin API direct calls or postman/Swagger
+
+- Service: Settlement, Route: api/v1.0/settlement/trigger, Method: POST
+  Critical: Manual settlement trigger has no dedicated frontend UI fetch call; 
+  referenced in admin settlements page via apiUrl proxy but not directly called from
+  merchant/dashboard UI
+
+- Service: Settlement, Route: api/v1.0/settlement (GET list), Method: GET
+  Critical: Settlement batch listing endpoint has no direct frontend fetch call; 
+  admin settlements page uses apiUrl proxy but the call pattern differs
+
+- Service: Settlement, Route: api/v1.0/settlement/{id} (GET), Method: GET
+  Critical: Settlement batch detail endpoint has no direct frontend fetch call;
+  similar to above - referenced but not actively fetched from dashboard UI
+
+- Service: Payment, Route: v1/payments/{id}/confirm, Method: POST
+  Critical: Public payment confirm endpoint uses different version path (v1 vs v1.0)
+  and is authenticated via secret key; frontend uses NEXT_PUBLIC_API_URL direct call
+  but the URL pattern differs from the canonical backend route
+
+- Service: Payment, Route: v1/payments/{id}, Method: GET
+  Critical: Same version path mismatch as above; public payments GET endpoint
+
+- Service: Payment, Route: api/v1.0/customers/{id} (DELETE), Method: DELETE
+  Critical: Customer deletion endpoint is admin-only and has no corresponding
+  frontend delete fetch call in the dashboard UI
+
+- Service: Payment, Route: api/v1.0/plans/{id}/archive, Method: POST
+  Critical: Plan archival endpoint is admin-focused; frontend does have a fetch call
+  to /api/proxy/payment/api/v1/plans/${plan.id}/archive but the backend route uses
+  a different template pattern (archive vs. standard PUT/POST)
+
+- Service: Identity, Route: api/v1.0/auth/revoke, Method: POST
+  Critical: Refresh token revocation has middleware-driven fetch in auth middleware
+  but no dedicated UI fetch call in any dashboard or settings page
+
+- Service: Merchant, Route: api/v1.0/merchants/{merchantId}/apikeys/{keyId} (DELETE), Method: DELETE
+  Critical: API key revocation endpoint; frontend has fetch calls to
+  /api/proxy/merchant/api/v1/merchants/${mid}/apikeys/${key.keyId} but the
+  DELETE method mapping through the proxy may not fully reconcile
+
+FRONTEND CALLS WITHOUT BACKEND ENDPOINTS:
+
+- File: apps/merchant/src/middleware.ts, Line: 48
+  URL: /api/auth/token
+  Type: Cookie refresh middleware fetch (not a direct API endpoint call);
+  targets the Next.js proxy route which forwards to identity/api/v1/auth/token
+
+- File: apps/merchant/src/middleware.ts, Line: 48
+  URL: /api/auth/token
+  Type: Same as above; duplicate entry in admin middleware
+
+- File: apps/admin/src/middleware.ts, Line: 43
+  URL: /api/auth/token
+  Type: Cookie refresh middleware fetch (not a direct API endpoint call);
+
+- File: apps/admin/src/middleware.ts, Line: 43
+  URL: /api/auth/token
+  Type: Same as above; duplicate entry in admin middleware
+
+- File: apps/merchant/src/components/notifications/notification-preferences.tsx, Line: 44
+  URL: /api/proxy/notification/api/v1/notifications/preferences
+  Type: Fetches notification preferences; backend has GET/PUT /api/v1.0/notifications/preferences
+  but the proxy path pattern /notification/api/v1/ not exactly match the canonical route
+
+- File: apps/merchant/src/hooks/use-merchant.ts, Line: 13
+  URL: /api/auth/token
+  Type: UseMerhook token refresh on mount; middleware-driven, not a UI API call
+
+- File: apps/merchant/src/app/(dashboard)/security/page.tsx, Line: 57
+  URL: /api/proxy/identity/api/v1/auth/change-password
+  Type: Change password flow; backend has POST /api/v1.0/auth/change-password
+  but the proxy path includes "identity" prefix not in the canonical route template
+
+- File: apps/admin/src/app/(auth)/forgot-password/page.tsx, Line: 33
+  URL: (incomplete fetch, needs review)
+  Type: Forgot password flow; may have incomplete backend mapping
+
+- File: apps/merchant/src/app/(auth)/forgot-password/page.tsx, Line: 37
+  URL: (incomplete fetch, needs review)
+  Type: Forgot password flow; may have incomplete backend mapping
+
+- File: apps/merchant/src/app/(auth)/reset-password/page.tsx, Line: 51
+  URL: (incomplete fetch, needs review)
+  Type: Reset password flow; may have incomplete backend mapping
+
+- File: apps/merchant/src/app/(auth)/register/page.tsx, Line: 57
+  URL: (incomplete fetch, needs review)
+  Type: Registration flow; may have incomplete backend mapping
+
+- File: apps/merchant/src/app/(auth)/login/page.tsx, Line: 35
+  URL: /api/auth/login
+  Type: Login fetch; targets Next.js proxy route which forwards to
+  identity/api/v1/auth/login; the /api/auth/login pattern is handled by
+  the proxy/route handler, not a direct backend API endpoint
+
+MISMATCHES/BASEPATH ISSUES:
+
+1. Version Mismatch: Frontend fetch URLs use API version prefix "v1" (e.g.,
+   /api/proxy/identity/api/v1/auth/token, /api/proxy/payment/api/v1/payments),
+   while backend .NET controllers use "v1.0" version prefix via the
+   [Route("api/v{version:apiVersion}/[controller]")] attribute (e.g.,
+   api/v1.0/auth/token, api/v1.0/payments). This creates a version skew
+   where v1 ≠ v1.0 in the routing layer.
+
+2. Service Name Prefix: Frontend fetch URLs embed explicit service name prefixes
+   in the proxy path (e.g., /api/proxy/identity/..., /api/proxy/merchant/...,
+   /api/proxy/payment/..., /api/proxy/ledger/..., /api/proxy/notification/...,
+   /api/proxy/settlement/...). The backend .NET route templates do not include
+   such service-name prefixes; routes are based on controller names only
+   (e.g., AuthController, MerchantsController, PaymentsController). The proxy
+   routes must strip or map these prefixes for backend routing to succeed.
+
+3. BasePath /admin for Admin App: The admin Next.js application runs with
+   basePath "/admin" (configured in next.config.js: basePath: "/admin"). All
+   frontend fetch calls in the admin app go through an apiUrl() helper that
+   prepends "/admin" (e.g., apiUrl("/api/proxy/identity/...") becomes
+   "/admin/api/proxy/identity/..."). The backend .NET endpoints have no
+   concept of this basePath prefix; the proxy routes in the admin app must
+   account for this when forwarding to NEXT_PUBLIC_API_URL. Calls without the
+   /admin prefix will 404 in the admin app's dev/production environment.
+
+4. Controller Name vs Path Segment: Frontend URLs use "identity", "merchant",
+   "payment", "ledger", "notification", "settlement" as path segments under
+   the proxy (e.g., /api/proxy/identity/api/v1/...), while the .NET backend
+   routes derive the route prefix from the C# controller class name suffix
+   after "Controller" (e.g., AuthController → auth, PaymentsController →
+   payments). Case and suffix handling may cause mismatches if not explicitly
+   mapped in route configuration.
+
+5. PublicPaymentsController Route Divergence: The PublicPaymentsController
+   uses [Route("v1/payments")] attribute (not the base [Route("api/v{version}/[controller]")]),
+   creating endpoints at v1/payments/intents, v1/payments/tokens, v1/payments/{id}/confirm,
+   v1/payments/{id} while the standard PaymentController uses api/v1.0/payments,
+   api/v1.0/payments/{id}. The frontend has both proxy calls
+   (/api/proxy/payment/api/v1/payments/...) and direct calls
+   (${process.env.NEXT_PUBLIC_API_URL}/payment/v1/checkout/links/...), creating
+   two distinct URL spaces for payment operations.
+
+6. HostedCheckoutController Divergence: HostedCheckoutController uses
+   [Route("v1/checkout")] producing endpoints at v1/checkout/links/{code},
+   v1/checkout/links/{code}/tokenize, v1/checkout/links/{code}/pay,
+   separate from the standard PaymentController routes. Frontend checkout
+   pages use direct NEXT_PUBLIC_API_URL calls to these paths, which is correct
+   for public-facing flows but diffe
