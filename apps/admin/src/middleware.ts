@@ -1,8 +1,17 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
-import { apiUrl } from "@/lib/api"
+import { BASE_PATH } from "./lib/api"
 
 const publicPaths = ["/login", "/forgot-password", "/reset-password"]
+
+// The app runs under basePath `/admin`, so request pathnames arrive with
+// that prefix (both in dev and behind nginx). Strip it before matching so
+// auth logic behaves identically with or without the prefix.
+function stripBasePath(pathname: string): string {
+  if (pathname === BASE_PATH) return "/"
+  if (pathname.startsWith(`${BASE_PATH}/`)) return pathname.slice(BASE_PATH.length)
+  return pathname
+}
 
 function isExpired(token: string): boolean {
   try {
@@ -18,18 +27,18 @@ function isExpired(token: string): boolean {
 export async function middleware(request: NextRequest) {
   const accessToken = request.cookies.get("access_token")?.value
   const refreshToken = request.cookies.get("refresh_token")?.value
-  const { pathname } = request.nextUrl
+  const pathname = stripBasePath(request.nextUrl.pathname)
 
   if (publicPaths.includes(pathname)) {
     if (accessToken && !isExpired(accessToken)) {
-      return NextResponse.redirect(new URL(apiUrl("/"), request.url))
+      return NextResponse.redirect(new URL(`${BASE_PATH}/`, request.url))
     }
     return NextResponse.next()
   }
 
   // No credentials at all — unauthenticated.
   if (!accessToken && !refreshToken) {
-    return NextResponse.redirect(new URL(apiUrl("/login"), request.url))
+    return NextResponse.redirect(new URL(`${BASE_PATH}/login`, request.url))
   }
 
   // Access token still valid — proceed.
@@ -41,7 +50,7 @@ export async function middleware(request: NextRequest) {
   // refresh. The /api/auth/token route rotates both cookies on success.
   if (refreshToken) {
     try {
-      const res = await fetch(new URL(apiUrl("/api/auth/token"), request.url), {
+      const res = await fetch(new URL(`${BASE_PATH}/api/auth/token`, request.url), {
         headers: { cookie: request.headers.get("cookie") ?? "" },
       })
       const data = await res.json()
@@ -57,9 +66,9 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  return NextResponse.redirect(new URL(apiUrl("/login?reason=expired"), request.url))
+  return NextResponse.redirect(new URL(`${BASE_PATH}/login?reason=expired`, request.url))
 }
 
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!api|admin/api|_next/static|_next/image|favicon.ico).*)"],
 }

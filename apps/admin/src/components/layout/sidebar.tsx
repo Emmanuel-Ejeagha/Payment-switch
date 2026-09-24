@@ -16,9 +16,9 @@ import {
   X,
 } from "lucide-react"
 import { useTheme } from "@/components/theme-provider"
-import { apiUrl } from "@/lib/api"
 import { useEffect, useState } from "react"
 import * as signalR from "@microsoft/signalr"
+import { apiUrl, BASE_PATH } from "@/lib/api"
 
 interface PaymentEvent {
   eventType: string
@@ -26,11 +26,11 @@ interface PaymentEvent {
   timestamp: string
 }
 
-async function getAccessToken(): Promise<string | null> {
+async function getAccessToken(): Promise<string> {
   const res = await fetch(apiUrl("/api/auth/token"))
-  if (!res.ok) return null
+  if (!res.ok) throw new Error("Not authenticated")
   const data = (await res.json()) as { accessToken?: string }
-  return data.accessToken ?? null
+  return data.accessToken ?? ""
 }
 
 const navItems = [
@@ -51,57 +51,50 @@ interface SidebarProps {
 export function Sidebar({ open, onClose }: SidebarProps) {
   const router = useRouter()
   const pathname = usePathname()
+  // usePathname() includes basePath (/admin/...); nav hrefs don't.
+  const activePath =
+    pathname === BASE_PATH
+      ? "/"
+      : pathname.startsWith(`${BASE_PATH}/`)
+        ? pathname.slice(BASE_PATH.length)
+        : pathname
   const { toggle } = useTheme()
   const [events, setEvents] = useState<PaymentEvent[]>([])
   const [connected, setConnected] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
 
   useEffect(() => {
-    let cancelled = false
-    let conn: signalR.HubConnection | null = null
+    const conn = new signalR.HubConnectionBuilder()
+      .withUrl(
+        `${process.env.NEXT_PUBLIC_API_URL}/notification/hubs/payment-notifications`,
+        {
+          withCredentials: false,
+          accessTokenFactory: getAccessToken,
+        }
+      )
+      .withAutomaticReconnect()
+      .configureLogging(signalR.LogLevel.Warning)
+      .build()
 
-    async function init() {
-      const token = await getAccessToken()
-      if (cancelled) return
-      if (!token) {
-        setConnected(false)
-        return
-      }
+    conn.on("PaymentEvent", (event: PaymentEvent) => {
+      setEvents((prev) => [event, ...prev])
+    })
 
-      conn = new signalR.HubConnectionBuilder()
-        .withUrl(
-          `${process.env.NEXT_PUBLIC_API_URL}/notification/hubs/payment-notifications`,
-          {
-            withCredentials: false,
-            accessTokenFactory: () => token,
-          }
-        )
-        .withAutomaticReconnect()
-        .configureLogging(signalR.LogLevel.Warning)
-        .build()
+    conn.onreconnecting(() => setConnected(false))
+    conn.onreconnected(() => setConnected(true))
+    conn.onclose(() => setConnected(false))
 
-      conn.on("PaymentEvent", (event: PaymentEvent) => {
-        setEvents((prev) => [event, ...prev])
-      })
-
-      conn.onreconnecting(() => setConnected(false))
-      conn.onreconnected(() => setConnected(true))
-      conn.onclose(() => setConnected(false))
-
+    async function start() {
       try {
         await conn.start()
-        if (!cancelled) setConnected(true)
+        setConnected(true)
       } catch {
-        if (!cancelled) setConnected(false)
+        setConnected(false)
       }
     }
+    start()
 
-    init()
-
-    return () => {
-      cancelled = true
-      conn?.stop()
-    }
+    return () => { conn.stop() }
   }, [])
 
   const handleLogout = async () => {
@@ -124,7 +117,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
             href={item.href}
             onClick={onClose}
             className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground ${
-              pathname === item.href
+              activePath === item.href
                 ? "bg-accent text-accent-foreground font-medium"
                 : "text-muted-foreground"
             }`}
