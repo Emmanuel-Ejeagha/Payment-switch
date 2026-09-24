@@ -11,7 +11,7 @@ describe("MerchantsPage search", () => {
 
   it("debounces search input and sends search param", async () => {
     vi.useFakeTimers()
-    const fetchMock = vi.fn(async () => {
+    const fetchMock = vi.fn(async (..._args: unknown[]) => {
       return new Response(JSON.stringify([]), {
         status: 200,
         headers: { "content-type": "application/json", "x-total-count": "0" },
@@ -27,7 +27,7 @@ describe("MerchantsPage search", () => {
       await Promise.resolve()
     })
     expect(fetchMock).toHaveBeenCalled()
-    const firstUrl = fetchMock.mock.calls[0][0] as string
+    const firstUrl = String(fetchMock.mock.calls[0]?.[0])
     expect(firstUrl).not.toContain("search=")
 
     fetchMock.mockClear()
@@ -45,7 +45,7 @@ describe("MerchantsPage search", () => {
       await Promise.resolve()
     })
     expect(fetchMock).toHaveBeenCalled()
-    const url = fetchMock.mock.calls[0][0] as string
+    const url = String(fetchMock.mock.calls[0]?.[0])
     expect(url).toContain("search=acme")
   })
 
@@ -54,7 +54,7 @@ describe("MerchantsPage search", () => {
       { id: "1", businessName: "A", email: "a@example.com", status: "Active", createdAt: new Date().toISOString() },
       { id: "2", businessName: "B", email: "b@example.com", status: "Pending", createdAt: new Date().toISOString() },
     ]
-    const fetchMock = vi.fn(async () => {
+    const fetchMock = vi.fn(async (..._args: unknown[]) => {
       return new Response(JSON.stringify(merchants), {
         status: 200,
         headers: { "content-type": "application/json", "x-total-count": "42" },
