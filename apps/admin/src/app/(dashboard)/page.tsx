@@ -1,7 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Store, CheckCircle2, Clock, Ban } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { Store, CreditCard, BookOpen, Banknote } from "lucide-react"
 import { StatsCard } from "@paymentswitch/ui"
 import { RecentMerchants } from "@paymentswitch/ui"
 import type { MerchantDto, UserDto } from "@paymentswitch/shared"
@@ -15,6 +16,7 @@ interface Stats {
 }
 
 export default function DashboardPage() {
+  const router = useRouter()
   const [user, setUser] = useState<UserDto | null>(null)
   const [merchants, setMerchants] = useState<MerchantDto[]>([])
   const [stats, setStats] = useState<Stats | null>(null)
@@ -31,20 +33,23 @@ export default function DashboardPage() {
 
         if (userRes.ok) {
           setUser(await userRes.json())
+        } else if (userRes.status === 401) {
+          // No usable session (middleware skips the exact basePath root,
+          // so this page enforces auth itself).
+          router.push(apiUrl("/login"))
+          return
         }
 
         if (merchantsRes.ok) {
           const list: MerchantDto[] = await merchantsRes.json()
           setMerchants(list)
 
-          const totalHeader = merchantsRes.headers.get("x-total-count")
-          const total = totalHeader ? parseInt(totalHeader, 10) : list.length
           const active = list.filter((m) => m.status === "Active").length
           const pending = list.filter((m) => m.status === "Pending").length
           const suspended = list.filter((m) => m.status === "Suspended").length
 
           setStats({
-            total,
+            total: list.length,
             active,
             pending,
             suspended,
@@ -64,7 +69,7 @@ export default function DashboardPage() {
     }
 
     load()
-  }, [])
+  }, [router])
 
   if (loading) {
     return (
@@ -115,19 +120,19 @@ export default function DashboardPage() {
         <StatsCard
           title="Active"
           value={stats?.active ?? 0}
-          icon={CheckCircle2}
+          icon={CreditCard}
           description="Merchants currently processing"
         />
         <StatsCard
           title="Pending"
           value={stats?.pending ?? 0}
-          icon={Clock}
+          icon={BookOpen}
           description="Awaiting activation"
         />
         <StatsCard
           title="Suspended"
           value={stats?.suspended ?? 0}
-          icon={Ban}
+          icon={Banknote}
           description="Temporarily disabled"
         />
       </div>
