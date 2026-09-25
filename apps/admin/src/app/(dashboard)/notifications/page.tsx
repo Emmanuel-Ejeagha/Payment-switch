@@ -49,7 +49,10 @@ export default function NotificationsPage() {
   }
 
   useEffect(() => {
-    loadData()
+    async function run() {
+      await loadData()
+    }
+    void run()
   }, [skip, statusFilter, channelFilter])
 
   return (

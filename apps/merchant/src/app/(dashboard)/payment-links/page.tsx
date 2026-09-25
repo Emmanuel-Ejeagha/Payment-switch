@@ -44,11 +44,11 @@ export default function PaymentLinksPage() {
   const [currency, setCurrency] = useState("USD")
   const [description, setDescription] = useState("")
 
-  const [origin, setOrigin] = useState("")
-
-  useEffect(() => {
-    setOrigin(window.location.origin)
-  }, [])
+  // Lazy initializer (not an effect): updates state during render instead
+  // of setState-in-effect (react-hooks/set-state-in-effect).
+  const [origin] = useState(() =>
+    typeof window === "undefined" ? "" : window.location.origin
+  )
 
   const loadLinks = useCallback(async (merchantId: string) => {
     const res = await fetch(`/api/proxy/payment/api/v1/payment-links?merchantId=${merchantId}&skip=0&take=50`)

@@ -39,7 +39,10 @@ export default function SettlementDetailPage() {
   }
 
   useEffect(() => {
-    loadBatch()
+    async function run() {
+      await loadBatch()
+    }
+    void run()
   }, [id])
 
   useEffect(() => {

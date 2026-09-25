@@ -35,6 +35,7 @@ Create the secret with all connection strings and the JWT secret.
 ```bash
 DB_PASSWORD=$(openssl rand -base64 24)
 JWT_SECRET=$(openssl rand -base64 32)
+SERVICE_TOKEN_SECRET=$(openssl rand -base64 32)
 RABBITMQ_PASS=$(openssl rand -base64 24)
 SEED_ADMIN_PASSWORD=$(openssl rand -base64 18)
 WEBHOOK_KEY=$(openssl rand -base64 32)
@@ -45,6 +46,7 @@ kubectl create secret generic payment-switch-secret \
   --namespace payment-switch \
   --from-literal=Postgres__Password="$DB_PASSWORD" \
   --from-literal=Jwt__Secret="$JWT_SECRET" \
+  --from-literal=ServiceToken__Secret="$SERVICE_TOKEN_SECRET" \
   --from-literal=RabbitMQ__UserName="paymentswitch" \
   --from-literal=RabbitMQ__Password="$RABBITMQ_PASS" \
   --from-literal=Seed__AdminPassword="$SEED_ADMIN_PASSWORD" \
@@ -62,8 +64,9 @@ kubectl create secret generic payment-switch-secret \
 
 Every key above is required at pod start (missing `secretKeyRef` entries
 fail fast), except `Jwt__PreviousSecret`, which is only set during a
-rotation dual-write window (see `docs/secrets.md`). Cross-check against
-`k8s/secret.example.yaml`, which lists the full key set.
+rotation dual-write window (see `docs/secrets.md`). `ServiceToken__Secret`
+must differ from `Jwt__Secret` (dedicated inter-service secret). Cross-check
+against `k8s/secret.example.yaml`, which lists the full key set.
 
 ## Step 3 – Deploy Infrastructure & Services
 
