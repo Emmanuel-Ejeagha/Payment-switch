@@ -41,7 +41,10 @@ export default function SettlementsPage() {
   }
 
   useEffect(() => {
-    loadData()
+    async function run() {
+      await loadData()
+    }
+    void run()
   }, [skip])
 
   const handleTrigger = async () => {
