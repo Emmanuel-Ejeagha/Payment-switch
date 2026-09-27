@@ -18,11 +18,49 @@ spec:
           image: grafana/grafana:10.4.3
           env:
             - name: GF_SECURITY_ADMIN_USER
-              value: admin
+              valueFrom:
+                secretKeyRef:
+                  name: payment-switch-secret
+                  key: GrafanaAdminUser
             - name: GF_SECURITY_ADMIN_PASSWORD
-              value: admin
+              valueFrom:
+                secretKeyRef:
+                  name: payment-switch-secret
+                  key: GrafanaAdminPassword
           ports:
             - containerPort: 3000
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts:
+            - name: datasources
+              mountPath: /etc/grafana/provisioning/datasources
+            - name: dashboards-provider
+              mountPath: /etc/grafana/provisioning/dashboards
+            - name: dashboards
+              mountPath: /var/lib/grafana/dashboards
+      volumes:
+        - name: datasources
+          configMap:
+            name: grafana-datasources
+        - name: dashboards-provider
+          configMap:
+            name: grafana-dashboards
+            items:
+              - key: dashboard.yml
+                path: dashboard.yml
+        - name: dashboards
+          configMap:
+            name: grafana-dashboards
+            items:
+              - key: paymentswitch-overview.json
+                path: paymentswitch-overview.json
+              - key: rabbitmq-queues.json
+                path: rabbitmq-queues.json
 ---
 apiVersion: v1
 kind: Service

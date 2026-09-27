@@ -1,18 +1,21 @@
 using Asp.Versioning.ApiExplorer;
 using BuildingBlocks.Shared;
+using BuildingBlocks.Shared.Auth;
+using BuildingBlocks.Shared.Configuration;
 using BuildingBlocks.Shared.Data;
 using BuildingBlocks.Shared.HealthChecks;
 using BuildingBlocks.Shared.Middleware;
 using BuildingBlocks.Shared.RateLimiting;
 using BuildingBlocks.Shared.Versioning;
 using BuildingBlocks.Shared.Caching;
+using BuildingBlocks.Shared.Http;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Diagnostics.HealthChecks;
-using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using Notification.API.Hubs;
 using Notification.API.Middlewares;
+using Notification.API.RateLimiting;
 using Notification.API.Services;
 using Notification.Application;
 using Notification.Application.Interfaces;
@@ -21,9 +24,10 @@ using Notification.Infrastructure.Persistence;
 using OpenTelemetry.Metrics;
 using Serilog;
 using System.Reflection;
-using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Configuration.ValidateSecuritySecrets("NotificationDb");
 
 builder.Host.UseSerilog((ctx, lc) => lc.ReadFrom.Configuration(ctx.Configuration));
 var otel = builder.AddPaymentSwitchObservability("Notification");
@@ -32,103 +36,112 @@ otel.WithMetrics(metrics => metrics.AddPrometheusExporter());
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 
-builder.Services.AddSwaggerGen(c =>
+// TASK-046: Swagger/OpenAPI docs are dev/test-only. In Production the API
+// surface is nginx-only and discovery endpoints must not be exposed (see
+// docs/prod-exposure.md).
+if (!builder.Environment.IsProduction())
 {
-    var xmlFilename = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
-    c.AddServer(new OpenApiServer { Url = "/notification" });
-    c.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, xmlFilename));
-    c.SwaggerDoc("v1", new OpenApiInfo { Title = "Notification API", Version = "v1" });
-    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    builder.Services.AddSwaggerGen(c =>
     {
-        Name = "Authorization",
-        Type = SecuritySchemeType.ApiKey,
-        Scheme = "Bearer",
-        BearerFormat = "JWT",
-        In = ParameterLocation.Header,
-        Description = "Enter 'Bearer' [space] and then your token"
-    });
-    c.AddSecurityRequirement(document => new OpenApiSecurityRequirement
-    {
-        [new OpenApiSecuritySchemeReference("Bearer", document)] = []
-    });
-});
-
-var jwtSettings = builder.Configuration.GetSection("Jwt");
-var key = Encoding.UTF8.GetBytes(jwtSettings["Secret"]!);
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
-    {
-        options.TokenValidationParameters = new TokenValidationParameters
+        var xmlFilename = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+        c.AddServer(new OpenApiServer { Url = "/notification" });
+        c.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, xmlFilename));
+        c.SwaggerDoc("v1", new OpenApiInfo { Title = "Notification API", Version = "v1" });
+        c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
         {
-            ValidateIssuer = true,
-            ValidateAudience = true,
-            ValidateLifetime = true,
-            ValidateIssuerSigningKey = true,
-            ValidIssuer = jwtSettings["Issuer"],
-            ValidAudience = jwtSettings["Audience"],
-            IssuerSigningKey = new SymmetricSecurityKey(key)
-        };
+            Name = "Authorization",
+            Type = SecuritySchemeType.ApiKey,
+            Scheme = "Bearer",
+            BearerFormat = "JWT",
+            In = ParameterLocation.Header,
+            Description = "Enter 'Bearer' [space] and then your token"
+        });
+        c.AddSecurityRequirement(document => new OpenApiSecurityRequirement
+        {
+            [new OpenApiSecuritySchemeReference("Bearer", document)] = []
+        });
     });
+}
+
+builder.Services.AddPaymentSwitchJwtBearer(builder.Configuration, options =>
+{
+    options.Events = new JwtBearerEvents
+    {
+        OnMessageReceived = context =>
+        {
+            var accessToken = context.Request.Query["access_token"];
+            var path = context.HttpContext.Request.Path;
+            if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
+            {
+                context.Token = accessToken;
+            }
+
+            return Task.CompletedTask;
+        }
+    };
+});
 
 builder.Services.AddAuthorization();
 
-builder.Services.AddCors(options =>
+builder.Services.AddPaymentSwitchCors(builder.Configuration);
+builder.Services.Configure<RateLimitOptions>(builder.Configuration.GetSection(RateLimitOptions.SectionName));
+builder.Services.AddSingleton<RateLimitHubFilter>();
+builder.Services.AddSignalR(options =>
 {
-    options.AddPolicy("AllowFrontend", policy =>
-    {
-        policy.WithOrigins("http://localhost:5173")
-              .AllowAnyMethod()
-              .AllowAnyHeader();
-    });
+    // TASK-047: harden against abusive connections — cap inbound frame size,
+    // bound parallel client invocations, and never leak exception details.
+    options.MaximumReceiveMessageSize = 32 * 1024;
+    options.MaximumParallelInvocationsPerClient = 4;
+    options.EnableDetailedErrors = false;
+})
+.AddHubOptions<PaymentNotificationHub>(options =>
+{
+    options.AddFilter<RateLimitHubFilter>();
 });
-builder.Services.AddSignalR();
 
+builder.Services.AddHttpClient<IMerchantGroupResolver, MerchantGroupResolver>(client =>
+{
+    client.BaseAddress = new Uri(
+        builder.Configuration["Merchant:BaseUrl"] ?? "http://merchant-api:8080");
+});
 builder.Services.AddNotificationApplication();
 builder.Services.AddNotificationInfrastructure(builder.Configuration);
 builder.Services.AddScoped<IRealTimeNotifier, SignalRRealTimeNotifier>();
 
 builder.Services.AddCorrelationId();
-builder.Services.AddPaymentSwitchRateLimiting();
+builder.Services.AddPaymentSwitchRateLimiting(builder.Configuration);
 builder.Services.AddPaymentSwitchVersioning();
 builder.Services.AddPaymentSwitchOutputCache();
 
 builder.Services.AddPaymentSwitchHealthChecks()
     .AddDbContextCheck<AppDbContext>("db", tags: ["ready"])
-    .AddCheck("rabbitmq", () =>
-    {
-        try
-        {
-            using var tcp = new System.Net.Sockets.TcpClient();
-            tcp.Connect(builder.Configuration["RabbitMQ:HostName"] ?? "localhost", 5672);
-            return HealthCheckResult.Healthy();
-        }
-        catch (Exception ex)
-        {
-            return HealthCheckResult.Unhealthy("RabbitMQ unreachable", ex);
-        }
-    }, tags: ["ready"]);
+    .AddRabbitMqHealthCheck(builder.Configuration);
 
 var app = builder.Build();
 
 app.MigrateDatabase<AppDbContext>();
 
 app.UsePaymentSwitchSecurityHeaders();
+app.UsePaymentSwitchForwardedHeaders(builder.Configuration);
 app.UseCorrelationId();
 app.UseRequestSizeLimit();
 app.UseMiddleware<ExceptionMiddleware>();
 app.UseSerilogRequestLogging();
 
-app.UseSwagger(c => c.RouteTemplate = "{documentName}/swagger.json");
-app.UseSwaggerUI(options =>
+if (!app.Environment.IsProduction())
 {
-    options.RoutePrefix = "swagger";
-    var provider = app.Services.GetRequiredService<IApiVersionDescriptionProvider>();
-    foreach (var description in provider.ApiVersionDescriptions)
+    app.UseSwagger(c => c.RouteTemplate = "{documentName}/swagger.json");
+    app.UseSwaggerUI(options =>
     {
-        options.SwaggerEndpoint($"../{description.GroupName}/swagger.json",
-            description.GroupName.ToUpperInvariant());
-    }
-});
+        options.RoutePrefix = "swagger";
+        var provider = app.Services.GetRequiredService<IApiVersionDescriptionProvider>();
+        foreach (var description in provider.ApiVersionDescriptions)
+        {
+            options.SwaggerEndpoint($"../{description.GroupName}/swagger.json",
+                description.GroupName.ToUpperInvariant());
+        }
+    });
+}
 
 app.UseCors("AllowFrontend");
 app.UseRateLimiter();

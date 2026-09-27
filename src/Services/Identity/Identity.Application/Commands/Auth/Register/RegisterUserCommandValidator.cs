@@ -1,4 +1,5 @@
-﻿using FluentValidation;
+﻿using BuildingBlocks.Shared.Security;
+using FluentValidation;
 
 namespace Identity.Application.Commands.Auth.Register;
 
@@ -13,8 +14,12 @@ public class RegisterUserCommandValidator : AbstractValidator<RegisterUserComman
 
         RuleFor(x => x.Password)
             .NotEmpty().WithMessage("Password is required.")
-            .MinimumLength(8).WithMessage("Password must be at least 8 characters.")
-            .MaximumLength(100);
+            .MinimumLength(PasswordPolicy.MinLength).WithMessage($"Password must be at least {PasswordPolicy.MinLength} characters.")
+            .MaximumLength(PasswordPolicy.MaxLength)
+            .Must(PasswordPolicy.HasComplexity)
+            .WithMessage("Password must contain a letter, a digit, and an uppercase letter or symbol.")
+            .Must(p => !PasswordPolicy.IsCommonPassword(p))
+            .WithMessage("This password is too common. Choose a less predictable password.");
 
         RuleFor(x => x.FullName)
             .NotEmpty().WithMessage("Full name is required.")

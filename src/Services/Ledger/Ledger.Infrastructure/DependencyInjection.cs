@@ -1,9 +1,15 @@
 ﻿using BuildingBlocks.Shared.Configuration;
+using BuildingBlocks.Shared.Retention;
 using Ledger.Application.Interfaces;
+using Ledger.Application.Options;
+using Ledger.Infrastructure.DeadLetter;
 using Ledger.Infrastructure.Messaging;
 using Ledger.Infrastructure.Outbox;
 using Ledger.Infrastructure.Persistence;
 using Ledger.Infrastructure.Persistence.Repositories;
+using Ledger.Infrastructure.Queries;
+using Ledger.Infrastructure.Reconciliation;
+using Ledger.Infrastructure.Retention;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,21 +25,34 @@ public static class DependencyInjection
         services.AddDbContext<AppDbContext>((sp, options) =>
         {
             var interceptor = sp.GetRequiredService<OutboxInterceptor>();
-            options.UseNpgsql(configuration.GetConnectionString("LedgerDb"), npgsqlOptions =>
-            {
-                npgsqlOptions.EnableRetryOnFailure(3, TimeSpan.FromSeconds(10), null);
-            })
+            options.UseNpgsql(configuration.GetConnectionString("LedgerDb"))
                    .AddInterceptors(interceptor);
         });
 
         services.AddScoped<ILedgerAccountRepository, LedgerAccountRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+        services.AddScoped<IDailyPayoutQuery, DailyPayoutQuery>();
+        services.AddScoped<IReconciliationService, ReconciliationService>();
+        services.AddScoped<IReconciliationReportRepository, ReconciliationReportRepository>();
 
         services.AddValidatedOptions<RabbitMQSettings>(configuration, "RabbitMQ",
             s => !string.IsNullOrEmpty(s.HostName),
             "RabbitMQ HostName is required");
-        services.AddScoped<IEventBus, RabbitMQEventBus>();
+        services.AddValidatedOptions<LedgerOptions>(configuration, "Ledger",
+            o => o.FeeBasisPoints >= 0 && o.FeeBasisPoints <= LedgerOptions.MaxFeeBasisPoints,
+            $"Ledger FeeBasisPoints must be between 0 and {LedgerOptions.MaxFeeBasisPoints}");
+        services.AddValidatedOptions<ReconciliationOptions>(configuration, "Reconciliation",
+            o => o.IntervalMinutes >= 1,
+            "Reconciliation IntervalMinutes must be >= 1");
+        services.AddOptions<LedgerRetentionOptions>()
+            .Bind(configuration.GetSection(LedgerRetentionOptions.SectionName));
+        services.AddSingleton<IEventBus, RabbitMQEventBus>();
         services.AddHostedService<OutboxPublisherService>();
+        services.AddHostedService<RabbitMQConsumerService>();
+        services.AddHostedService<MerchantEventConsumerService>();
+        services.AddHostedService<LedgerRetentionService>();
+        services.AddHostedService<ReconciliationBackgroundService>();
+        services.AddHostedService<DeadLetterConsumerService>();
 
         return services;
     }

@@ -20,14 +20,23 @@ public class LedgerAccountRepository : ILedgerAccountRepository
             .FirstOrDefaultAsync(a => a.MerchantId == merchantId, cancellationToken);
     }
 
+    public async Task<LedgerAccount?> GetByMerchantIdAndCurrencyAsync(Guid merchantId, string currency, CancellationToken cancellationToken = default)
+    {
+        return await _context.LedgerAccounts
+            .Include(a => a.Journal)
+            .FirstOrDefaultAsync(a => a.MerchantId == merchantId && a.Currency == currency, cancellationToken);
+    }
+
+    public async Task<List<LedgerAccount>> ListByMerchantIdAsync(Guid merchantId, CancellationToken cancellationToken = default)
+    {
+        return await _context.LedgerAccounts
+            .Include(a => a.Journal)
+            .Where(a => a.MerchantId == merchantId)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task AddAsync(LedgerAccount account, CancellationToken cancellationToken = default)
     {
         await _context.LedgerAccounts.AddAsync(account, cancellationToken);
-    }
-
-    public Task UpdateAsync(LedgerAccount account, CancellationToken cancellationToken = default)
-    {
-        _context.LedgerAccounts.Update(account);
-        return Task.CompletedTask;
     }
 }

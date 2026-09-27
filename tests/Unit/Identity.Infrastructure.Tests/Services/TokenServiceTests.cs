@@ -1,4 +1,5 @@
-﻿using Identity.Domain.Entities;
+﻿using BuildingBlocks.Shared.Auth;
+using Identity.Domain.Entities;
 using Identity.Domain.ValueObjects;
 using Identity.Infrastructure.Services;
 using Microsoft.Extensions.Options;
@@ -34,6 +35,59 @@ public class TokenServiceTests
         Assert.NotNull(token);
         Assert.Equal("test@test.com", jwt.Claims.First(c => c.Type == ClaimTypes.Email).Value);
         Assert.Contains("Merchant", jwt.Claims.First(c => c.Type == ClaimTypes.Role).Value);
+        Assert.Equal("false", jwt.Claims.First(c => c.Type == CustomClaimTypes.EmailVerified).Value);
+    }
+
+    [Fact]
+    public void GenerateAccessToken_ShouldEmitJtiIatAndNbfClaims()
+    {
+        var user = new User(Guid.NewGuid(), new Email("test@test.com"), new PasswordHash("hash"), new FullName("Test User"));
+        var jwt = new JwtSecurityTokenHandler().ReadJwtToken(_tokenService.GenerateAccessToken(user));
+
+        Assert.False(string.IsNullOrEmpty(jwt.Id));
+        Assert.True(jwt.Payload.TryGetValue("iat", out var iat));
+        Assert.True(jwt.Payload.TryGetValue("nbf", out var nbf));
+        Assert.NotNull(iat);
+        Assert.NotNull(nbf);
+    }
+
+    [Fact]
+    public void GenerateAccessToken_ShouldEmitUniqueJtiPerToken()
+    {
+        var user = new User(Guid.NewGuid(), new Email("test@test.com"), new PasswordHash("hash"), new FullName("Test User"));
+        var handler = new JwtSecurityTokenHandler();
+
+        var first = handler.ReadJwtToken(_tokenService.GenerateAccessToken(user)).Id;
+        var second = handler.ReadJwtToken(_tokenService.GenerateAccessToken(user)).Id;
+
+        Assert.NotEqual(first, second);
+    }
+
+    [Fact]
+    public void GenerateAccessToken_ConfirmedUser_EmitsEmailVerifiedTrue()
+    {
+        var user = new User(Guid.NewGuid(), new Email("test@test.com"), new PasswordHash("hash"), new FullName("Test User"));
+        user.MarkEmailConfirmed();
+
+        var jwt = new JwtSecurityTokenHandler().ReadJwtToken(_tokenService.GenerateAccessToken(user));
+
+        Assert.Equal("true", jwt.Claims.First(c => c.Type == CustomClaimTypes.EmailVerified).Value);
+    }
+
+    [Fact]
+    public void GenerateAccessToken_LegacyLowercaseRole_EmitsCanonical()
+    {
+        var user = new User(Guid.NewGuid(), new Email("test@test.com"), new PasswordHash("hash"), new FullName("Test User"));
+        // Simulate a pre-normalization row (EF materialization bypasses AddRole).
+        typeof(User).GetField("_roles", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
+            .SetValue(user, new List<string> { "admin", "Support" });
+
+        var jwt = new JwtSecurityTokenHandler().ReadJwtToken(_tokenService.GenerateAccessToken(user));
+        var roles = jwt.Claims.Where(c => c.Type == ClaimTypes.Role).Select(c => c.Value).ToList();
+
+        Assert.Contains("Admin", roles);
+        Assert.Contains("Support", roles);
+        Assert.DoesNotContain("admin", roles);
     }
 
     [Fact]
@@ -41,5 +95,14 @@ public class TokenServiceTests
     {
         var token = _tokenService.GenerateRefreshToken();
         Assert.False(string.IsNullOrEmpty(token));
+    }
+
+    [Fact]
+    public void HashRefreshToken_ShouldProduceDeterministicBase64Hash()
+    {
+        var hash = _tokenService.HashRefreshToken("plain-token");
+        Assert.False(string.IsNullOrEmpty(hash));
+        Assert.Equal(hash, _tokenService.HashRefreshToken("plain-token"));
+        Assert.NotEqual("plain-token", hash);
     }
 }

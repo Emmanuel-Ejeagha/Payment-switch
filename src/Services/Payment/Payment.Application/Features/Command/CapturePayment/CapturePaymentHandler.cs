@@ -1,4 +1,4 @@
-﻿using BuildingBlocks.Shared.Events;
+﻿using BuildingBlocks.Shared.Exceptions;
 using BuildingBlocks.Shared.Results;
 using FluentValidation;
 using Payment.Application.Interfaces;
@@ -14,7 +14,6 @@ public class CapturePaymentHandler
     private readonly IPaymentIntentRepository _repository;
     private readonly IPaymentGatewayService _gateway;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IDomainEventDispatcher _dispatcher;
     private readonly IValidator<CapturePaymentCommand> _validator;
     private readonly ILogger<CapturePaymentHandler> _logger;
 
@@ -22,14 +21,12 @@ public class CapturePaymentHandler
         IPaymentIntentRepository repository,
         IPaymentGatewayService gateway,
         IUnitOfWork unitOfWork,
-        IDomainEventDispatcher dispatcher,
         IValidator<CapturePaymentCommand> validator,
         ILogger<CapturePaymentHandler> logger)
     {
         _repository = repository;
         _gateway = gateway;
         _unitOfWork = unitOfWork;
-        _dispatcher = dispatcher;
         _validator = validator;
         _logger = logger;
     }
@@ -45,15 +42,60 @@ public class CapturePaymentHandler
         if (intent is null)
             return PaymentErrors.PaymentIntentNotFound(command.IntentId);
 
+        if (!string.IsNullOrWhiteSpace(command.IdempotencyKey))
+        {
+            var replay = intent.Transactions.FirstOrDefault(t => t.Type == TransactionType.Capture && t.IdempotencyKey == command.IdempotencyKey);
+            if (replay is not null)
+            {
+                // Null amount defers to the recorded result; a concrete
+                // different amount is a conflicting reuse, not a replay.
+                if (command.Amount.HasValue && command.Amount.Value != replay.Amount.Amount)
+                {
+                    _logger.LogWarning("Idempotency key {Key} reused with different amount for Intent {IntentId}", command.IdempotencyKey, intent.Id);
+                    return PaymentErrors.IdempotencyKeyConflict(command.IdempotencyKey!);
+                }
+
+                _logger.LogInformation("Replaying capture for Intent {IntentId} with key {Key}", intent.Id, command.IdempotencyKey);
+                return new CapturePaymentResponse(replay.Id, intent.Status.Value);
+            }
+        }
+
+        if (intent.Status != PaymentStatus.Authorized && intent.Status != PaymentStatus.PartiallyCaptured)
+            return PaymentErrors.InvalidStatusTransition(intent.Status.Value, "Captured");
+
         Money? amount = command.Amount.HasValue ? new Money(command.Amount.Value, intent.Amount.Currency) : null;
 
-        var gatewayResult = await _gateway.CaptureAsync(intent.MerchantId, intent.GatewayReference!, amount ?? intent.Amount, cancellationToken);
+        // Default to the uncaptured remainder so a null-amount follow-up
+        // captures what is left instead of re-requesting the full amount.
+        var captureAmount = amount ?? intent.GetCapturableAmount();
+
+        var gatewayResult = await _gateway.CaptureAsync(intent.MerchantId, intent.GatewayReference!, captureAmount, command.IdempotencyKey, intent.ProviderName, cancellationToken);
         if (!gatewayResult.IsSuccess)
             return new Error("Payment.CaptureFailed", gatewayResult.Errors.First().Message);
 
-        intent.Capture(amount);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
-        await _dispatcher.DispatchAsync(intent.DomainEvents, cancellationToken);
+        await _unitOfWork.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            intent.Capture(amount, command.IdempotencyKey);
+        }
+        catch (InvalidOperationException ex)
+        {
+            await _unitOfWork.RollbackAsync(cancellationToken);
+            if (ex.Message.Contains("exceeds remaining authorized amount", StringComparison.OrdinalIgnoreCase))
+                return PaymentErrors.CaptureExceedsAuthorized(amount?.Amount ?? intent.Amount.Amount, intent.Amount.Amount);
+            return PaymentErrors.InvalidStatusTransition(intent.Status.Value, "Captured");
+        }
+
+        try
+        {
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            await _unitOfWork.CommitAsync(cancellationToken);
+        }
+        catch (ConcurrencyConflictException)
+        {
+            await _unitOfWork.RollbackAsync(cancellationToken);
+            return PaymentErrors.ConcurrencyConflict;
+        }
 
         var captureTx = intent.Transactions.Last(t => t.Type == TransactionType.Capture);
         return new CapturePaymentResponse(captureTx.Id, intent.Status.Value);

@@ -22,8 +22,8 @@ public static class ResultExtensions
         var first = errors[0];
         var statusCode = first.Code switch
         {
-            "Payment.IdempotencyKeyViolation" => 409,
-            "Payment.InvalidStatusTransition" => 400,
+            "Payment.ConcurrencyConflict" => 409,
+            "Payment.IdempotencyKeyConflict" => 409,            "Payment.InvalidStatusTransition" => 400,
             "Payment.CaptureExceedsAuthorized" => 400,
             "Payment.RefundExceedsCaptured" => 400,
             "Payment.PaymentIntentNotFound" => 404,

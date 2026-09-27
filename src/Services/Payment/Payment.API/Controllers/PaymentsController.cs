@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using System.Globalization;
+using BuildingBlocks.Shared.Paging;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
 using Payment.API.Extensions;
@@ -41,9 +43,11 @@ public class PaymentsController : BaseApiController
     public async Task<IActionResult> Authorize(
         Guid id,
         [FromBody] AuthorizePaymentCommand command,
+        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
         [FromServices] AuthorizePaymentHandler handler)
     {
-        command = new AuthorizePaymentCommand(id, command.CardLastFour, command.CardBrand);
+        var key = !string.IsNullOrWhiteSpace(command.IdempotencyKey) ? command.IdempotencyKey : idempotencyKey;
+        command = new AuthorizePaymentCommand(id, command.CardLastFour, command.CardBrand, key);
         var result = await handler.Handle(command);
         return result.ToActionResult();
     }
@@ -58,9 +62,11 @@ public class PaymentsController : BaseApiController
     public async Task<IActionResult> Capture(
         Guid id,
         [FromBody] CapturePaymentCommand command,
+        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
         [FromServices] CapturePaymentHandler handler)
     {
-        command = new CapturePaymentCommand(id, command.Amount);
+        var key = !string.IsNullOrWhiteSpace(command.IdempotencyKey) ? command.IdempotencyKey : idempotencyKey;
+        command = new CapturePaymentCommand(id, command.Amount, key);
         var result = await handler.Handle(command);
         return result.ToActionResult();
     }
@@ -74,9 +80,10 @@ public class PaymentsController : BaseApiController
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Void(
         Guid id,
+        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
         [FromServices] VoidPaymentHandler handler)
     {
-        var result = await handler.Handle(new VoidPaymentCommand(id));
+        var result = await handler.Handle(new VoidPaymentCommand(id, idempotencyKey));
         return result.ToActionResult();
     }
 
@@ -90,9 +97,11 @@ public class PaymentsController : BaseApiController
     public async Task<IActionResult> Refund(
         Guid id,
         [FromBody] RefundPaymentCommand command,
+        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
         [FromServices] RefundPaymentHandler handler)
     {
-        command = new RefundPaymentCommand(id, command.Amount);
+        var key = !string.IsNullOrWhiteSpace(command.IdempotencyKey) ? command.IdempotencyKey : idempotencyKey;
+        command = new RefundPaymentCommand(id, command.Amount, key);
         var result = await handler.Handle(command);
         return result.ToActionResult();
     }
@@ -120,10 +129,14 @@ public class PaymentsController : BaseApiController
     public async Task<IActionResult> List(
         [FromQuery] Guid merchantId,
         [FromServices] ListPaymentIntentsByMerchantHandler handler,
-        [FromQuery] int skip = 0,
-        [FromQuery] int take = 10)
+        [FromQuery] int skip = PageBounds.DefaultSkip,
+        [FromQuery] int take = PageBounds.DefaultTake)
     {
-        var result = await handler.Handle(new ListPaymentIntentsByMerchantQuery(merchantId, skip, take));
-        return result.ToActionResult();
+        var (normalizedSkip, normalizedTake) = PageBounds.Normalize(skip, take);
+        var result = await handler.Handle(new ListPaymentIntentsByMerchantQuery(merchantId, normalizedSkip, normalizedTake));
+        if (result.IsFailure) return result.ToActionResult();
+
+        Response.Headers["X-Total-Count"] = result.Value!.TotalCount.ToString(CultureInfo.InvariantCulture);
+        return Ok(result.Value.Items);
     }
 }

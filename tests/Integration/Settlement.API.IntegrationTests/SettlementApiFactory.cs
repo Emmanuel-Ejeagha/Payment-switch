@@ -1,8 +1,7 @@
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using PaymentSwitch.IntegrationTests.Shared;
 using Settlement.Infrastructure.Persistence;
 using Testcontainers.PostgreSql;
 
@@ -14,27 +13,15 @@ public class SettlementApiFactory : WebApplicationFactory<Program>, IAsyncLifeti
         .WithImage("postgres:16-alpine")
         .WithDatabase("SettlementDb")
         .WithUsername("paymentswitch")
-        .WithPassword("paymentswitch")
+        .WithPassword(TestSecrets.PostgresPassword)
         .Build();
 
-    protected override void ConfigureWebHost(IWebHostBuilder builder)
-    {
-        builder.ConfigureAppConfiguration((context, config) =>
-        {
-            config.AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["ConnectionStrings:SettlementDb"] = _postgres.GetConnectionString(),
-                ["RabbitMQ:HostName"] = "nonexistent",
-                ["Jwt:Secret"] = "test-super-secret-key-minimum-32-bytes!!",
-                ["Jwt:Issuer"] = "SettlementService",
-                ["Jwt:Audience"] = "PaymentSwitch"
-            });
-        });
-    }
+    public SettlementApiFactory() => TestSecrets.ApplyEnvironment("SettlementService");
 
     public async Task InitializeAsync()
     {
         await _postgres.StartAsync();
+        TestSecrets.ApplyConnectionString("SettlementDb", _postgres.GetConnectionString());
 
         using var scope = Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();

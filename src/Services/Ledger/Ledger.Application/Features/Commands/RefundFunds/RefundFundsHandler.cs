@@ -1,4 +1,4 @@
-﻿using BuildingBlocks.Shared.Events;
+﻿using BuildingBlocks.Shared.Exceptions;
 using BuildingBlocks.Shared.Results;
 using FluentValidation;
 using Ledger.Application.Interfaces;
@@ -12,20 +12,17 @@ public class RefundFundsHandler
 {
     private readonly ILedgerAccountRepository _repository;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IDomainEventDispatcher _dispatcher;
     private readonly IValidator<RefundFundsCommand> _validator;
     private readonly ILogger<RefundFundsHandler> _logger;
 
     public RefundFundsHandler(
         ILedgerAccountRepository repository,
         IUnitOfWork unitOfWork,
-        IDomainEventDispatcher dispatcher,
         IValidator<RefundFundsCommand> validator,
         ILogger<RefundFundsHandler> logger)
     {
         _repository = repository;
         _unitOfWork = unitOfWork;
-        _dispatcher = dispatcher;
         _validator = validator;
         _logger = logger;
     }
@@ -37,23 +34,33 @@ public class RefundFundsHandler
         if (!validation.IsValid)
             return validation.Errors.Select(e => new Error(e.PropertyName, e.ErrorMessage)).ToList();
 
-        var account = await _repository.GetByMerchantIdAsync(command.MerchantId, cancellationToken);
+        var account = await _repository.GetByMerchantIdAndCurrencyAsync(command.MerchantId, command.Currency, cancellationToken);
         if (account is null)
             return LedgerErrors.AccountNotFound(command.MerchantId);
 
+        await _unitOfWork.BeginTransactionAsync(cancellationToken);
         try
         {
             var amount = new Money(command.Amount, command.Currency);
             var correlationId = new CorrelationId(command.CorrelationId);
-            account.RefundFunds(amount, correlationId);
+            account.RefundFunds(amount, correlationId, command.EventOccurredOn);
         }
         catch (InvalidOperationException ex)
         {
+            await _unitOfWork.RollbackAsync(cancellationToken);
             return new Error("Ledger.RefundFailed", ex.Message);
         }
 
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
-        await _dispatcher.DispatchAsync(account.DomainEvents, cancellationToken);
+        try
+        {
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            await _unitOfWork.CommitAsync(cancellationToken);
+        }
+        catch (ConcurrencyConflictException)
+        {
+            await _unitOfWork.RollbackAsync(cancellationToken);
+            return LedgerErrors.ConcurrencyConflict;
+        }
 
         return Result.Success();
     }

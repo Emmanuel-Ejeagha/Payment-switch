@@ -9,6 +9,8 @@ public class MerchantStatus : ValueObject
     private MerchantStatus(string value) => Value = value;
 
     public static readonly MerchantStatus Pending = new("Pending");
+    public static readonly MerchantStatus Approved = new("Approved");
+    public static readonly MerchantStatus Rejected = new("Rejected");
     public static readonly MerchantStatus Active = new("Active");
     public static readonly MerchantStatus Suspended = new("Suspended");
 

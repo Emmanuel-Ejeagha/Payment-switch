@@ -6,20 +6,17 @@ public class UpdateMerchantConfigurationHandler
 {
     private readonly IMerchantRepository _repository;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IDomainEventDispatcher _dispatcher;
     private readonly IValidator<UpdateMerchantConfigurationCommand> _validator;
     private readonly ILogger<UpdateMerchantConfigurationHandler> _logger;
 
     public UpdateMerchantConfigurationHandler(
         IMerchantRepository repository,
         IUnitOfWork unitOfWork,
-        IDomainEventDispatcher dispatcher,
         IValidator<UpdateMerchantConfigurationCommand> validator,
         ILogger<UpdateMerchantConfigurationHandler> logger)
     {
         _repository = repository;
         _unitOfWork = unitOfWork;
-        _dispatcher = dispatcher;
         _validator = validator;
         _logger = logger;
     }
@@ -36,9 +33,18 @@ public class UpdateMerchantConfigurationHandler
         if (merchant == null)
             return MerchantErrors.MerchantNotFound(command.MerchantId);
 
+        if (!command.Caller.CanAccess(merchant.OwnerId))
+            return MerchantErrors.Unauthorized();
+
+        if (!command.Caller.EmailVerified)
+            return MerchantErrors.EmailNotVerified();
+
+        if (merchant.Status != MerchantStatus.Active)
+            return MerchantErrors.MerchantNotActive();
+
         try
         {
-            merchant.UpdateConfiguration(command.WebhookUrl, command.PaymentMethods);
+            merchant.UpdateConfiguration(command.WebhookUrl, command.PaymentMethods, command.AutoCapture);
         }
         catch (InvalidOperationException)
         {
@@ -46,7 +52,6 @@ public class UpdateMerchantConfigurationHandler
         }
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
-        await _dispatcher.DispatchAsync(merchant.DomainEvents, cancellationToken);
         return Result.Success();
     }
 }

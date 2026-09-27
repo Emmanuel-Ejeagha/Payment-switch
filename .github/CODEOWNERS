@@ -1,0 +1,29 @@
+# CODEOWNERS — default code reviewers
+
+# Every change needs a review from the owning team (single-owner repo today).
+* @Emmanuel-Ejeagha
+
+# Backend microservices
+/src/Services/Identity/    @Emmanuel-Ejeagha
+/src/Services/Merchant/    @Emmanuel-Ejeagha
+/src/Services/Payment/     @Emmanuel-Ejeagha
+/src/Services/Ledger/      @Emmanuel-Ejeagha
+/src/Services/Notification/ @Emmanuel-Ejeagha
+/src/Services/Settlement/  @Emmanuel-Ejeagha
+
+# Shared kernel / building blocks
+/src/BuildingBlocks/       @Emmanuel-Ejeagha
+
+# Frontends
+/apps/merchant/            @Emmanuel-Ejeagha
+/apps/admin/               @Emmanuel-Ejeagha
+
+# Tests
+/tests/                    @Emmanuel-Ejeagha
+
+# Infrastructure, CI/CD, and documentation
+/.github/                  @Emmanuel-Ejeagha
+/k8s/                      @Emmanuel-Ejeagha
+/helm/                     @Emmanuel-Ejeagha
+/docker-compose.yml        @Emmanuel-Ejeagha
+/docs/                     @Emmanuel-Ejeagha

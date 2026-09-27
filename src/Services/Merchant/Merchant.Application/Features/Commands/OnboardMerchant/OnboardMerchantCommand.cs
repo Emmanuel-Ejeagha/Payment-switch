@@ -1,4 +1,5 @@
-﻿namespace Merchant.Application.Features.Commands.OnboardMerchant;
+﻿using Merchant.Application.Auth;
 
-public record OnboardMerchantCommand(string BusinessName, string Email);
+namespace Merchant.Application.Features.Commands.OnboardMerchant;
 
+public record OnboardMerchantCommand(string BusinessName, string Email, CallerContext Caller);

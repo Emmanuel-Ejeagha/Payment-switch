@@ -1,0 +1,47 @@
+using System.Globalization;
+using BuildingBlocks.Shared.Paging;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Payment.API.Extensions;
+using Payment.Application.Features.Command.CreatePaymentLink;
+using Payment.Application.Features.Queries.ListPaymentLinksByMerchant;
+
+namespace Payment.API.Controllers;
+
+[Authorize]
+[Route("api/v{version:apiVersion}/payment-links")]
+public class PaymentLinksController : BaseApiController
+{
+    /// <summary>
+    /// Create a new payment link for a merchant.
+    /// </summary>
+    [HttpPost]
+    [ProducesResponseType(typeof(CreatePaymentLinkResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> Create(
+        [FromBody] CreatePaymentLinkCommand command,
+        [FromServices] CreatePaymentLinkHandler handler)
+    {
+        var result = await handler.Handle(command);
+        return result.ToActionResult();
+    }
+
+    /// <summary>
+    /// List payment links for a merchant (paginated).
+    /// </summary>
+    [HttpGet]
+    [ProducesResponseType(typeof(List<PaymentLinkDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> List(
+        [FromQuery] Guid merchantId,
+        [FromServices] ListPaymentLinksByMerchantHandler handler,
+        [FromQuery] int skip = PageBounds.DefaultSkip,
+        [FromQuery] int take = PageBounds.DefaultTake)
+    {
+        var (normalizedSkip, normalizedTake) = PageBounds.Normalize(skip, take);
+        var result = await handler.Handle(new ListPaymentLinksByMerchantQuery(merchantId, normalizedSkip, normalizedTake));
+        if (result.IsFailure) return result.ToActionResult();
+
+        Response.Headers["X-Total-Count"] = result.Value!.TotalCount.ToString(CultureInfo.InvariantCulture);
+        return Ok(result.Value.Items);
+    }
+}

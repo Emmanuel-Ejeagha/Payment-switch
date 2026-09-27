@@ -17,9 +17,9 @@ public class HealthCheckTests : IClassFixture<LedgerApiFactory>
     }
 
     [Fact]
-    public async Task Ready_Returns503_WhenRabbitMqUnavailable()
+    public async Task Ready_Returns200_WhenRabbitMqAvailable()
     {
         var response = await _client.GetAsync("/health/ready");
-        Assert.Equal(System.Net.HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        Assert.Equal(System.Net.HttpStatusCode.OK, response.StatusCode);
     }
 }

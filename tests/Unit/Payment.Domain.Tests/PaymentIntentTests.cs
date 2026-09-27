@@ -8,7 +8,7 @@ namespace Payment.Domain.Tests;
 public class PaymentIntentTests
 {
     private readonly Guid _merchantId = Guid.NewGuid();
-    private readonly Money _amount = new(100m, "USD");
+    private readonly Money _amount = new(100L, "USD");
     private readonly IdempotencyKey _idempotencyKey = new("unique-key-123");
 
     [Fact]
@@ -44,6 +44,16 @@ public class PaymentIntentTests
     }
 
     [Fact]
+    public void Authorize_WithProviderName_ShouldRecordItForFollowOnPinning()
+    {
+        var intent = CreatePendingIntent();
+
+        intent.Authorize(new AuthorizationCode("AUTH123"), new GatewayReference("GTW-1"), providerName: "stripe");
+
+        Assert.Equal("stripe", intent.ProviderName);
+    }
+
+    [Fact]
     public void Authorize_FromNonPending_Throws()
     {
         var intent = CreatePendingIntent();
@@ -56,7 +66,7 @@ public class PaymentIntentTests
     public void Capture_Full_FromAuthorized_ShouldCaptureAndSetStatus()
     {
         var intent = CreateAuthorizedIntent();
-        var captureAmount = new Money(100m, "USD");
+        var captureAmount = new Money(100L, "USD");
 
         intent.Capture(captureAmount);
 
@@ -69,7 +79,7 @@ public class PaymentIntentTests
     public void Capture_Partial_ShouldSetPartiallyCaptured()
     {
         var intent = CreateAuthorizedIntent();
-        var captureAmount = new Money(40m, "USD");
+        var captureAmount = new Money(40L, "USD");
 
         intent.Capture(captureAmount);
 
@@ -77,10 +87,22 @@ public class PaymentIntentTests
     }
 
     [Fact]
+    public void Capture_NullAmountAfterPartial_ShouldCaptureRemainder()
+    {
+        var intent = CreateAuthorizedIntent();
+        intent.Capture(new Money(60L, "USD"));
+
+        intent.Capture(null);
+
+        Assert.Equal(PaymentStatus.Captured, intent.Status);
+        Assert.Equal(40L, intent.Transactions.Last(t => t.Type == TransactionType.Capture).Amount.Amount);
+    }
+
+    [Fact]
     public void Capture_ExceedsAuthorized_Throws()
     {
         var intent = CreateAuthorizedIntent();
-        var captureAmount = new Money(200m, "USD");
+        var captureAmount = new Money(200L, "USD");
 
         Assert.Throws<InvalidOperationException>(() => intent.Capture(captureAmount));
     }
@@ -89,7 +111,7 @@ public class PaymentIntentTests
     public void Capture_FromPending_Throws()
     {
         var intent = CreatePendingIntent();
-        Assert.Throws<InvalidOperationException>(() => intent.Capture(new Money(10m, "USD")));
+        Assert.Throws<InvalidOperationException>(() => intent.Capture(new Money(10L, "USD")));
     }
 
     [Fact]
@@ -101,7 +123,9 @@ public class PaymentIntentTests
 
         Assert.Equal(PaymentStatus.Voided, intent.Status);
         Assert.Single(intent.Transactions, t => t.Type == TransactionType.Void);
-        Assert.Contains(intent.DomainEvents, e => e is PaymentVoidedDomainEvent);
+        var voidedEvent = Assert.Single(intent.DomainEvents.OfType<PaymentVoidedDomainEvent>());
+        Assert.Equal(intent.MerchantId, voidedEvent.MerchantId);
+        Assert.Equal(intent.Amount, voidedEvent.Amount);
     }
 
     [Fact]
@@ -115,7 +139,7 @@ public class PaymentIntentTests
     public void Refund_Full_FromCaptured_ShouldRefundAndSetStatus()
     {
         var intent = CreateCapturedIntent();
-        var refundAmount = new Money(100m, "USD");
+        var refundAmount = new Money(100L, "USD");
 
         intent.Refund(refundAmount);
 
@@ -128,7 +152,7 @@ public class PaymentIntentTests
     public void Refund_Partial_ShouldSetPartiallyRefunded()
     {
         var intent = CreateCapturedIntent();
-        var refundAmount = new Money(30m, "USD");
+        var refundAmount = new Money(30L, "USD");
 
         intent.Refund(refundAmount);
 
@@ -136,10 +160,22 @@ public class PaymentIntentTests
     }
 
     [Fact]
+    public void Refund_NullAmountAfterPartialCapture_ShouldRefundCapturedTotal()
+    {
+        var intent = CreateAuthorizedIntent();
+        intent.Capture(new Money(60L, "USD"));
+
+        intent.Refund(null);
+
+        Assert.Equal(PaymentStatus.FullyRefunded, intent.Status);
+        Assert.Equal(60L, intent.Transactions.Last(t => t.Type == TransactionType.Refund).Amount.Amount);
+    }
+
+    [Fact]
     public void Refund_ExceedsCaptured_Throws()
     {
         var intent = CreateCapturedIntent();
-        var refundAmount = new Money(200m, "USD");
+        var refundAmount = new Money(200L, "USD");
 
         Assert.Throws<InvalidOperationException>(() => intent.Refund(refundAmount));
     }
@@ -148,7 +184,7 @@ public class PaymentIntentTests
     public void Refund_FromUnauthorizedStatus_Throws()
     {
         var intent = CreatePendingIntent();
-        Assert.Throws<InvalidOperationException>(() => intent.Refund(new Money(10m, "USD")));
+        Assert.Throws<InvalidOperationException>(() => intent.Refund(new Money(10L, "USD")));
     }
 
     [Fact]
@@ -158,7 +194,6 @@ public class PaymentIntentTests
         intent.Fail();
         Assert.Equal(PaymentStatus.Failed, intent.Status);
     }
-
     [Fact]
     public void Fail_FromAuthorized_Throws()
     {
@@ -167,17 +202,138 @@ public class PaymentIntentTests
     }
 
     [Fact]
+    public void Fail_FromRequiresAction_EmitsFailedEvent()
+    {
+        var intent = CreateRequiresActionIntent();
+
+        intent.Fail();
+
+        Assert.Equal(PaymentStatus.Failed, intent.Status);
+        var failed = Assert.Single(intent.DomainEvents.OfType<PaymentFailedDomainEvent>());
+        Assert.Equal(intent.MerchantId, failed.MerchantId);
+        Assert.Equal(intent.Amount, failed.Amount);
+    }
+
+    [Fact]
+    public void Fail_FromProcessing_EmitsFailedEvent()
+    {
+        var intent = CreateRequiresActionIntent();
+        intent.MarkProcessing();
+
+        intent.Fail();
+
+        Assert.Equal(PaymentStatus.Failed, intent.Status);
+        Assert.Single(intent.DomainEvents.OfType<PaymentFailedDomainEvent>());
+    }
+
+    [Fact]
+    public void Void_FromPartiallyCaptured_VoidsRemainder()
+    {
+        var intent = CreateAuthorizedIntent();
+        intent.Capture(new Money(60L, "USD"));
+        intent.ClearDomainEvents();
+
+        intent.Void();
+
+        Assert.Equal(PaymentStatus.Voided, intent.Status);
+        var voidTx = Assert.Single(intent.Transactions, t => t.Type == TransactionType.Void);
+        Assert.Equal(40L, voidTx.Amount.Amount);
+        var voidedEvent = Assert.Single(intent.DomainEvents.OfType<PaymentVoidedDomainEvent>());
+        Assert.Equal(40L, voidedEvent.Amount.Amount);
+    }
+
+    [Fact]
+    public void RequireAction_FromPending_ShouldSetRequiresActionAndRaiseEvent()
+    {
+        var intent = CreatePendingIntent();
+        var gatewayRef = new GatewayReference("GTW-3DS");
+
+        intent.RequireAction(gatewayRef);
+
+        Assert.Equal(PaymentStatus.RequiresAction, intent.Status);
+        Assert.Equal(gatewayRef, intent.GatewayReference);
+        Assert.Contains(intent.DomainEvents, e => e is PaymentRequiresActionDomainEvent);
+    }
+
+    [Fact]
+    public void RequireAction_FromNonPending_Throws()
+    {
+        var intent = CreateAuthorizedIntent();
+        Assert.Throws<InvalidOperationException>(() => intent.RequireAction(new GatewayReference("G")));
+    }
+
+    [Fact]
+    public void MarkProcessing_FromRequiresAction_ShouldSetProcessingAndRaiseEvent()
+    {
+        var intent = CreateRequiresActionIntent();
+
+        intent.MarkProcessing();
+
+        Assert.Equal(PaymentStatus.Processing, intent.Status);
+        Assert.Contains(intent.DomainEvents, e => e is PaymentProcessingDomainEvent);
+    }
+
+    [Fact]
+    public void MarkProcessing_FromPending_Throws()
+    {
+        var intent = CreatePendingIntent();
+        Assert.Throws<InvalidOperationException>(() => intent.MarkProcessing());
+    }
+
+    [Fact]
+    public void ConfirmAction_FromRequiresAction_ShouldAuthorizeAndRaiseEvent()
+    {
+        var intent = CreateRequiresActionIntent();
+        var authCode = new AuthorizationCode("AUTH-3DS");
+        var gatewayRef = new GatewayReference("GTW-3DS");
+
+        intent.ConfirmAction(authCode, gatewayRef);
+
+        Assert.Equal(PaymentStatus.Authorized, intent.Status);
+        Assert.Equal(authCode, intent.AuthorizationCode);
+        Assert.Equal(gatewayRef, intent.GatewayReference);
+        Assert.Single(intent.Transactions, t => t.Type == TransactionType.Authorization);
+        Assert.Contains(intent.DomainEvents, e => e is PaymentAuthorizedDomainEvent);
+    }
+
+    [Fact]
+    public void ConfirmAction_FromProcessing_ShouldAuthorize()
+    {
+        var intent = CreateRequiresActionIntent();
+        intent.MarkProcessing();
+        intent.ClearDomainEvents();
+
+        intent.ConfirmAction(new AuthorizationCode("AUTH-3DS"), new GatewayReference("GTW-3DS"));
+
+        Assert.Equal(PaymentStatus.Authorized, intent.Status);
+        Assert.Contains(intent.DomainEvents, e => e is PaymentAuthorizedDomainEvent);
+    }
+
+    [Fact]
+    public void ConfirmAction_FromPending_Throws()
+    {
+        var intent = CreatePendingIntent();
+        Assert.Throws<InvalidOperationException>(() => intent.ConfirmAction(new AuthorizationCode("A"), new GatewayReference("G")));
+    }
+
+    [Fact]
     public void Money_InvalidAmount_Throws()
     {
-        Assert.Throws<ArgumentException>(() => new Money(0m, "USD"));
-        Assert.Throws<ArgumentException>(() => new Money(-5m, "USD"));
+        Assert.Throws<ArgumentException>(() => new Money(-5L, "USD"));
+    }
+
+    [Fact]
+    public void Money_ZeroAmount_IsAllowed()
+    {
+        var money = new Money(0L, "USD");
+        Assert.Equal(0L, money.Amount);
     }
 
     [Fact]
     public void Money_InvalidCurrency_Throws()
     {
-        Assert.Throws<ArgumentException>(() => new Money(10m, "US"));
-        Assert.Throws<ArgumentException>(() => new Money(10m, ""));
+        Assert.Throws<ArgumentException>(() => new Money(10L, "US"));
+        Assert.Throws<ArgumentException>(() => new Money(10L, ""));
     }
 
     [Fact]
@@ -186,9 +342,153 @@ public class PaymentIntentTests
         Assert.Throws<ArgumentException>(() => new IdempotencyKey(""));
     }
 
+    [Fact]
+    public void Expire_FromPending_ShouldExpireAndRaiseEvent()
+    {
+        var intent = CreatePendingIntent();
+
+        intent.Expire();
+
+        Assert.Equal(PaymentStatus.Expired, intent.Status);
+        Assert.Contains(intent.DomainEvents, e => e is PaymentExpiredDomainEvent);
+    }
+
+    [Fact]
+    public void Expire_FromRequiresAction_ShouldExpire()
+    {
+        var intent = CreateRequiresActionIntent();
+
+        intent.Expire();
+
+        Assert.Equal(PaymentStatus.Expired, intent.Status);
+    }
+
+    [Fact]
+    public void Expire_FromProcessing_ShouldExpire()
+    {
+        var intent = CreateRequiresActionIntent();
+        intent.MarkProcessing();
+        intent.ClearDomainEvents();
+
+        intent.Expire();
+
+        Assert.Equal(PaymentStatus.Expired, intent.Status);
+        Assert.Contains(intent.DomainEvents, e => e is PaymentExpiredDomainEvent);
+    }
+
+    [Fact]
+    public void Expire_FromAuthorized_Throws()
+    {
+        var intent = CreateAuthorizedIntent();
+        Assert.Throws<InvalidOperationException>(() => intent.Expire());
+    }
+
+    [Fact]
+    public void Expire_FromCaptured_Throws()
+    {
+        var intent = CreateCapturedIntent();
+        Assert.Throws<InvalidOperationException>(() => intent.Expire());
+    }
+
+    [Fact]
+    public void Expire_FromVoided_Throws()
+    {
+        var intent = CreateAuthorizedIntent();
+        intent.Void();
+        Assert.Throws<InvalidOperationException>(() => intent.Expire());
+    }
+
+    [Fact]
+    public void Expire_FromFailed_Throws()
+    {
+        var intent = CreatePendingIntent();
+        intent.Fail();
+        Assert.Throws<InvalidOperationException>(() => intent.Expire());
+    }
+
+    [Fact]
+    public void Expire_WhenAlreadyExpired_IsIdempotentNoOp()
+    {
+        var intent = CreatePendingIntent();
+        intent.Expire();
+        intent.ClearDomainEvents();
+
+        intent.Expire();
+
+        Assert.Equal(PaymentStatus.Expired, intent.Status);
+        Assert.Empty(intent.DomainEvents);
+    }
+
+    [Fact]
+    public void ExpiredIntent_CannotBeAuthorized()
+    {
+        var intent = CreatePendingIntent();
+        intent.Expire();
+
+        Assert.Throws<InvalidOperationException>(() =>
+            intent.Authorize(new AuthorizationCode("AUTH-LATE"), new GatewayReference("GTW-LATE")));
+    }
+
+    [Fact]
+    public void ExpiredIntent_CannotBeCaptured()
+    {
+        var intent = CreatePendingIntent();
+        intent.Expire();
+
+        Assert.Throws<InvalidOperationException>(() => intent.Capture(new Money(100L, "USD")));
+    }
+
+    [Fact]
+    public void ExpiredIntent_CannotRequireAction()
+    {
+        var intent = CreatePendingIntent();
+        intent.Expire();
+
+        Assert.Throws<InvalidOperationException>(() => intent.RequireAction(new GatewayReference("G")));
+    }
+
+    [Fact]
+    public void ExpiredIntent_CanBeFailed_OnlyFromPending_IsRejected()
+    {
+        var intent = CreatePendingIntent();
+        intent.Expire();
+
+        Assert.Throws<InvalidOperationException>(() => intent.Fail());
+    }
+
+    [Fact]
+    public void ExpiredIntent_IsStableTerminalState()
+    {
+        var intent = CreatePendingIntent();
+        intent.Expire();
+
+        Assert.Throws<InvalidOperationException>(() => intent.Void());
+        Assert.Throws<InvalidOperationException>(() => intent.Refund(new Money(100L, "USD")));
+        Assert.Throws<InvalidOperationException>(() => intent.ConfirmAction(new AuthorizationCode("A"), new GatewayReference("G")));
+    }
+
+    [Fact]
+    public void Expire_DoesNotAlterAmountOrTransactions()
+    {
+        var intent = CreatePendingIntent();
+
+        intent.Expire();
+
+        Assert.Equal(_amount, intent.Amount);
+        Assert.Empty(intent.Transactions);
+    }
+
     // Helper methods
     private PaymentIntent CreatePendingIntent() =>
         new(Guid.NewGuid(), _merchantId, _amount, _idempotencyKey, PaymentMethod.Card);
+
+    private PaymentIntent CreateRequiresActionIntent()
+    {
+        var intent = CreatePendingIntent();
+        intent.RequireAction(new GatewayReference("GTW-3DS"));
+        intent.ClearDomainEvents();
+        return intent;
+    }
 
     private PaymentIntent CreateAuthorizedIntent()
     {
@@ -201,7 +501,7 @@ public class PaymentIntentTests
     private PaymentIntent CreateCapturedIntent()
     {
         var intent = CreateAuthorizedIntent();
-        intent.Capture(new Money(100m, "USD"));
+        intent.Capture(new Money(100L, "USD"));
         intent.ClearDomainEvents();
         return intent;
     }

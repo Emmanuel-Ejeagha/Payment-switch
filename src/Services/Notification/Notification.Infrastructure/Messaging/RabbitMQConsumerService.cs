@@ -1,9 +1,13 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using BuildingBlocks.Shared.Messaging;
+using BuildingBlocks.Shared.Middleware;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Notification.Application.Features.Commands.CreateNotification;
 using Notification.Application.Interfaces;
+using Notification.Application.Messaging;
+using Notification.Application.Services;
 using Notification.Infrastructure.Inbox;
 using Notification.Infrastructure.Persistence;
 using RabbitMQ.Client;
@@ -11,26 +15,49 @@ using RabbitMQ.Client.Events;
 using System.Text;
 using System.Text.Json;
 
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("Notification.API.IntegrationTests")]
+
 namespace Notification.Infrastructure.Messaging;
 
 public class RabbitMQConsumerService : BackgroundService
 {
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly ICorrelationIdProvider _correlationIdProvider;
     private readonly ILogger<RabbitMQConsumerService> _logger;
     private readonly RabbitMQSettings _settings;
     private IConnection? _connection;
     private IChannel? _channel;
     private readonly string _queueName = "notification.events";
+    private readonly string _retryExchange = "notification.events.retry";
+    private readonly string _retryQueue = "notification.events.retry";
+    private readonly string _dlxExchange = "notification.events.dlx";
+    private readonly string _dlq = "notification.events.dlq";
+    private readonly string _sourceExchange = "payment.events";
 
 
     public RabbitMQConsumerService(
         IOptions<RabbitMQSettings> settings,
         IServiceScopeFactory scopeFactory,
+        ICorrelationIdProvider correlationIdProvider,
         ILogger<RabbitMQConsumerService> logger)
     {
         _scopeFactory = scopeFactory;
+        _correlationIdProvider = correlationIdProvider;
         _logger = logger;
         _settings = settings.Value;
+    }
+
+    /// <summary>
+    /// Carries the originating request's correlation ID into the consumer's async
+    /// flow (mirrors the Ledger consumer), so logging and outbox correlation stay
+    /// joined to the HTTP request that produced the event.
+    /// </summary>
+    internal void RestoreCorrelation(string? correlationId)
+    {
+        if (!string.IsNullOrWhiteSpace(correlationId))
+        {
+            _correlationIdProvider.Set(correlationId);
+        }
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -41,12 +68,23 @@ public class RabbitMQConsumerService : BackgroundService
             {
                 await TryConnectAndConsume(stoppingToken);
             }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                break;
+            }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "RabbitMQ consumer error. Retrying in 10 seconds...");
             }
 
-            await Task.Delay(10_000, stoppingToken);
+            try
+            {
+                await Task.Delay(10_000, stoppingToken);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
         }
     }
 
@@ -55,6 +93,7 @@ public class RabbitMQConsumerService : BackgroundService
         var factory = new ConnectionFactory
         {
             HostName = _settings.HostName,
+            Port = _settings.Port,
             UserName = _settings.UserName,
             Password = _settings.Password
         };
@@ -62,38 +101,63 @@ public class RabbitMQConsumerService : BackgroundService
         _connection = await factory.CreateConnectionAsync(cancellationToken);
         _channel = await _connection.CreateChannelAsync(cancellationToken: cancellationToken);
 
+        await _channel.ExchangeDeclareAsync(_retryExchange, ExchangeType.Topic, durable: true, cancellationToken: cancellationToken);
+        await _channel.ExchangeDeclareAsync(_dlxExchange, ExchangeType.Topic, durable: true, cancellationToken: cancellationToken);
+
+        var retryArgs = new Dictionary<string, object?>
+        {
+            ["x-message-ttl"] = (long)MessageRetryPolicy.RetryDelay.TotalMilliseconds,
+            ["x-dead-letter-exchange"] = _sourceExchange
+        };
+        await _channel.QueueDeclareAsync(_retryQueue, durable: true, exclusive: false, autoDelete: false, arguments: retryArgs, cancellationToken: cancellationToken);
+        await _channel.QueueBindAsync(_retryQueue, _retryExchange, "#", null, cancellationToken: cancellationToken);
+
+        await _channel.QueueDeclareAsync(_dlq, durable: true, exclusive: false, autoDelete: false, cancellationToken: cancellationToken);
+        await _channel.QueueBindAsync(_dlq, _dlxExchange, "#", null, cancellationToken: cancellationToken);
+
         await _channel.QueueDeclareAsync(_queueName, durable: true, exclusive: false, autoDelete: false, cancellationToken: cancellationToken);
-        await _channel.QueueBindAsync(_queueName, "payment.events", "PaymentAuthorizedDomainEvent", null, cancellationToken: cancellationToken);
-        await _channel.QueueBindAsync(_queueName, "payment.events", "PaymentCapturedDomainEvent", null, cancellationToken: cancellationToken);
-        await _channel.QueueBindAsync(_queueName, "payment.events", "PaymentRefundedDomainEvent", null, cancellationToken: cancellationToken);
+        foreach (var routingKey in PaymentEventChannels.NotificationBoundPaymentEvents)
+            await _channel.QueueBindAsync(_queueName, _sourceExchange, routingKey, null, cancellationToken: cancellationToken);
 
         var consumer = new AsyncEventingBasicConsumer(_channel);
         consumer.ReceivedAsync += async (sender, ea) =>
         {
+            // Resume the producer's trace (HTTP/outbox → broker → this consumer → DB).
+            using var activity = RabbitMqTracing.StartConsumerActivity(
+                ea.RoutingKey,
+                RabbitMqTracing.ExtractActivityContext(ea.BasicProperties.Headers));
             var messageId = ea.BasicProperties.MessageId ?? Guid.NewGuid().ToString();
             var eventType = ea.RoutingKey;
             var body = Encoding.UTF8.GetString(ea.Body.ToArray());
+
+            RestoreCorrelation(ea.BasicProperties.CorrelationId);
 
             using var scope = _scopeFactory.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var createHandler = scope.ServiceProvider.GetRequiredService<CreateNotificationHandler>();
             var realTimeNotifier = scope.ServiceProvider.GetRequiredService<IRealTimeNotifier>();
+            var merchantContacts = scope.ServiceProvider.GetRequiredService<IMerchantContactService>();
+            var preferenceRepo = scope.ServiceProvider.GetRequiredService<INotificationPreferenceRepository>();
 
             // Extract merchantId from the event for real-time notification
             Guid? merchantId = null;
 
             try
             {
-                if (db.InboxMessages.Any(m => m.MessageId == messageId))
+                var existing = db.InboxMessages.FirstOrDefault(m => m.MessageId == messageId);
+                if (existing is not null && existing.ProcessedAt is not null)
                 {
                     _logger.LogWarning("Duplicate message {MessageId} ignored", messageId);
                     await _channel.BasicAckAsync(ea.DeliveryTag, false);
                     return;
                 }
 
-                var inboxMsg = new InboxMessage(messageId, eventType, body);
-                db.InboxMessages.Add(inboxMsg);
-                await db.SaveChangesAsync(cancellationToken);
+                if (existing is null)
+                {
+                    var inboxMsg = new InboxMessage(messageId, eventType, body);
+                    db.InboxMessages.Add(inboxMsg);
+                    await db.SaveChangesAsync(cancellationToken);
+                }
 
                 CreateNotificationCommand? command = null;
 
@@ -101,24 +165,59 @@ public class RabbitMQConsumerService : BackgroundService
                 {
                     case "PaymentAuthorizedDomainEvent":
                         var authEvent = JsonSerializer.Deserialize<PaymentAuthorizedEvent>(body)!;
-                        command = MapAuthorized(body);
                         merchantId = authEvent.MerchantId;
+                        command = await ResolveCommandAsync(merchantContacts, eventType, authEvent.MerchantId,
+                            recipient => PaymentEventMapper.MapAuthorized(authEvent, recipient, body), cancellationToken);
                         break;
 
                     case "PaymentCapturedDomainEvent":
                         var captEvent = JsonSerializer.Deserialize<PaymentCapturedEvent>(body)!;
-                        command = MapCaptured(body);
                         merchantId = captEvent.MerchantId;
+                        command = await ResolveCommandAsync(merchantContacts, eventType, captEvent.MerchantId,
+                            recipient => PaymentEventMapper.MapCaptured(captEvent, recipient, body), cancellationToken);
                         break;
 
                     case "PaymentRefundedDomainEvent":
                         var refEvent = JsonSerializer.Deserialize<PaymentRefundedEvent>(body)!;
-                        command = MapRefunded(body);
                         merchantId = refEvent.MerchantId;
+                        command = await ResolveCommandAsync(merchantContacts, eventType, refEvent.MerchantId,
+                            recipient => PaymentEventMapper.MapRefunded(refEvent, recipient, body), cancellationToken);
+                        break;
+
+                    case "PaymentIntentCreatedDomainEvent":
+                        var intentEvent = JsonSerializer.Deserialize<PaymentIntentCreatedEvent>(body)!;
+                        merchantId = intentEvent.MerchantId;
+                        command = await ResolveCommandAsync(merchantContacts, eventType, intentEvent.MerchantId,
+                            recipient => PaymentEventMapper.MapIntentCreated(intentEvent, recipient, body), cancellationToken);
+                        break;
+
+                    case "PaymentVoidedDomainEvent":
+                        var voidedEvent = JsonSerializer.Deserialize<PaymentVoidedEvent>(body)!;
+                        merchantId = voidedEvent.MerchantId;
+                        command = await ResolveCommandAsync(merchantContacts, eventType, voidedEvent.MerchantId,
+                            recipient => PaymentEventMapper.MapVoided(voidedEvent, recipient, body), cancellationToken);
+                        break;
+
+                    case "PaymentFailedDomainEvent":
+                        var failedEvent = JsonSerializer.Deserialize<PaymentFailedEvent>(body)!;
+                        merchantId = failedEvent.MerchantId;
+                        command = await ResolveCommandAsync(merchantContacts, eventType, failedEvent.MerchantId,
+                            recipient => PaymentEventMapper.MapFailed(failedEvent, recipient, body), cancellationToken);
+                        break;
+
+                    case "PaymentExpiredDomainEvent":
+                        var expiredEvent = JsonSerializer.Deserialize<PaymentExpiredEvent>(body)!;
+                        merchantId = expiredEvent.MerchantId;
+                        command = await ResolveCommandAsync(merchantContacts, eventType, expiredEvent.MerchantId,
+                            recipient => PaymentEventMapper.MapExpired(expiredEvent, recipient, body), cancellationToken);
                         break;
                 }
 
-                if (command != null)
+                if (command != null && await IsSuppressedAsync(preferenceRepo, command, eventType, cancellationToken))
+                {
+                    _logger.LogInformation("Notification suppressed for {Recipient} ({EventType}) by preference", command.Recipient, eventType);
+                }
+                else if (command != null)
                 {
                     var result = await createHandler.Handle(command, cancellationToken);
                     if (result.IsSuccess)
@@ -134,60 +233,166 @@ public class RabbitMQConsumerService : BackgroundService
                                 cancellationToken);
                         }
                     }
+                    else
+                    {
+                        _logger.LogWarning("CreateNotification failed: {Errors}", string.Join("; ", result.Errors.Select(e => e.Message)));
+                        await HandleFailureAsync(ea, messageId, cancellationToken);
+                        return;
+                    }
                 }
 
-                inboxMsg.MarkAsProcessed();
+                var msg = db.InboxMessages.First(m => m.MessageId == messageId);
+                msg.MarkAsProcessed();
                 await db.SaveChangesAsync(cancellationToken);
                 await _channel.BasicAckAsync(ea.DeliveryTag, false);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error processing message {MessageId}", messageId);
-                await _channel.BasicNackAsync(ea.DeliveryTag, false, false);
+                await HandleFailureAsync(ea, messageId, cancellationToken);
             }
         };
 
         await _channel.BasicConsumeAsync(_queueName, autoAck: false, consumer: consumer, cancellationToken: cancellationToken);
 
-        // Keep the connection alive until cancelled
+        // Keep the connection alive until cancelled. If the broker drops mid-run
+        // the connection closes; exit so ExecuteAsync reconnects and re-declares
+        // the topology instead of blocking on a dead channel.
         while (!cancellationToken.IsCancellationRequested)
         {
+            if (_connection is not { IsOpen: true })
+            {
+                _logger.LogWarning("RabbitMQ connection lost; reconnecting in 10 seconds...");
+                break;
+            }
             await Task.Delay(1000, cancellationToken);
         }
     }
 
-    private CreateNotificationCommand MapAuthorized(string body)
+    private async Task HandleFailureAsync(BasicDeliverEventArgs ea, string messageId, CancellationToken cancellationToken)
     {
-        var e = JsonSerializer.Deserialize<PaymentAuthorizedEvent>(body)!;
-        return new CreateNotificationCommand("customer@example.com", "email", "Payment Authorized",
-            $"Your payment of {e.Amount.Amount} {e.Amount.Currency} has been authorized.", null, body);
+        // A delivered message always carries BasicProperties; the client types it
+        // as nullable so we assert it rather than branch on a value that cannot be null.
+        var basicProperties = ea.BasicProperties!;
+        // The consumer is running on a channel created in ExecuteAsync, so it is
+        // always initialized by the time a failure can be handled.
+        var channel = _channel ?? throw new InvalidOperationException("Channel is not initialized.");
+        var retryCount = MessageRetryPolicy.GetRetryCount(basicProperties.Headers);
+
+        if (MessageRetryPolicy.ShouldRetry(retryCount))
+        {
+            var properties = new BasicProperties
+            {
+                Persistent = true,
+                ContentType = "application/json",
+                MessageId = basicProperties.MessageId,
+                CorrelationId = basicProperties.CorrelationId,
+                Headers = new Dictionary<string, object?>
+                {
+                    [MessageRetryPolicy.RetryCountHeader] = retryCount + 1
+                }
+            };
+
+            await channel.BasicPublishAsync(
+                exchange: _retryExchange,
+                routingKey: ea.RoutingKey,
+                mandatory: false,
+                basicProperties: properties,
+                body: ea.Body,
+                cancellationToken: cancellationToken);
+            await channel.BasicAckAsync(ea.DeliveryTag, false, cancellationToken);
+
+            _logger.LogWarning("Message {MessageId} failed; scheduled retry {RetryCount}/{MaxRetries}",
+                messageId, retryCount + 1, MessageRetryPolicy.MaxRetries);
+        }
+        else
+        {
+            var properties = new BasicProperties
+            {
+                Persistent = true,
+                ContentType = "application/json",
+                MessageId = basicProperties.MessageId,
+                CorrelationId = basicProperties.CorrelationId,
+                Headers = basicProperties.Headers
+            };
+
+            await channel.BasicPublishAsync(
+                exchange: _dlxExchange,
+                routingKey: ea.RoutingKey,
+                mandatory: false,
+                basicProperties: properties,
+                body: ea.Body,
+                cancellationToken: cancellationToken);
+            await channel.BasicAckAsync(ea.DeliveryTag, false, cancellationToken);
+
+            _logger.LogError("Message {MessageId} failed after {MaxRetries} retries; moved to DLQ",
+                messageId, MessageRetryPolicy.MaxRetries);
+        }
     }
 
-    private CreateNotificationCommand MapCaptured(string body)
+    private async Task<bool> IsSuppressedAsync(
+        INotificationPreferenceRepository preferenceRepo,
+        CreateNotificationCommand command,
+        string eventType,
+        CancellationToken cancellationToken)
     {
-        var e = JsonSerializer.Deserialize<PaymentCapturedEvent>(body)!;
-        return new CreateNotificationCommand("customer@example.com", "email", "Payment Captured",
-            $"Your payment of {e.Amount.Amount} {e.Amount.Currency} has been captured.", null, body);
+        var preference = await preferenceRepo.FindAsync(command.Recipient, command.Channel, eventType, cancellationToken);
+        return NotificationPreferenceRules.IsSuppressed(preference);
     }
 
-    private CreateNotificationCommand MapRefunded(string body)
+    private async Task<CreateNotificationCommand?> ResolveCommandAsync(
+        IMerchantContactService merchantContacts,
+        string eventType,
+        Guid merchantId,
+        Func<string, CreateNotificationCommand> mapper,
+        CancellationToken cancellationToken)
     {
-        var e = JsonSerializer.Deserialize<PaymentRefundedEvent>(body)!;
-        return new CreateNotificationCommand("customer@example.com", "email", "Payment Refunded",
-            $"Your refund of {e.Amount.Amount} {e.Amount.Currency} has been processed.", null, body);
+        var recipient = await merchantContacts.GetMerchantEmailAsync(merchantId, cancellationToken);
+        if (recipient is null)
+        {
+            _logger.LogWarning("Skipping {EventType}: no merchant contact email for {MerchantId}", eventType, merchantId);
+            return null;
+        }
+
+        return mapper(recipient);
+    }
+
+    /// <summary>
+    /// Graceful teardown: after the consume loop exits, close the channel and
+    /// connection so any in-flight unacknowledged deliveries are requeued by the
+    /// broker (autoAck is off), never dropped. Async avoids sync-over-async.
+    /// </summary>
+    public override async Task StopAsync(CancellationToken cancellationToken)
+    {
+        await base.StopAsync(cancellationToken);
+        if (_channel is not null)
+        {
+            try
+            {
+                await _channel.CloseAsync(CancellationToken.None);
+            }
+            catch (Exception ex) when (ex is ObjectDisposedException or RabbitMQ.Client.Exceptions.AlreadyClosedException)
+            {
+                // The client library already closed the channel (e.g. the
+                // connection dropped mid-run); teardown must not fail the shutdown.
+            }
+            await _channel.DisposeAsync();
+        }
+        if (_connection is not null)
+        {
+            try
+            {
+                await _connection.CloseAsync(CancellationToken.None);
+            }
+            catch (Exception ex) when (ex is ObjectDisposedException or RabbitMQ.Client.Exceptions.AlreadyClosedException)
+            {
+            }
+            await _connection.DisposeAsync();
+        }
     }
 
     public override void Dispose()
     {
-        _channel?.CloseAsync().GetAwaiter().GetResult();
-        _connection?.CloseAsync().GetAwaiter().GetResult();
-        _channel?.Dispose();
-        _connection?.Dispose();
         base.Dispose();
     }
 }
-
-public record PaymentAuthorizedEvent(Guid IntentId, Guid MerchantId, MoneyPayload Amount, string AuthorizationCode, string GatewayReference);
-public record PaymentCapturedEvent(Guid IntentId, Guid MerchantId, MoneyPayload Amount, Guid TransactionId);
-public record PaymentRefundedEvent(Guid IntentId, Guid MerchantId, MoneyPayload Amount, Guid TransactionId);
-public record MoneyPayload(decimal Amount, string Currency);

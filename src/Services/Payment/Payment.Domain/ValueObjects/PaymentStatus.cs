@@ -9,11 +9,14 @@ public class PaymentStatus : ValueObject
     private PaymentStatus(string value) => Value = value;
 
     public static readonly PaymentStatus Pending = new("Pending");
+    public static readonly PaymentStatus RequiresAction = new("RequiresAction");
+    public static readonly PaymentStatus Processing = new("Processing");
     public static readonly PaymentStatus Authorized = new("Authorized");
     public static readonly PaymentStatus Captured = new("Captured");
     public static readonly PaymentStatus PartiallyCaptured = new("PartiallyCaptured");
     public static readonly PaymentStatus Voided = new("Voided");
     public static readonly PaymentStatus Failed = new("Failed");
+    public static readonly PaymentStatus Expired = new("Expired");
     public static readonly PaymentStatus PartiallyRefunded = new("PartiallyRefunded");
     public static readonly PaymentStatus FullyRefunded = new("FullyRefunded");
 

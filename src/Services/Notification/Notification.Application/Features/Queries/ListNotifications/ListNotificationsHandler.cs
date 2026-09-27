@@ -1,4 +1,5 @@
-﻿using BuildingBlocks.Shared.Results;
+﻿using BuildingBlocks.Shared.Paging;
+using BuildingBlocks.Shared.Results;
 using Microsoft.Extensions.Logging;
 using Notification.Application.DTOs;
 using Notification.Application.Interfaces;
@@ -16,7 +17,7 @@ public class ListNotificationsHandler
         _logger = logger;
     }
 
-    public async Task<Result<List<NotificationDto>>> Handle(ListNotificationsQuery query, CancellationToken cancellationToken = default)
+    public async Task<Result<PagedData<NotificationDto>>> Handle(ListNotificationsQuery query, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Handling {QueryName}", nameof(ListNotificationsQuery));
 
@@ -24,6 +25,9 @@ public class ListNotificationsHandler
             query.Recipient, query.Channel, query.Status,
             query.Skip, query.Take, cancellationToken);
 
-        return notifications;
+        var total = await _repository.CountAsync(
+            query.Recipient, query.Channel, query.Status, cancellationToken);
+
+        return new PagedData<NotificationDto>(notifications, total);
     }
 }

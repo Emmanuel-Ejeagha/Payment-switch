@@ -1,5 +1,7 @@
-﻿using Ledger.Domain;
+﻿using BuildingBlocks.Shared.Retention;
+using Ledger.Domain;
 using Ledger.Domain.Entities;
+using Ledger.Infrastructure.DeadLetter;
 using Ledger.Infrastructure.Inbox;
 using Ledger.Infrastructure.Outbox;
 using Microsoft.EntityFrameworkCore;
@@ -11,11 +13,15 @@ public class AppDbContext : DbContext
     public DbSet<LedgerAccount> LedgerAccounts { get; set; }
     public DbSet<OutboxMessage> OutboxMessages { get; set; }
     public DbSet<InboxMessage> InboxMessages { get; set; }
+    public DbSet<ReconciliationReport> ReconciliationReports { get; set; }
+    public DbSet<DeadLetterRecord> DeadLetterRecords { get; set; }
+    public DbSet<ArchivedRecord> ArchivedRecords { get; set; }
 
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
+        RetentionModelConfiguration.ConfigureArchivedRecord(modelBuilder);
     }
 }

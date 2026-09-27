@@ -24,6 +24,9 @@ public static class ResultExtensions
         {
             "Merchant.EmailAlreadyInUse" => 409,
             "Merchant.MerchantNotFound" => 404,
+            "Merchant.ApiKeyNotFound" => 404,
+            "Merchant.Unauthorized" => 403,
+            "Merchant.EmailNotVerified" => 403,
             "Merchant.InvalidStatusTransition" => 400,
             "Merchant.ConfigurationUpdateFailed" => 400,
             _ => 400

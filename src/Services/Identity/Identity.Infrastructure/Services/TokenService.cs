@@ -1,4 +1,5 @@
-﻿using Identity.Application.Interfaces;
+﻿using BuildingBlocks.Shared.Auth;
+using Identity.Application.Interfaces;
 using Identity.Domain.Entities;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -17,15 +18,26 @@ public class TokenService : ITokenService
         _jwtSettings = jwtSettings.Value;
     }
 
+    public int AccessTokenExpirationSeconds => _jwtSettings.AccessTokenExpirationMinutes * 60;
+
     public string GenerateAccessToken(User user)
     {
+        var issuedAt = DateTime.UtcNow;
         var claims = new List<Claim>
         {
+            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N")),
+            new Claim(JwtRegisteredClaimNames.Iat, new DateTimeOffset(issuedAt).ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
+            new Claim(JwtRegisteredClaimNames.Nbf, new DateTimeOffset(issuedAt).ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
             new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new Claim(ClaimTypes.Email, user.Email.Value),
-            new Claim(ClaimTypes.Name, user.FullName.Value)            
+            new Claim(ClaimTypes.Name, user.FullName.Value),
+            new Claim(CustomClaimTypes.EmailVerified, user.EmailConfirmed ? "true" : "false")
         };
-        claims.AddRange(user.Roles.Select(role => new Claim(ClaimTypes.Role, role)));
+        // Step 7.5: emit canonical roles so authorization is case-uniform even
+        // for legacy rows stored before normalization (unknown values pass
+        // through verbatim — no policy references them).
+        claims.AddRange(user.Roles.Select(role =>
+            new Claim(ClaimTypes.Role, RoleNames.Normalize(role) ?? role)));
 
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.Secret));
@@ -34,8 +46,8 @@ public class TokenService : ITokenService
         var token = new JwtSecurityToken(
             issuer: _jwtSettings.Issuer,
             audience: _jwtSettings.Audience,
-            claims:  claims,
-            expires:  DateTime.UtcNow.AddMinutes(_jwtSettings.AccessTokenExpirationMinutes),
+            claims: claims,
+            expires: DateTime.UtcNow.AddMinutes(_jwtSettings.AccessTokenExpirationMinutes),
             signingCredentials: credentials);
 
         return new JwtSecurityTokenHandler().WriteToken(token);
@@ -47,5 +59,11 @@ public class TokenService : ITokenService
         using var rng = RandomNumberGenerator.Create();
         rng.GetBytes(randomNumber);
         return Convert.ToBase64String(randomNumber);
+    }
+
+    public string HashRefreshToken(string refreshToken)
+    {
+        var bytes = System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(refreshToken));
+        return Convert.ToBase64String(bytes);
     }
 }

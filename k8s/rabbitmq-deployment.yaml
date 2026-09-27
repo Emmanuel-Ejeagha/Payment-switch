@@ -16,16 +16,58 @@ spec:
       containers:
         - name: rabbitmq
           image: rabbitmq:3-management-alpine
+          # Step 8.1: serve the prometheus scrape target (:15692). The plugin
+          # is off by default upstream; the inner entrypoint re-entry keeps
+          # RABBITMQ_DEFAULT_* handling intact (args override CMD only).
+          args: ["sh", "-c", "rabbitmq-plugins enable --offline rabbitmq_prometheus && exec docker-entrypoint.sh rabbitmq-server"]
           env:
             - name: RABBITMQ_DEFAULT_USER
-              value: guest
+              valueFrom:
+                secretKeyRef:
+                  name: payment-switch-secret
+                  key: RabbitMQ__UserName
             - name: RABBITMQ_DEFAULT_PASS
-              value: guest
+              valueFrom:
+                secretKeyRef:
+                  name: payment-switch-secret
+                  key: RabbitMQ__Password
           ports:
             - containerPort: 5672
               name: amqp
             - containerPort: 15672
               name: management
+            - containerPort: 15692
+              name: prometheus
+          # Step 9.4: the broker had no probes — a wedged-but-listening
+          # container stayed in service. Cold boot (mnesia init + plugin
+          # enable) can take minutes, hence the generous startup window.
+          startupProbe:
+            exec:
+              command: ["rabbitmq-diagnostics", "-q", "ping"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            exec:
+              command: ["rabbitmq-diagnostics", "-q", "ping"]
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command: ["rabbitmq-diagnostics", "-q", "ping"]
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
 ---
 apiVersion: v1
 kind: Service
@@ -42,3 +84,6 @@ spec:
     - name: management
       port: 15672
       targetPort: 15672
+    - name: prometheus
+      port: 15692
+      targetPort: 15692

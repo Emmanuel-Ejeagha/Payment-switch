@@ -1,4 +1,19 @@
 {{- if .Values.infrastructure.postgres.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: {{ .Values.namespace }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  {{- with .Values.infrastructure.postgres.storageClassName }}
+  storageClassName: {{ . }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.infrastructure.postgres.storageSize }}
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -6,6 +21,8 @@ metadata:
   namespace: {{ .Values.namespace }}
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: postgres
@@ -21,13 +38,23 @@ spec:
             - containerPort: {{ .Values.infrastructure.postgres.port }}
           env:
             - name: POSTGRES_USER
-              value: "paymentswitch"
+              value: {{ .Values.config.postgres.userName | quote }}
             - name: POSTGRES_PASSWORD
-              value: "paymentswitch"
-            - name: POSTGRES_MULTIPLE_DATABASES
-              value: "IdentityDb,MerchantDb,PaymentDb,LedgerDb,NotificationDb,SettlementDb"
+              value: {{ .Values.config.postgres.password | quote }}
           resources:
             {{- toYaml .Values.infrastructure.postgres.resources | nindent 12 }}
+          volumeMounts:
+            - name: postgres-storage
+              mountPath: /var/lib/postgresql/data
+            - name: postgres-init
+              mountPath: /docker-entrypoint-initdb.d
+      volumes:
+        - name: postgres-storage
+          persistentVolumeClaim:
+            claimName: postgres-pvc
+        - name: postgres-init
+          configMap:
+            name: postgres-init
 ---
 apiVersion: v1
 kind: Service

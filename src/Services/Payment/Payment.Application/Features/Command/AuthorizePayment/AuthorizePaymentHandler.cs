@@ -1,8 +1,9 @@
-﻿using BuildingBlocks.Shared.Events;
+﻿using BuildingBlocks.Shared.Exceptions;
 using BuildingBlocks.Shared.Results;
 using FluentValidation;
 using Payment.Application.Interfaces;
 using Payment.Domain;
+using Payment.Domain.Enums;
 using Payment.Domain.ValueObjects;
 using Microsoft.Extensions.Logging;
 
@@ -13,7 +14,6 @@ public class AuthorizePaymentHandler
     private readonly IPaymentIntentRepository _repository;
     private readonly IPaymentGatewayService _gateway;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IDomainEventDispatcher _dispatcher;
     private readonly IValidator<AuthorizePaymentCommand> _validator;
     private readonly IMerchantService _merchantService;
     private readonly ILogger<AuthorizePaymentHandler> _logger;
@@ -22,15 +22,13 @@ public class AuthorizePaymentHandler
         IPaymentIntentRepository repository,
         IPaymentGatewayService gateway,
         IUnitOfWork unitOfWork,
-        IDomainEventDispatcher dispatcher,
         IValidator<AuthorizePaymentCommand> validator,
         IMerchantService merchantService,
-        ILogger<AuthorizePaymentHandler> logger)                
+        ILogger<AuthorizePaymentHandler> logger)
     {
         _repository = repository;
         _gateway = gateway;
         _unitOfWork = unitOfWork;
-        _dispatcher = dispatcher;
         _validator = validator;
         _merchantService = merchantService;
         _logger = logger;
@@ -46,23 +44,62 @@ public class AuthorizePaymentHandler
         var intent = await _repository.GetByIdAsync(command.IntentId, cancellationToken);
         if (intent is null) return PaymentErrors.PaymentIntentNotFound(command.IntentId);
 
+        if (!string.IsNullOrWhiteSpace(command.IdempotencyKey))
+        {
+            var replay = intent.Transactions.FirstOrDefault(t => t.Type == TransactionType.Authorization && t.IdempotencyKey == command.IdempotencyKey);
+            if (replay is not null)
+            {
+                _logger.LogInformation("Replaying authorize for Intent {IntentId} with key {Key}", intent.Id, command.IdempotencyKey);
+                return new AuthorizePaymentResponse(intent.AuthorizationCode!.Value, intent.GatewayReference!.Value, intent.Status.Value);
+            }
+        }
+
         var statusResult = await _merchantService.GetMerchantStatusAsync(intent.MerchantId, cancellationToken);
         if (!statusResult.IsSuccess) return Result<AuthorizePaymentResponse>.Failure(statusResult.Errors);
-        if (statusResult.Value != "active") return new Error("Payment.MerchantNotActive", "Merchant is not active.");
+        if (!string.Equals(statusResult.Value, "Active", StringComparison.OrdinalIgnoreCase)) return new Error("Payment.MerchantNotActive", "Merchant is not active.");
 
+        if (intent.Status != PaymentStatus.Pending)
+            return PaymentErrors.InvalidStatusTransition(intent.Status.Value, "Authorized");
 
-        var gatewayResult = await _gateway.AuthorizeAsync(intent.MerchantId, intent.Amount, intent.CardDetails, cancellationToken);
+        // Merchant-initiated authorization of a stored intent: no cardholder present,
+        // and the CVC from intent creation was never retained, so none is forwarded.
+        var gatewayResult = await _gateway.AuthorizeAsync(intent.MerchantId, intent.Amount, intent.CardDetails, idempotencyKey: command.IdempotencyKey, cancellationToken: cancellationToken);
         if (!gatewayResult.IsSuccess)
             return new Error("Payment.AuthorizationFailed", gatewayResult.Errors.First().Message);
 
         var gwResponse = gatewayResult.Value!;
-        var authCode = new AuthorizationCode(gwResponse.AuthorizationCode!);
         var gatewayRef = new GatewayReference(gwResponse.GatewayReference!);
 
-        intent.Authorize(authCode, gatewayRef);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
-        await _dispatcher.DispatchAsync(intent.DomainEvents, cancellationToken);
+        await _unitOfWork.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            if (gwResponse.RequiresChallenge)
+            {
+                intent.RequireAction(gatewayRef, gwResponse.ProviderName);
+            }
+            else
+            {
+                var authCode = new AuthorizationCode(gwResponse.AuthorizationCode!);
+                intent.Authorize(authCode, gatewayRef, command.IdempotencyKey, gwResponse.ProviderName);
+            }
+        }
+        catch (InvalidOperationException)
+        {
+            await _unitOfWork.RollbackAsync(cancellationToken);
+            return PaymentErrors.InvalidStatusTransition(intent.Status.Value, "Authorized");
+        }
 
-        return new AuthorizePaymentResponse(authCode.Value, gatewayRef.Value, intent.Status.Value);
+        try
+        {
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            await _unitOfWork.CommitAsync(cancellationToken);
+        }
+        catch (ConcurrencyConflictException)
+        {
+            await _unitOfWork.RollbackAsync(cancellationToken);
+            return PaymentErrors.ConcurrencyConflict;
+        }
+
+        return new AuthorizePaymentResponse(intent.AuthorizationCode?.Value ?? gwResponse.GatewayReference!, gwResponse.GatewayReference!, intent.Status.Value);
     }
 }

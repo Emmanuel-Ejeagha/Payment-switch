@@ -15,12 +15,27 @@ public class LedgerAccountConfiguration : IEntityTypeConfiguration<LedgerAccount
         builder.Property(a => a.PendingBalance).IsRequired();
         builder.Property(a => a.ReservedBalance).IsRequired();
         builder.Property(a => a.Currency).IsRequired().HasMaxLength(3);
+        builder.Property(a => a.RowVersion).IsRowVersion();
+
+        builder.HasIndex(a => new { a.MerchantId, a.Currency }).IsUnique();
+
+        builder.ToTable("LedgerAccounts", t => t.HasCheckConstraint(
+            "CK_LedgerAccounts_NonNegativeBalances",
+            "\"AvailableBalance\" >= 0 AND \"PendingBalance\" >= 0 AND \"ReservedBalance\" >= 0"));
+
+        builder.Navigation(a => a.Journal)
+            .UsePropertyAccessMode(PropertyAccessMode.PreferField);
 
         builder.OwnsMany(a => a.Journal, j =>
         {
+            j.UsePropertyAccessMode(PropertyAccessMode.PreferField);
             j.WithOwner().HasForeignKey("LedgerAccountId");
-            j.HasKey(e => e.Id);
+            j.HasKey("Id");
+            j.HasIndex("LedgerAccountId", "Timestamp");
+            j.Property(e => e.Id).ValueGeneratedNever();
             j.Property(e => e.Type).HasConversion<string>().IsRequired();
+            j.Property(e => e.DebitAccount).HasConversion<string>().IsRequired();
+            j.Property(e => e.CreditAccount).HasConversion<string>().IsRequired();
             j.Property(e => e.Description).IsRequired().HasMaxLength(500);
             j.OwnsOne(e => e.Amount, a =>
             {
@@ -30,6 +45,7 @@ public class LedgerAccountConfiguration : IEntityTypeConfiguration<LedgerAccount
             j.OwnsOne(e => e.CorrelationId, c =>
             {
                 c.Property(cid => cid.Value).HasColumnName("CorrelationId").IsRequired().HasMaxLength(200);
+                c.HasIndex(cid => cid.Value).IsUnique();
             });
             j.Property(e => e.Timestamp).IsRequired();
             j.ToTable("JournalEntries");

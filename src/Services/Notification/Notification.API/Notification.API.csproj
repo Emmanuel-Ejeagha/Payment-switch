@@ -31,6 +31,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Notification.API.IntegrationTests" />
+    <InternalsVisibleTo Include="E2E.IntegrationTests" />
   </ItemGroup>
 
 </Project>

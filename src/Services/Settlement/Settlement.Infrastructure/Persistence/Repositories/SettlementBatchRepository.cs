@@ -21,11 +21,12 @@ public class SettlementBatchRepository : ISettlementBatchRepository
             .FirstOrDefaultAsync(b => b.Id == id, cancellationToken);
     }
 
-    public async Task<SettlementBatch?> GetByBatchDateAsync(DateTime date, CancellationToken cancellationToken = default)
+    public async Task<SettlementBatch?> GetByBatchDateAndCurrencyAsync(DateTime date, string currency, CancellationToken cancellationToken = default)
     {
+        var normalized = date.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(date, DateTimeKind.Utc) : date;
         return await _context.SettlementBatches
             .Include(b => b.Payouts)
-            .FirstOrDefaultAsync(b => b.BatchDate == date.Date, cancellationToken);
+            .FirstOrDefaultAsync(b => b.BatchDate == normalized.Date && b.Currency == currency, cancellationToken);
     }
 
     public async Task AddAsync(SettlementBatch batch, CancellationToken cancellationToken = default)
@@ -33,37 +34,50 @@ public class SettlementBatchRepository : ISettlementBatchRepository
         await _context.SettlementBatches.AddAsync(batch, cancellationToken);
     }
 
-    public Task UpdateAsync(SettlementBatch batch, CancellationToken cancellationToken = default)
-    {
-        _context.SettlementBatches.Update(batch);
-        return Task.CompletedTask;
-    }
-
     public async Task<List<SettlementBatchDto>> ListAsync(DateTime? from, DateTime? to, int skip, int take, CancellationToken cancellationToken = default)
     {
-        var query = _context.SettlementBatches.AsQueryable();
+        var query = ApplyDateFilter(_context.SettlementBatches.AsQueryable(), from, to);
 
-        if (from.HasValue)
-            query = query.Where(b => b.BatchDate >= from.Value.Date);
-        if (to.HasValue)
-            query = query.Where(b => b.BatchDate <= to.Value.Date);
-
-        return await query
+        var batches = await query
             .OrderByDescending(b => b.BatchDate)
             .Skip(skip).Take(take)
-            .Select(b => new SettlementBatchDto(
-                b.Id,
-                b.BatchDate,
-                b.Status.Value,
-                b.TotalAmount,
-                b.Payouts.Select(p => new PayoutDto(
-                    p.MerchantId,
-                    p.GrossVolume.Amount,
-                    p.Fees.Amount,
-                    p.NetAmount.Amount,
-                    p.Currency
-                )).ToList()
-            ))
+            .Include(b => b.Payouts)
             .ToListAsync(cancellationToken);
+
+        return batches.Select(b => new SettlementBatchDto(
+            b.Id,
+            b.BatchDate,
+            b.Status.Value,
+            b.TotalAmount,
+            b.Currency,
+            b.Payouts.Select(p => new PayoutDto(
+                p.MerchantId,
+                p.GrossVolume.Amount,
+                p.Fees.Amount,
+                p.NetAmount.Amount,
+                p.Currency
+            )).ToList()
+        )).ToList();
+    }
+
+    public async Task<int> CountAsync(DateTime? from, DateTime? to, CancellationToken cancellationToken = default)
+    {
+        var query = ApplyDateFilter(_context.SettlementBatches.AsQueryable(), from, to);
+        return await query.CountAsync(cancellationToken);
+    }
+
+    private static IQueryable<SettlementBatch> ApplyDateFilter(IQueryable<SettlementBatch> query, DateTime? from, DateTime? to)
+    {
+        if (from.HasValue)
+        {
+            var fromDate = from.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(from.Value, DateTimeKind.Utc) : from.Value;
+            query = query.Where(b => b.BatchDate >= fromDate.Date);
+        }
+        if (to.HasValue)
+        {
+            var toDate = to.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(to.Value, DateTimeKind.Utc) : to.Value;
+            query = query.Where(b => b.BatchDate <= toDate.Date);
+        }
+        return query;
     }
 }

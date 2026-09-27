@@ -1,4 +1,5 @@
 ﻿using FluentValidation;
+using BuildingBlocks.Shared.Exceptions;
 using FluentValidation.Results;
 using Ledger.Application.Features.Commands.CreateLedgerAccount;
 using Ledger.Application.Interfaces;
@@ -25,7 +26,7 @@ public class CreateLedgerAccountHandlerTests
     {
         var command = new CreateLedgerAccountCommand(Guid.NewGuid(), "USD");
         SetupValidatorSuccess(command);
-        _repoMock.Setup(r => r.GetByMerchantIdAsync(command.MerchantId, It.IsAny<CancellationToken>())).ReturnsAsync((LedgerAccount?)null);
+        _repoMock.Setup(r => r.GetByMerchantIdAndCurrencyAsync(command.MerchantId, "USD", It.IsAny<CancellationToken>())).ReturnsAsync((LedgerAccount?)null);
         _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
         var result = await _handler.Handle(command);
@@ -36,12 +37,12 @@ public class CreateLedgerAccountHandlerTests
     }
 
     [Fact]
-    public async Task Handle_ExistingAccount_ShouldReturnSuccess()
+    public async Task Handle_ExistingAccountInCurrency_ShouldReturnSuccess()
     {
         var account = new LedgerAccount(Guid.NewGuid(), Guid.NewGuid(), "USD");
         var command = new CreateLedgerAccountCommand(account.MerchantId, "USD");
         SetupValidatorSuccess(command);
-        _repoMock.Setup(r => r.GetByMerchantIdAsync(account.MerchantId, It.IsAny<CancellationToken>())).ReturnsAsync(account);
+        _repoMock.Setup(r => r.GetByMerchantIdAndCurrencyAsync(account.MerchantId, "USD", It.IsAny<CancellationToken>())).ReturnsAsync(account);
 
         var result = await _handler.Handle(command);
 
@@ -49,6 +50,35 @@ public class CreateLedgerAccountHandlerTests
         _repoMock.Verify(r => r.AddAsync(It.IsAny<LedgerAccount>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
+    [Fact]
+    public async Task Handle_AccountInOtherCurrency_ShouldCreateNewCurrencyAccount()
+    {
+        var usdAccount = new LedgerAccount(Guid.NewGuid(), Guid.NewGuid(), "USD");
+        var command = new CreateLedgerAccountCommand(usdAccount.MerchantId, "EUR");
+        SetupValidatorSuccess(command);
+        _repoMock.Setup(r => r.GetByMerchantIdAndCurrencyAsync(usdAccount.MerchantId, "EUR", It.IsAny<CancellationToken>())).ReturnsAsync((LedgerAccount?)null);
+        _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsSuccess);
+        _repoMock.Verify(r => r.AddAsync(It.IsAny<LedgerAccount>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
     private void SetupValidatorSuccess(CreateLedgerAccountCommand command) =>
         _validatorMock.Setup(v => v.ValidateAsync(command, It.IsAny<CancellationToken>())).ReturnsAsync(new ValidationResult());
+
+    [Fact]
+    public async Task Handle_ConcurrentInsert_ConvergesToSuccess()
+    {
+        var command = new CreateLedgerAccountCommand(Guid.NewGuid(), "USD");
+        SetupValidatorSuccess(command);
+        _repoMock.Setup(r => r.GetByMerchantIdAndCurrencyAsync(command.MerchantId, "USD", It.IsAny<CancellationToken>())).ReturnsAsync((LedgerAccount?)null);
+        _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ThrowsAsync(new UniqueConstraintViolationException());
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsSuccess);
+        _uowMock.Verify(u => u.RollbackAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
 }

@@ -24,10 +24,18 @@ public static class ResultExtensions
         {
             "Identity.EmailAlreadyInUse" => 409,
             "Identity.InvalidCredentials" => 401,
+            "Identity.AccountLocked" => 401,
             "Identity.UserNotFound" => 404,
-            "Identity.ApiKeyNotFound" => 404,
             "Identity.NotAuthorized" => 403,
             "Identity.UserInactive" => 403,
+            "Identity.EmailNotVerified" => 403,
+            "Identity.EmailAlreadyVerified" => 409,
+            "Identity.InvalidVerificationToken" => 400,
+            "Identity.VerificationTokenExpired" => 400,
+            "Identity.InvalidCurrentPassword" => 400,
+            "Identity.InvalidPasswordResetToken" => 400,
+            "Identity.PasswordResetTokenExpired" => 400,
+            "Identity.ConcurrencyConflict" => 409,
             _ => 400
         };
 
