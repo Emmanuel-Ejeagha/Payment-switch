@@ -29,7 +29,7 @@ public class LedgerAccount : AggregateRoot
         ReservedBalance = 0;
     }
 
-    public void ReserveFunds(Money amount, CorrelationId correlationId, DateTime? eventOccurredOn = null)
+    public void ReserveFunds(Money amount, CorrelationId correlationId)
     {
         if (amount.Currency != Currency)
             throw new InvalidOperationException("Currency mismatch.");
@@ -38,12 +38,12 @@ public class LedgerAccount : AggregateRoot
         PendingBalance += amount.Amount;
         ReservedBalance += amount.Amount;
 
-        var entry = new JournalEntry(EntryType.Credit, GlAccountCode.Cash, GlAccountCode.Reserve, amount, "Funds reserved", correlationId, eventOccurredOn);
+        var entry = new JournalEntry(EntryType.Credit, GlAccountCode.Cash, GlAccountCode.Reserve, amount, "Funds reserved", correlationId);
         _journal.Add(entry);
         AddDomainEvent(new FundsReservedEvent(MerchantId, amount, correlationId.Value));
     }
 
-    public void CaptureFunds(Money amount, CorrelationId correlationId, DateTime? eventOccurredOn = null)
+    public void CaptureFunds(Money amount, CorrelationId correlationId)
     {
         if (amount.Currency != Currency)
             throw new InvalidOperationException("Currency mismatch.");
@@ -54,28 +54,12 @@ public class LedgerAccount : AggregateRoot
         ReservedBalance -= amount.Amount;
         AvailableBalance += amount.Amount;
 
-        var entry = new JournalEntry(EntryType.Credit, GlAccountCode.Reserve, GlAccountCode.MerchantLiability, amount, "Funds captured", correlationId, eventOccurredOn);
+        var entry = new JournalEntry(EntryType.Credit, GlAccountCode.Reserve, GlAccountCode.MerchantLiability, amount, "Funds captured", correlationId);
         _journal.Add(entry);
         AddDomainEvent(new FundsCapturedEvent(MerchantId, amount, correlationId.Value));
     }
 
-    public void ReleaseFunds(Money amount, CorrelationId correlationId, DateTime? eventOccurredOn = null)
-    {
-        if (amount.Currency != Currency)
-            throw new InvalidOperationException("Currency mismatch.");
-        if (PendingBalance < amount.Amount || ReservedBalance < amount.Amount)
-            throw new InvalidOperationException("Insufficient reserved funds.");
-
-        // Reverse of ReserveFunds: a voided authorization frees the hold.
-        PendingBalance -= amount.Amount;
-        ReservedBalance -= amount.Amount;
-
-        var entry = new JournalEntry(EntryType.Debit, GlAccountCode.Reserve, GlAccountCode.Cash, amount, "Funds released", correlationId, eventOccurredOn);
-        _journal.Add(entry);
-        AddDomainEvent(new FundsReleasedEvent(MerchantId, amount, correlationId.Value));
-    }
-
-    public void RefundFunds(Money amount, CorrelationId correlationId, DateTime? eventOccurredOn = null)
+    public void RefundFunds(Money amount, CorrelationId correlationId)
     {
         if (amount.Currency != Currency)
             throw new InvalidOperationException("Currency mismatch.");
@@ -84,12 +68,12 @@ public class LedgerAccount : AggregateRoot
 
         AvailableBalance -= amount.Amount;
 
-        var entry = new JournalEntry(EntryType.Debit, GlAccountCode.MerchantLiability, GlAccountCode.Cash, amount, "Funds refunded", correlationId, eventOccurredOn);
+        var entry = new JournalEntry(EntryType.Debit, GlAccountCode.MerchantLiability, GlAccountCode.Cash, amount, "Funds refunded", correlationId);
         _journal.Add(entry);
         AddDomainEvent(new FundsRefundedEvent(MerchantId, amount, correlationId.Value));
     }
 
-    public void ChargeFees(Money fees, CorrelationId correlationId, DateTime? eventOccurredOn = null)
+    public void ChargeFees(Money fees, CorrelationId correlationId)
     {
         if (fees.Currency != Currency)
             throw new InvalidOperationException("Currency mismatch.");
@@ -101,7 +85,7 @@ public class LedgerAccount : AggregateRoot
 
         AvailableBalance -= fees.Amount;
 
-        var entry = new JournalEntry(EntryType.Debit, GlAccountCode.MerchantLiability, GlAccountCode.FeesIncome, fees, "Processing fees", correlationId, eventOccurredOn);
+        var entry = new JournalEntry(EntryType.Debit, GlAccountCode.MerchantLiability, GlAccountCode.FeesIncome, fees, "Processing fees", correlationId);
         _journal.Add(entry);
         AddDomainEvent(new FeesChargedEvent(MerchantId, fees, correlationId.Value));
     }

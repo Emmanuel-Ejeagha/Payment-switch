@@ -43,11 +43,9 @@ public class PaymentsController : BaseApiController
     public async Task<IActionResult> Authorize(
         Guid id,
         [FromBody] AuthorizePaymentCommand command,
-        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
         [FromServices] AuthorizePaymentHandler handler)
     {
-        var key = !string.IsNullOrWhiteSpace(command.IdempotencyKey) ? command.IdempotencyKey : idempotencyKey;
-        command = new AuthorizePaymentCommand(id, command.CardLastFour, command.CardBrand, key);
+        command = new AuthorizePaymentCommand(id, command.CardLastFour, command.CardBrand, command.IdempotencyKey);
         var result = await handler.Handle(command);
         return result.ToActionResult();
     }
@@ -62,11 +60,9 @@ public class PaymentsController : BaseApiController
     public async Task<IActionResult> Capture(
         Guid id,
         [FromBody] CapturePaymentCommand command,
-        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
         [FromServices] CapturePaymentHandler handler)
     {
-        var key = !string.IsNullOrWhiteSpace(command.IdempotencyKey) ? command.IdempotencyKey : idempotencyKey;
-        command = new CapturePaymentCommand(id, command.Amount, key);
+        command = new CapturePaymentCommand(id, command.Amount, command.IdempotencyKey);
         var result = await handler.Handle(command);
         return result.ToActionResult();
     }
@@ -97,11 +93,9 @@ public class PaymentsController : BaseApiController
     public async Task<IActionResult> Refund(
         Guid id,
         [FromBody] RefundPaymentCommand command,
-        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
         [FromServices] RefundPaymentHandler handler)
     {
-        var key = !string.IsNullOrWhiteSpace(command.IdempotencyKey) ? command.IdempotencyKey : idempotencyKey;
-        command = new RefundPaymentCommand(id, command.Amount, key);
+        command = new RefundPaymentCommand(id, command.Amount, command.IdempotencyKey);
         var result = await handler.Handle(command);
         return result.ToActionResult();
     }

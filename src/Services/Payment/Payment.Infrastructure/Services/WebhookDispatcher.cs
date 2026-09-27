@@ -82,18 +82,6 @@ public static class WebhookSignature
     public static string Compute(string? secret, byte[] payload, out string timestamp)
     {
         timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString();
-        return ComputeWithTimestamp(secret, payload, timestamp);
-    }
-
-    /// <summary>
-    /// Deterministic HMAC over the supplied timestamp. <see cref="Compute"/>
-    /// is a thin wrapper that stamps "now"; verification MUST use this method
-    /// with the sender-supplied timestamp (Step 7.3 fix: Verify previously
-    /// recomputed with a fresh timestamp, so verification always failed
-    /// except within the same second).
-    /// </summary>
-    public static string ComputeWithTimestamp(string? secret, byte[] payload, string timestamp)
-    {
         var keyBytes = Encoding.UTF8.GetBytes(secret ?? string.Empty);
         var body = Encoding.UTF8.GetBytes($"{timestamp}.{Convert.ToBase64String(payload)}");
         using var hmac = new HMACSHA256(keyBytes);
@@ -101,30 +89,18 @@ public static class WebhookSignature
         return $"sha256={Convert.ToHexString(hash).ToLowerInvariant()}";
     }
 
-    public static readonly TimeSpan DefaultFreshnessWindow = TimeSpan.FromMinutes(5);
-
     /// <summary>
-    /// Constant-time verification of a received webhook signature with a 5-minute
-    /// freshness window. Used by merchants to validate a delivery (see docs/webhooks.md).
-    /// The signature is an HMAC-SHA256 of "&lt;timestamp&gt;.&lt;base64(payload)&gt;"
-    /// with the signing secret, formatted "sha256=&lt;hex&gt;".
+    /// Constant-time verification of a received webhook signature. Used by
+    /// merchants to validate a delivery (see docs/webhooks.md). The signature
+    /// is an HMAC-SHA256 of "<timestamp>.<base64(payload)>" with the signing
+    /// secret, formatted "sha256=&lt;hex&gt;".
     /// </summary>
     public static bool Verify(string? secret, byte[] payload, string timestamp, string signature)
-        => Verify(secret, payload, timestamp, signature, DefaultFreshnessWindow);
-
-    public static bool Verify(string? secret, byte[] payload, string timestamp, string signature, TimeSpan maxAge)
     {
         if (string.IsNullOrWhiteSpace(signature))
             return false;
 
-        if (!long.TryParse(timestamp, out var tsUnix))
-            return false;
-
-        var nowUnix = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-        if (Math.Abs(nowUnix - tsUnix) > maxAge.TotalSeconds)
-            return false;
-
-        var expected = ComputeWithTimestamp(secret, payload, timestamp);
+        var expected = Compute(secret, payload, out _);
         if (expected is null || !expected.StartsWith("sha256=", StringComparison.Ordinal))
             return false;
 
@@ -145,37 +121,6 @@ public static class WebhookSignature
         {
             return false;
         }
-    }
-
-    /// <summary>
-    /// Dual-secret verification for the rotation grace window (TASK-006 / Step 7.3).
-    /// Tries the current secret first, then the previous secret when it is still
-    /// within <paramref name="gracePeriod"/> of <paramref name="rotatedAtUtc"/>.
-    /// Freshness is enforced inside <see cref="Verify"/> (default 5 minutes).
-    /// </summary>
-    public static bool VerifyWithRotation(
-        string? currentSecret,
-        string? previousSecret,
-        DateTime? rotatedAtUtc,
-        byte[] payload,
-        string timestamp,
-        string signature,
-        TimeSpan gracePeriod,
-        TimeSpan? maxAge = null,
-        DateTime? nowUtc = null)
-    {
-        var window = maxAge ?? DefaultFreshnessWindow;
-        if (Verify(currentSecret, payload, timestamp, signature, window))
-            return true;
-
-        if (string.IsNullOrWhiteSpace(previousSecret) || rotatedAtUtc is null)
-            return false;
-
-        var now = nowUtc ?? DateTime.UtcNow;
-        if (now - rotatedAtUtc.Value >= gracePeriod)
-            return false;
-
-        return Verify(previousSecret, payload, timestamp, signature, window);
     }
 }
 

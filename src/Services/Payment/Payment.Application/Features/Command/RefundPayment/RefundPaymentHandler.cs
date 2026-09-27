@@ -47,14 +47,6 @@ public class RefundPaymentHandler
             var replay = intent.Transactions.FirstOrDefault(t => t.Type == TransactionType.Refund && t.IdempotencyKey == command.IdempotencyKey);
             if (replay is not null)
             {
-                // Null amount defers to the recorded result; a concrete
-                // different amount is a conflicting reuse, not a replay.
-                if (command.Amount.HasValue && command.Amount.Value != replay.Amount.Amount)
-                {
-                    _logger.LogWarning("Idempotency key {Key} reused with different amount for Intent {IntentId}", command.IdempotencyKey, intent.Id);
-                    return PaymentErrors.IdempotencyKeyConflict(command.IdempotencyKey!);
-                }
-
                 _logger.LogInformation("Replaying refund for Intent {IntentId} with key {Key}", intent.Id, command.IdempotencyKey);
                 return new RefundPaymentResponse(replay.Id, intent.Status.Value);
             }
@@ -64,12 +56,9 @@ public class RefundPaymentHandler
             return PaymentErrors.InvalidStatusTransition(intent.Status.Value, "Refunded");
 
         Money? amount = command.Amount.HasValue ? new Money(command.Amount.Value, intent.Amount.Currency) : null;
+        var refundAmount = amount ?? new Money(intent.Amount.Amount, intent.Amount.Currency);
 
-        // Default to captured-minus-refunded so a null-amount refund after a
-        // partial capture does not over-request the authorized total.
-        var refundAmount = amount ?? intent.GetRefundableAmount();
-
-        var gatewayResult = await _gateway.RefundAsync(intent.MerchantId, intent.GatewayReference!, refundAmount, command.IdempotencyKey, intent.ProviderName, cancellationToken);
+        var gatewayResult = await _gateway.RefundAsync(intent.MerchantId, intent.GatewayReference!, refundAmount, cancellationToken);
         if (!gatewayResult.IsSuccess)
             return new Error("Payment.RefundFailed", gatewayResult.Errors.First().Message);
 

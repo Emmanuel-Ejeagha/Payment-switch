@@ -1,4 +1,3 @@
-using BuildingBlocks.Shared.Exceptions;
 using BuildingBlocks.Shared.Messaging;
 using BuildingBlocks.Shared.Middleware;
 using BuildingBlocks.Shared.Results;
@@ -10,7 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Npgsql;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using System.Text;
@@ -151,10 +149,8 @@ public class MerchantEventConsumerService : BackgroundService
                     var result = await ProcessOnboardAsync(scope, body, cancellationToken);
                     if (result.IsFailure)
                     {
-                        var failure = string.Join("; ", result.Errors.Select(e => e.Message));
                         _logger.LogWarning("MerchantOnboardedEvent ({MessageId}) failed: {Errors}",
-                            messageId, failure);
-                        await RecordFailureAsync(messageId, eventType, body, failure, cancellationToken);
+                            messageId, string.Join("; ", result.Errors.Select(e => e.Message)));
                         await HandleFailureAsync(ea, messageId, cancellationToken);
                         return;
                     }
@@ -163,23 +159,6 @@ public class MerchantEventConsumerService : BackgroundService
                 await MarkAsProcessedAsync(messageId, cancellationToken);
                 await _channel.BasicAckAsync(ea.DeliveryTag, false);
                 _logger.LogInformation("Processed MerchantOnboardedEvent ({MessageId})", messageId);
-            }
-            catch (DbUpdateException ex) when (IsUniqueViolation(ex))
-            {
-                // A concurrent delivery committed the account insert first;
-                // the work is done, so complete idempotently instead of
-                // retrying into the DLQ.
-                _logger.LogWarning("Duplicate account insert detected for {MessageId}; completing idempotently", messageId);
-                await MarkAsProcessedAsync(messageId, cancellationToken);
-                await _channel.BasicAckAsync(ea.DeliveryTag, false);
-            }
-            catch (UniqueConstraintViolationException)
-            {
-                // Same idempotent completion surfacing through the UnitOfWork
-                // translation instead of raw EF.
-                _logger.LogWarning("Duplicate account insert detected for {MessageId}; completing idempotently", messageId);
-                await MarkAsProcessedAsync(messageId, cancellationToken);
-                await _channel.BasicAckAsync(ea.DeliveryTag, false);
             }
             catch (Exception ex)
             {
@@ -211,34 +190,6 @@ public class MerchantEventConsumerService : BackgroundService
         return await handler.Handle(new CreateLedgerAccountCommand(onboardEvent.MerchantId, "USD"), cancellationToken);
     }
 
-    private async Task RecordFailureAsync(
-        string messageId,
-        string eventType,
-        string body,
-        string error,
-        CancellationToken cancellationToken)
-    {
-        // Best-effort audit: the claim scope rolls back on business failure,
-        // so record the failure here instead. Must never break redelivery.
-        try
-        {
-            using var scope = _scopeFactory.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var row = await db.InboxMessages.FirstOrDefaultAsync(m => m.MessageId == messageId, cancellationToken);
-            if (row is null)
-            {
-                row = new InboxMessage(messageId, eventType, body);
-                db.InboxMessages.Add(row);
-            }
-            row.MarkAsFailed(error);
-            await db.SaveChangesAsync(cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to record inbox failure for {MessageId}", messageId);
-        }
-    }
-
     private async Task MarkAsProcessedAsync(string messageId, CancellationToken cancellationToken)
     {
         // A fresh scope so a failed handler's dirty tracked entities can never be re-saved.
@@ -251,10 +202,6 @@ public class MerchantEventConsumerService : BackgroundService
         msg.MarkAsProcessed();
         await db.SaveChangesAsync(cancellationToken);
     }
-
-    private static bool IsUniqueViolation(DbUpdateException ex) =>
-        ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation }
-        || ex.InnerException?.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation };
 
     private async Task HandleFailureAsync(BasicDeliverEventArgs ea, string messageId, CancellationToken cancellationToken)
     {

@@ -42,7 +42,4 @@ public static class IdentityErrors
 
     public static Error PasswordResetTokenExpired =>
         new("Identity.PasswordResetTokenExpired", "This password reset link has expired. Request a new one.");
-
-    public static Error ConcurrencyConflict =>
-        new("Identity.ConcurrencyConflict", "A concurrent update was detected. Please retry.");
 }

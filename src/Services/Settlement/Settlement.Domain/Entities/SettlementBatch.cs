@@ -10,7 +10,6 @@ namespace Settlement.Domain.Entities;
 public class SettlementBatch : AggregateRoot
 {
     public DateTime BatchDate { get; private set; }
-    public string? Currency { get; private set; }
     public SettlementStatus Status { get; internal set; } = null!;
     public long TotalAmount { get; internal set; }
     public IReadOnlyList<Payout> Payouts => _payouts.AsReadOnly();
@@ -39,14 +38,8 @@ public class SettlementBatch : AggregateRoot
         if (grossVolume.Currency != fees.Currency)
             throw new ArgumentException("Currency mismatch between gross volume and fees.");
 
-        // A batch holds a single currency so TotalAmount stays meaningful.
-        // Cross-currency payouts belong in a separate batch for their currency.
-        if (Currency is not null && !string.Equals(Currency, grossVolume.Currency, StringComparison.OrdinalIgnoreCase))
-            throw new ArgumentException($"Currency mismatch with batch currency '{Currency}'.");
-
         var payout = new Payout(merchantId, grossVolume, fees);
         _payouts.Add(payout);
-        Currency ??= payout.Currency;
         TotalAmount += payout.NetAmount.Amount;
     }
 
@@ -55,14 +48,8 @@ public class SettlementBatch : AggregateRoot
         if (Status == SettlementStatus.Completed)
             throw new InvalidOperationException("Batch is already completed.");
 
-        if (_payouts.Count == 0)
-            throw new InvalidOperationException("Cannot complete an empty settlement batch.");
-
-        if (Currency is null)
-            throw new InvalidOperationException("Cannot complete a batch with no currency.");
-
         Status = SettlementStatus.Completed;
         CompletedAt = DateTime.UtcNow;
-        AddDomainEvent(new SettlementBatchCompletedEvent(Id, BatchDate, TotalAmount, Currency));
+        AddDomainEvent(new SettlementBatchCompletedEvent(Id, BatchDate, TotalAmount, _payouts.FirstOrDefault()?.Currency ?? "USD"));
     }
 }
