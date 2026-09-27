@@ -12,7 +12,6 @@ using BuildingBlocks.Shared.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi;
 using OpenTelemetry.Metrics;
-using Payment.API.Configuration;
 using Payment.API.Middlewares;
 using Payment.Application;
 using Payment.Infrastructure;
@@ -61,11 +60,7 @@ if (!builder.Environment.IsProduction())
 
 builder.Services.AddPaymentSwitchJwtBearer(builder.Configuration);
 
-builder.Services.AddAuthorization(options =>
-{
-    options.AddPolicy(AuthPolicies.ServiceOnly, policy =>
-        policy.RequireClaim(ServiceTokenOptions.ClientTypeClaim, ServiceTokenOptions.ClientTypeService));
-});
+builder.Services.AddAuthorization();
 
 builder.Services.AddPaymentSwitchCors(builder.Configuration);
 
@@ -74,10 +69,7 @@ builder.Services.AddPaymentInfrastructure(builder.Configuration);
 
 builder.Services.AddCorrelationId();
 builder.Services.AddMemoryCache();
-builder.Services.Configure<ApiKeyAuthOptions>(builder.Configuration.GetSection(ApiKeyAuthOptions.SectionName));
-builder.Services.AddSingleton<ApiKeyResolutionCache>();
-builder.Services.AddSingleton<ApiKeyFailureThrottle>();
-builder.Services.AddPaymentSwitchRateLimiting(builder.Configuration);
+builder.Services.AddPaymentSwitchRateLimiting();
 builder.Services.AddPaymentSwitchVersioning();
 builder.Services.AddPaymentSwitchOutputCache();
 

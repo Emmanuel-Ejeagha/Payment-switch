@@ -66,7 +66,7 @@ builder.Services.AddApplication();
 builder.Services.AddIdentityInfrastructure(builder.Configuration);
 
 builder.Services.AddCorrelationId();
-builder.Services.AddPaymentSwitchRateLimiting(builder.Configuration);
+builder.Services.AddPaymentSwitchRateLimiting();
 builder.Services.AddPaymentSwitchVersioning();
 builder.Services.AddPaymentSwitchOutputCache();
 

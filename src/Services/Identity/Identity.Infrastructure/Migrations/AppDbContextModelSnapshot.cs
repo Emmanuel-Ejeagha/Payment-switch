@@ -61,12 +61,6 @@ namespace Identity.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("jsonb");
 
-                    b.Property<uint>("RowVersion")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("xid")
-                        .HasColumnName("xmin");
-
                     b.HasKey("Id");
 
                     b.ToTable("Users");
@@ -188,12 +182,6 @@ namespace Identity.Infrastructure.Migrations
 
                             b1.Property<bool>("IsRevoked")
                                 .HasColumnType("boolean");
-
-                            b1.Property<uint>("RowVersion")
-                                .IsConcurrencyToken()
-                                .ValueGeneratedOnAddOrUpdate()
-                                .HasColumnType("xid")
-                                .HasColumnName("xmin");
 
                             b1.Property<Guid>("UserId")
                                 .HasColumnType("uuid");

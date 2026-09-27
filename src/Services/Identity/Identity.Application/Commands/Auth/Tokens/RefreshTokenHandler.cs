@@ -1,8 +1,6 @@
-﻿using BuildingBlocks.Shared.Exceptions;
-using BuildingBlocks.Shared.Results;
+﻿using BuildingBlocks.Shared.Results;
 using FluentValidation;
 using Identity.Application.Interfaces;
-using Identity.Domain.DomainErrors;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -51,59 +49,13 @@ public class RefreshTokenHandler
             return new Error("Identity.RefreshTokenReuseDetected", "Refresh token reuse detected. All refresh tokens revoked.");
         }
 
-        if (user.IsLockedOut(DateTime.UtcNow))
-        {
-            _logger.LogWarning("Refresh rejected for locked user {UserId}", user.Id);
-            return IdentityErrors.AccountLocked;
-        }
-
-        if (!user.IsActive)
-        {
-            _logger.LogWarning("Refresh rejected for deactivated user {UserId}", user.Id);
-            return new Error("Identity.UserInactive", "User account is deactivated.");
-        }
-
         user.RevokeRefreshToken(tokenHash);
         var newAccessToken = _tokenService.GenerateAccessToken(user);
         var newRefreshToken = _tokenService.GenerateRefreshToken();
         user.AddRefreshToken(_tokenService.HashRefreshToken(newRefreshToken), DateTime.UtcNow.AddDays(7));
         user.EnforceRefreshTokenCap();
         await _userRepository.PruneRefreshTokensAsync(cancellationToken);
-        try
-        {
-            await _unitOfWork.SaveChangesAsync(cancellationToken);
-        }
-        catch (ConcurrencyConflictException)
-        {
-            // Lost a race with another writer (typically a concurrent refresh).
-            // Reload and decide: a meanwhile-revoked token means the other side
-            // already rotated it, which is a replay — revoke everything.
-            // Otherwise the conflict came from an unrelated update; report it
-            // as retryable instead of minting a second live session.
-            var fresh = await _userRepository.GetByIdAsync(user.Id, cancellationToken);
-            var freshToken = fresh?.RefreshTokens.FirstOrDefault(t => t.Value == tokenHash);
-            if (freshToken is null || freshToken.IsRevoked || freshToken.ExpiresAt < DateTime.UtcNow)
-            {
-                _logger.LogWarning("Refresh token reuse detected for user {UserId} after concurrency conflict. Revoking all refresh tokens.", user.Id);
-                if (fresh is not null)
-                {
-                    fresh.RevokeAllRefreshTokens();
-                    try
-                    {
-                        await _unitOfWork.SaveChangesAsync(cancellationToken);
-                    }
-                    catch (ConcurrencyConflictException)
-                    {
-                        // Another writer already settled the revocation; the
-                        // account is safe, so report the reuse and move on.
-                        _logger.LogWarning("Concurrent revocation already settled for user {UserId}", user.Id);
-                    }
-                }
-                return new Error("Identity.RefreshTokenReuseDetected", "Refresh token reuse detected. All refresh tokens revoked.");
-            }
-
-            return IdentityErrors.ConcurrencyConflict;
-        }
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return new RefreshTokenResponse(newAccessToken, newRefreshToken, _tokenService.AccessTokenExpirationSeconds);
     }

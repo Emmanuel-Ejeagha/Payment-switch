@@ -11,8 +11,6 @@ public static class NotificationEventTypes
     public const string PaymentRefunded = "PaymentRefundedDomainEvent";
     public const string PaymentIntentCreated = "PaymentIntentCreatedDomainEvent";
     public const string PaymentVoided = "PaymentVoidedDomainEvent";
-    public const string PaymentFailed = "PaymentFailedDomainEvent";
-    public const string PaymentExpired = "PaymentExpiredDomainEvent";
 
     public static readonly IReadOnlyList<string> All = new[]
     {
@@ -20,11 +18,9 @@ public static class NotificationEventTypes
         PaymentCaptured,
         PaymentRefunded,
         PaymentIntentCreated,
-        PaymentVoided,
-        PaymentFailed,
-        PaymentExpired
+        PaymentVoided
     };
 
     public static bool IsValid(string eventType) =>
-        eventType is PaymentAuthorized or PaymentCaptured or PaymentRefunded or PaymentIntentCreated or PaymentVoided or PaymentFailed or PaymentExpired;
+        eventType is PaymentAuthorized or PaymentCaptured or PaymentRefunded or PaymentIntentCreated or PaymentVoided;
 }
