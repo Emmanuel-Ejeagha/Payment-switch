@@ -19,11 +19,11 @@ public class PaymentIntentConfiguration : IEntityTypeConfiguration<PaymentIntent
             a.Property(m => m.Currency).HasColumnName("Currency").IsRequired().HasMaxLength(3);
         });
 
-        builder.OwnsOne(p => p.IdempotencyKey, ik =>
-        {
-            ik.Property(i => i.Value).HasColumnName("IdempotencyKey").IsRequired();
-            ik.HasIndex(i => i.Value).IsUnique();
-        });
+        builder.Property(p => p.IdempotencyKey)
+            .HasConversion(k => k.Value, v => new IdempotencyKey(v))
+            .HasColumnName("IdempotencyKey")
+            .HasMaxLength(200);
+        builder.HasIndex(p => new { p.MerchantId, p.IdempotencyKey }).IsUnique();
 
         builder.OwnsOne(p => p.AuthorizationCode, ac =>
         {
@@ -34,6 +34,8 @@ public class PaymentIntentConfiguration : IEntityTypeConfiguration<PaymentIntent
         {
             gr.Property(g => g.Value).HasColumnName("GatewayReference").HasMaxLength(100);
         });
+
+        builder.Property(p => p.ProviderName).HasMaxLength(100);
 
         builder.Property(p => p.PaymentMethod)
             .HasConversion(v => v.Value, v => PaymentMethod.FromString(v))
@@ -54,7 +56,11 @@ public class PaymentIntentConfiguration : IEntityTypeConfiguration<PaymentIntent
         {
             t.WithOwner().HasForeignKey("PaymentIntentId");
             t.HasKey("Id");
+            t.Property(tx => tx.Id).ValueGeneratedNever();
+            t.UsePropertyAccessMode(PropertyAccessMode.PreferField);
             t.Property(tx => tx.Type).HasConversion<string>().IsRequired();
+            t.Property(tx => tx.IdempotencyKey).HasMaxLength(200);
+            t.HasIndex("PaymentIntentId", "IdempotencyKey").IsUnique();
             t.OwnsOne(tx => tx.Amount, txA =>
             {
                 txA.Property(m => m.Amount).HasColumnName("Amount").IsRequired();
@@ -71,17 +77,22 @@ public class PaymentIntentConfiguration : IEntityTypeConfiguration<PaymentIntent
         builder.Property(p => p.CreatedAt).IsRequired();
         builder.Property(p => p.UpdatedAt);
 
+        builder.Property(p => p.RowVersion).IsRowVersion();
+
         builder.Ignore(p => p.DomainEvents);
     }
 
     private static PaymentStatus ResolveStatus(string value) => value switch
     {
         "Pending" => PaymentStatus.Pending,
+        "RequiresAction" => PaymentStatus.RequiresAction,
+        "Processing" => PaymentStatus.Processing,
         "Authorized" => PaymentStatus.Authorized,
         "Captured" => PaymentStatus.Captured,
         "PartiallyCaptured" => PaymentStatus.PartiallyCaptured,
         "Voided" => PaymentStatus.Voided,
         "Failed" => PaymentStatus.Failed,
+        "Expired" => PaymentStatus.Expired,
         "PartiallyRefunded" => PaymentStatus.PartiallyRefunded,
         "FullyRefunded" => PaymentStatus.FullyRefunded,
         _ => throw new ArgumentException($"Unknown status: {value}")

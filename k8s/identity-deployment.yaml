@@ -5,6 +5,11 @@ metadata:
   namespace: payment-switch
 spec:
   replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app: identity-api
@@ -13,9 +18,16 @@ spec:
       labels:
         app: identity-api
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: identity-api
-          image: paymentswitch-identity:latest
+          image: paymentswitch/identity-api:latest
           env:
             - name: ConnectionStrings__IdentityDb
               valueFrom:
@@ -27,6 +39,17 @@ spec:
                 secretKeyRef:
                   name: payment-switch-secret
                   key: Jwt__Secret
+            - name: ServiceToken__Secret
+              valueFrom:
+                secretKeyRef:
+                  name: payment-switch-secret
+                  key: ServiceToken__Secret
+            - name: Jwt__PreviousSecret
+              valueFrom:
+                secretKeyRef:
+                  name: payment-switch-secret
+                  key: Jwt__PreviousSecret
+                  optional: true
             - name: Jwt__Issuer
               valueFrom:
                 configMapKeyRef:
@@ -44,16 +67,73 @@ spec:
                   key: RabbitMQ__HostName
             - name: RabbitMQ__UserName
               valueFrom:
-                configMapKeyRef:
-                  name: payment-switch-config
+                secretKeyRef:
+                  name: payment-switch-secret
                   key: RabbitMQ__UserName
             - name: RabbitMQ__Password
               valueFrom:
+                secretKeyRef:
+                  name: payment-switch-secret
+                  key: RabbitMQ__Password
+            - name: Smtp__Host
+              valueFrom:
                 configMapKeyRef:
                   name: payment-switch-config
-                  key: RabbitMQ__Password
+                  key: Smtp__Host
+            - name: Smtp__Port
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-switch-config
+                  key: Smtp__Port
+            - name: Smtp__Username
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-switch-config
+                  key: Smtp__Username
+            - name: Smtp__Password
+              valueFrom:
+                secretKeyRef:
+                  name: payment-switch-secret
+                  key: Smtp__Password
+            - name: Smtp__FromAddress
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-switch-config
+                  key: Smtp__FromAddress
+            - name: Smtp__FromName
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-switch-config
+                  key: Smtp__FromName
+            - name: Seed__AdminEmail
+              value: "admin@paymentswitch.com"
+            - name: Seed__AdminPassword
+              valueFrom:
+                secretKeyRef:
+                  name: payment-switch-secret
+                  key: Seed__AdminPassword
           ports:
             - containerPort: 8080
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+          startupProbe:
+            httpGet:
+              path: /health/live
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 30
           livenessProbe:
             httpGet:
               path: /health/live

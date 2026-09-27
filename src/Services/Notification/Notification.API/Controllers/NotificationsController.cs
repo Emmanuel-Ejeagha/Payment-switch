@@ -1,4 +1,7 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using System.Globalization;
+using BuildingBlocks.Shared.Auth;
+using BuildingBlocks.Shared.Paging;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Notification.API.Extensions;
 using Notification.Application.DTOs;
@@ -7,13 +10,14 @@ using Notification.Application.Features.Queries.ListNotifications;
 
 namespace Notification.API.Controllers;
 
-[Authorize(Roles = "Admin")]
+[Authorize]
 public class NotificationsController : BaseApiController
 {
     /// <summary>
-    /// Get a single notification by ID (Admin only).
+    /// Get a single notification by ID (Admin + Support read).
     /// </summary>
     [HttpGet("{id:guid}")]
+    [Authorize(Roles = RolePolicies.ReadOnly)]
     [ProducesResponseType(typeof(NotificationDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(
@@ -25,19 +29,24 @@ public class NotificationsController : BaseApiController
     }
 
     /// <summary>
-    /// List notifications with optional filters (Admin only).
+    /// List notifications with optional filters (Admin + Support read).
     /// </summary>
     [HttpGet]
+    [Authorize(Roles = RolePolicies.ReadOnly)]
     [ProducesResponseType(typeof(List<NotificationDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> List(
         [FromQuery] string? recipient,
         [FromQuery] string? channel,
         [FromQuery] string? status,
         [FromServices] ListNotificationsHandler handler,
-        [FromQuery] int skip = 0,
-        [FromQuery] int take = 10)
+        [FromQuery] int skip = PageBounds.DefaultSkip,
+        [FromQuery] int take = PageBounds.DefaultTake)
     {
-        var result = await handler.Handle(new ListNotificationsQuery(recipient, channel, status, skip, take));
-        return result.ToActionResult();
+        var (normalizedSkip, normalizedTake) = PageBounds.Normalize(skip, take);
+        var result = await handler.Handle(new ListNotificationsQuery(recipient, channel, status, normalizedSkip, normalizedTake));
+        if (result.IsFailure) return result.ToActionResult();
+
+        Response.Headers["X-Total-Count"] = result.Value!.TotalCount.ToString(CultureInfo.InvariantCulture);
+        return Ok(result.Value.Items);
     }
 }

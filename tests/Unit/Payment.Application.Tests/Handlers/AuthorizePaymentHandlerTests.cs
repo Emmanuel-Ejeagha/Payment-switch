@@ -1,4 +1,4 @@
-﻿using BuildingBlocks.Shared.Events;
+﻿using BuildingBlocks.Shared.Exceptions;
 using BuildingBlocks.Shared.Results;
 using FluentValidation;
 using FluentValidation.Results;
@@ -16,7 +16,6 @@ public class AuthorizePaymentHandlerTests
     private readonly Mock<IPaymentIntentRepository> _repoMock = new();
     private readonly Mock<IPaymentGatewayService> _gatewayMock = new();
     private readonly Mock<IUnitOfWork> _uowMock = new();
-    private readonly Mock<IDomainEventDispatcher> _dispatcherMock = new();
     private readonly Mock<IValidator<AuthorizePaymentCommand>> _validatorMock = new();
     private readonly Mock<IMerchantService> _merchantServiceMock = new();
     private readonly Mock<ILogger<AuthorizePaymentHandler>> _loggerMock = new();
@@ -28,7 +27,6 @@ public class AuthorizePaymentHandlerTests
         _repoMock.Object,
         _gatewayMock.Object,
         _uowMock.Object,
-        _dispatcherMock.Object,
         _validatorMock.Object,
         _merchantServiceMock.Object, _loggerMock.Object);
     }
@@ -40,7 +38,7 @@ public class AuthorizePaymentHandlerTests
         var command = new AuthorizePaymentCommand(intent.Id, null, null);
         SetupValidatorSuccess(command);
         _repoMock.Setup(r => r.GetByIdAsync(intent.Id, It.IsAny<CancellationToken>())).ReturnsAsync(intent);
-        _gatewayMock.Setup(g => g.AuthorizeAsync(intent.MerchantId, intent.Amount, intent.CardDetails, It.IsAny<CancellationToken>()))
+        _gatewayMock.Setup(g => g.AuthorizeAsync(intent.MerchantId, intent.Amount, intent.CardDetails, It.IsAny<CardSecurityCode?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<GatewayResponse>.Success(new GatewayResponse(true, "AUTH123", "GW-1", null)));
         _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
         _merchantServiceMock
@@ -50,9 +48,9 @@ public class AuthorizePaymentHandlerTests
         var result = await _handler.Handle(command);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal("AUTH123", result.Value.AuthorizationCode);
-        Assert.Equal("GW-1", result.Value.GatewayReference);
-        Assert.Equal("Authorized", result.Value.Status);
+        Assert.Equal("AUTH123", result.Value!.AuthorizationCode);
+        Assert.Equal("GW-1", result.Value!.GatewayReference);
+        Assert.Equal("Authorized", result.Value!.Status);
     }
 
     [Fact]
@@ -78,13 +76,53 @@ public class AuthorizePaymentHandlerTests
     .Setup(m => m.GetMerchantStatusAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
     .ReturnsAsync(Result<string>.Success("active"));
         _repoMock.Setup(r => r.GetByIdAsync(intent.Id, It.IsAny<CancellationToken>())).ReturnsAsync(intent);
-        _gatewayMock.Setup(g => g.AuthorizeAsync(intent.MerchantId, intent.Amount, intent.CardDetails, It.IsAny<CancellationToken>()))
+        _gatewayMock.Setup(g => g.AuthorizeAsync(intent.MerchantId, intent.Amount, intent.CardDetails, It.IsAny<CardSecurityCode?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<GatewayResponse>.Failure(new Error("Gateway.Declined", "Card declined.")));
 
         var result = await _handler.Handle(command);
 
         Assert.True(result.IsFailure);
         Assert.Equal("Payment.AuthorizationFailed", result.Errors[0].Code);
+    }
+
+    [Fact]
+    public async Task Handle_ConcurrencyConflict_ShouldFail()
+    {
+        var intent = CreatePendingIntent();
+        var command = new AuthorizePaymentCommand(intent.Id, null, null);
+        SetupValidatorSuccess(command);
+        _merchantServiceMock
+            .Setup(m => m.GetMerchantStatusAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<string>.Success("active"));
+        _repoMock.Setup(r => r.GetByIdAsync(intent.Id, It.IsAny<CancellationToken>())).ReturnsAsync(intent);
+        _gatewayMock.Setup(g => g.AuthorizeAsync(intent.MerchantId, intent.Amount, intent.CardDetails, It.IsAny<CardSecurityCode?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<GatewayResponse>.Success(new GatewayResponse(true, "AUTH123", "GW-1", null)));
+        _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new ConcurrencyConflictException());
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Payment.ConcurrencyConflict", result.Errors[0].Code);
+    }
+
+    [Fact]
+    public async Task Handle_ReplayedIdempotencyKey_ShouldReturnExistingAuthorization()
+    {
+        var intent = CreatePendingIntent();
+        intent.Authorize(new AuthorizationCode("AUTH123"), new GatewayReference("GW-1"), "auth-key");
+        intent.ClearDomainEvents();
+        var command = new AuthorizePaymentCommand(intent.Id, null, null, "auth-key");
+        SetupValidatorSuccess(command);
+        _repoMock.Setup(r => r.GetByIdAsync(intent.Id, It.IsAny<CancellationToken>())).ReturnsAsync(intent);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("AUTH123", result.Value!.AuthorizationCode);
+        Assert.Equal("GW-1", result.Value!.GatewayReference);
+        _gatewayMock.Verify(g => g.AuthorizeAsync(It.IsAny<Guid>(), It.IsAny<Money>(), It.IsAny<CardDetails>(), It.IsAny<CardSecurityCode?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+        _uowMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
     private PaymentIntent CreatePendingIntent() =>

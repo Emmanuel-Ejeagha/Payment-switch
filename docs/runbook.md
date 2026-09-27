@@ -1,0 +1,232 @@
+# Operations Runbook
+
+The live production runtime is **Docker Compose on an EC2 host** (see
+`docker-compose.yml`). The Kubernetes manifests (`k8s/`) and Helm chart
+(`helm/payment-switch`) are implemented and CI-tested but are **not** the
+live runtime — treat them as the target platform for a future migration. This
+runbook covers the compose deployment, TLS, backups, and common incident
+responses. See `docs/deployment.md` (k8s/CI-CD), `docs/tls.md` (TLS), and
+`docs/secrets.md` (secret management + rotation) for the deep dives.
+
+## 1. Deploying the stack
+
+### Prerequisites (one-time)
+
+- EC2 host with Docker Engine + Compose v2 installed.
+- DNS A record pointing the domain at the host's public IP (a raw IP cannot get
+  a public certificate).
+- A `.env` file at the repo root populated from the managed secret store
+  (see `docs/secrets.md`). Missing required values cause `docker compose up`
+  to fail fast, which is intentional.
+
+### First deployment
+
+```bash
+git clone <repo> /opt/paymentswitch && cd /opt/paymentswitch
+# Materialize .env from the secret store (AWS SSM/Secrets Manager)
+docker compose up -d --build
+docker compose ps          # wait until all services are healthy
+```
+
+Compose runs migrations on startup (`RunMigrations=true` on every API).
+
+### Updating (normal release)
+
+```bash
+cd /opt/paymentswitch
+git pull origin main
+docker compose up -d --build --remove-orphans
+docker compose ps
+```
+
+Each API uses a rolling restart by default (`restart: always`; nginx
+`depends_on` all APIs). Brief overlaps are fine; the message bus and DB keep
+the stack consistent. For zero-downtime deployment of a single service,
+`docker compose up -d <service>`.
+
+### Verifying a deploy
+
+```bash
+curl -fsS http://localhost/identity/health/live
+curl -fsS http://localhost/merchant/health/ready
+curl -I http://localhost/            # merchant portal
+curl -I http://localhost/admin/login # admin portal
+```
+
+Health lives at `/health/live|ready` on each API (no `/api/v1` prefix);
+nginx strips the `/<service>/` prefix when proxying (Step 8.1). For metrics
+and the full per-API matrix, run `bash infra/smoke/compose-smoke.sh`.
+
+## 2. TLS (production)
+
+TLS terminates at nginx (see `docs/tls.md`):
+
+1. Obtain certs with certbot: `sudo certbot certonly --standalone -d <domain>`.
+2. Copy `fullchain.pem` + `privkey.pem` into `infra/nginx/tls/certs/`
+   (gitignored).
+3. Bring up the production overlay (adds `:443` + the TLS server blocks;
+   plain `docker compose up` stays HTTP-only on `:80`):
+   `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d`.
+4. Confirm the redirect + HSTS:
+    ```bash
+    curl -I http://<domain>/identity/health/live   # 301 -> https
+    curl -I https://<domain>/                        # 200
+    ```
+
+### Renewal
+
+certbot installs a systemd timer. Wire a `--deploy-hook` that copies the fresh
+certs into `infra/nginx/tls/certs` and reloads nginx (see `docs/tls.md`).
+Test renewal with `sudo certbot renew --dry-run`.
+
+## 3. Backups
+
+All state lives in the named volumes (`postgres_data`, `rabbitmq_data`,
+`prometheus_data`, `grafana_data`; `redis_data` is cache).
+
+### Postgres (critical) — automated job + drill
+
+The `backup` compose service runs `infra/backup/pg-backup.sh` on a daily
+loop: per-database custom-format dumps for all six DBs plus a globals dump,
+a `SHA256SUMS` manifest, `latest-<db>` symlinks, and 14-daily pruning — all
+in the `pgbackups` volume. No schedule to configure; it starts with the
+stack (gated on postgres healthy).
+
+```bash
+# Inspect recent artifacts:
+docker compose exec backup ls -l /backups | tail
+```
+
+A volume alone is not a backup. Sync off-host nightly from the host cron:
+
+```bash
+# Host crontab: copy the volume contents to object storage daily.
+docker run --rm -v paymentswitch_pgbackups:/data -v /var/backups:/backup \
+  alpine sh -c 'tar czf /backup/pgbackups-$(date +%F).tgz -C /data .'
+# + upload /var/backups/pgbackups-*.tgz to S3 (14 daily + 12 monthly).
+```
+
+### Restore drill (Step 10.1 — run quarterly)
+
+`infra/backup/restore-drill.sh` proves restorability against a scratch
+container (never the live volume): checksums the manifest, restores every
+`latest-*.dump.gz`, and asserts each database opens with countable core
+tables. Exit 0 = pass.
+
+```bash
+# Copy one backup set locally, then:
+bash infra/backup/restore-drill.sh /var/backups/latest-copy
+# Manual single-DB restore (same mechanism the drill uses):
+gunzip -c IdentityDb-<ts>.dump.gz | docker compose exec -T postgres \
+  pg_restore -U paymentswitch -d IdentityDb --no-owner
+```
+
+Record each drill (date + result + operator) in the ops log. A drill that
+is overdue is an incident: fix backup/restore before it becomes an emergency.
+
+### RabbitMQ / Prometheus / Grafana
+
+These are recreatable from config (`infra/`) and re-populate from the DB / live
+traffic. A nightly snapshot of the volumes is optional:
+
+```bash
+docker run --rm -v paymentswitch_prometheus_data:/data -v /var/backups:/backup \
+  alpine tar czf /backup/prometheus-$(date +%F).tgz -C /data .
+```
+
+## 4. Health, metrics & logs
+
+- **Health endpoints:** each API exposes `/health/live` and `/health/ready`
+  (nginx proxies them; used by the Docker healthchecks).
+- **Metrics:** Prometheus scrapes `/metrics` from each API (port 8080,
+  `metrics_path` pinned in `infra/prometheus/prometheus.yml`) and RabbitMQ
+  (`:15692`, via the `rabbitmq_prometheus` plugin enabled in compose/k8s).
+  Verify with `bash infra/smoke/compose-smoke.sh` (per-API health through
+  nginx + per-API exposition on loopback). Grafana dashboards are provisioned
+  from `infra/grafana`. Alert rules live in `infra/prometheus/alerts.yml`
+  (fired via Alertmanager).
+- **Traces:** OpenTelemetry OTLP -> Jaeger (`http://jaeger:4317`).
+- **Logs:** `docker compose logs -f <service>` (structured JSON via Serilog).
+  For a tail of everything: `docker compose logs -f --tail=200`.
+
+Public exposure of these surfaces (Swagger/metrics/Hangfire and the infra UIs)
+is deliberately limited — see `docs/prod-exposure.md` (only nginx :80/:443 is
+public; Swagger is disabled in Production; Grafana/Jaeger/Prometheus are
+internal-only).
+
+## 5. Common incidents
+
+### A service keeps restarting
+
+```bash
+docker compose ps                 # which one is unhealthy/restarting
+docker compose logs <service> --tail=100
+docker compose exec <service> sh  # inspect if needed
+```
+
+Most common causes:
+
+- **Migrations not run / DB unreachable** — check `ConnectionStrings__*`
+  in compose and Postgres health.
+- **Secret validation failure at startup** (intentional fail-fast) — the API
+  exits immediately; re-check `.env` against `docs/secrets.md`. After rotating
+  a JWT key, confirm both `JWT_SECRET` and `JWT_PREVIOUS_SECRET` are set during
+  the window.
+- **RabbitMQ credentials mismatch** — rotate `RABBITMQ_DEFAULT_USER/PASS`
+  together across `.env` and the RabbitMQ container.
+
+### Outbox/inbox backlog (consumers not draining)
+
+```bash
+docker compose logs <consumer-service> --tail=200
+# RabbitMQ management UI on :15672 -> check queue depth (payment.events, DLQ)
+```
+
+The inbox/outbox are resilient by design (idempotent processing, DLX/DLQ). If
+a consumer is down, restart it; messages accumulate in the queue and drain on
+recovery.
+
+### Settlement nightly job misbehaving
+
+The 01:00 batch is a Hangfire recurring job (`nightly-settlement`); check
+`docker compose logs settlement-api` for the trigger output and tie-out
+result. The HTML dashboard (`/hangfire`) is intentionally unreachable from
+the outside — see "Hangfire in production" in `docs/prod-exposure.md` for why
+and how to inspect it safely. To rerun a date manually, `POST
+/api/v1/settlement/trigger` as Admin (duplicate-safe: one batch per date).
+
+### Disk filling up
+
+```bash
+docker system df                       # images, containers, volumes
+docker compose logs --tail=200 -f      # large or log-spinning service?
+docker image prune -af                 # prune dangling images (keep :latest tags)
+docker volume ls                       # identify big named volumes
+```
+
+Postgres WAL growth is normal; if `postgres_data` balloons, check that
+`wal_level`/archiving is configured for the backup approach in use.
+
+### Rollback a bad release (compose)
+
+```bash
+cd /opt/paymentswitch
+git checkout <previous-sha> -- docker-compose.yml infra/
+docker compose up -d --build
+```
+
+(For the k8s/CI-CD target the pipeline records previous images and reverts
+automatically — see `docs/deployment.md`.)
+
+## 6. k8s / Helm — implemented, not live
+
+The `k8s/` and `helm/` artefacts are validated by CI (`helm lint`, `helm
+template`, kubeconform on both the manifests and the render) but the
+production runtime is compose. Before relying
+on k8s in production:
+
+- Apply against a staging cluster and validate rollouts/HPA/NetworkPolicies.
+- Provision the `payment-switch-secret` and configmap, wire External Secrets
+  Operator, and confirm the Ingress + cert-manager issuance.
+- Confirm the frontend deployments (`merchant-web`, `admin-web`) route through
+  the frontend Ingress (`/` and `/admin`).

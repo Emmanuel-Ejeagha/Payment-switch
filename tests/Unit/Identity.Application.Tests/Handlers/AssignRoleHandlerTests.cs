@@ -89,6 +89,58 @@ public class AssignRoleHandlerTests
         Assert.Contains(result.Errors, e => e.Code == "Role");
     }
 
+    [Fact]
+    public async Task Handle_LowercaseRole_ShouldStoreCanonical()
+    {
+        // Arrange
+        var adminId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        var command = new AssignRoleCommand(adminId, targetId, "support");
+        var adminUser = CreateUserWithRoles(adminId, new[] { "Admin" });
+        var targetUser = CreateUserWithRoles(targetId, new[] { "Merchant" });
+
+        SetupValidatorSuccess(command);
+        _userRepositoryMock.Setup(r => r.GetByIdAsync(adminId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(adminUser);
+        _userRepositoryMock.Setup(r => r.GetByIdAsync(targetId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(targetUser);
+        _unitOfWorkMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        // Act
+        var result = await _handler.Handle(command);
+
+        // Assert
+        Assert.True(result.IsSuccess);
+        Assert.Contains("Support", targetUser.Roles);
+        Assert.DoesNotContain("support", targetUser.Roles);
+    }
+
+    [Fact]
+    public async Task Handle_LowercaseAdminAssigner_ShouldSucceed()
+    {
+        // Arrange
+        var adminId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        var command = new AssignRoleCommand(adminId, targetId, "Support");
+        var adminUser = CreateUserWithRoles(adminId, new[] { "admin" });
+        var targetUser = CreateUserWithRoles(targetId, new[] { "Merchant" });
+
+        SetupValidatorSuccess(command);
+        _userRepositoryMock.Setup(r => r.GetByIdAsync(adminId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(adminUser);
+        _userRepositoryMock.Setup(r => r.GetByIdAsync(targetId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(targetUser);
+        _unitOfWorkMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        // Act
+        var result = await _handler.Handle(command);
+
+        // Assert
+        Assert.True(result.IsSuccess);
+    }
+
     private static User CreateUserWithRoles(Guid userId, string[] roles)
     {
         var user = new User(userId, new Email($"{userId}@example.com"), new PasswordHash("hashed"), new FullName("User"));

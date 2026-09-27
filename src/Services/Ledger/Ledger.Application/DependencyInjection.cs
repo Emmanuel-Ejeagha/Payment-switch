@@ -1,12 +1,16 @@
 ﻿using BuildingBlocks.Shared;
-using BuildingBlocks.Shared.Events;
 using FluentValidation;
 using Ledger.Application.Features.Commands.CaptureFunds;
 using Ledger.Application.Features.Commands.CreateLedgerAccount;
 using Ledger.Application.Features.Commands.RefundFunds;
+using Ledger.Application.Features.Commands.ReleaseFunds;
 using Ledger.Application.Features.Commands.ReserveFunds;
+using Ledger.Application.Features.Commands.RunReconciliation;
+using Ledger.Application.Features.Queries.GetAllBalances;
 using Ledger.Application.Features.Queries.GetBalance;
+using Ledger.Application.Features.Queries.GetLatestReconciliation;
 using Ledger.Application.Features.Queries.GetTransactionHistory;
+using Ledger.Application.Features.Queries.ListReconciliationReports;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Ledger.Application;
@@ -19,10 +23,13 @@ public static class DependencyInjection
         services.AddScoped<ReserveFundsHandler>();
         services.AddScoped<CaptureFundsHandler>();
         services.AddScoped<RefundFundsHandler>();
+        services.AddScoped<ReleaseFundsHandler>();
         services.AddScoped<GetBalanceHandler>();
+        services.AddScoped<GetAllBalancesHandler>();
         services.AddScoped<GetTransactionHistoryHandler>();
-
-        services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
+        services.AddScoped<RunReconciliationHandler>();
+        services.AddScoped<GetLatestReconciliationHandler>();
+        services.AddScoped<ListReconciliationReportsHandler>();
 
         services.AddValidatorsFromAssemblyContaining<CreateLedgerAccountCommandValidator>();
 

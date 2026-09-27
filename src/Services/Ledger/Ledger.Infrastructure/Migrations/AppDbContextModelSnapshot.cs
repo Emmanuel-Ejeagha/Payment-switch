@@ -22,14 +22,38 @@ namespace Ledger.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("BuildingBlocks.Shared.Retention.ArchivedRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("ArchivedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("SourceTable")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ArchivedAt");
+
+                    b.ToTable("ArchivedRecords", (string)null);
+                });
+
             modelBuilder.Entity("Ledger.Domain.Entities.LedgerAccount", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<decimal>("AvailableBalance")
-                        .HasColumnType("numeric");
+                    b.Property<long>("AvailableBalance")
+                        .HasColumnType("bigint");
 
                     b.Property<string>("Currency")
                         .IsRequired()
@@ -39,18 +63,56 @@ namespace Ledger.Infrastructure.Migrations
                     b.Property<Guid>("MerchantId")
                         .HasColumnType("uuid");
 
-                    b.Property<decimal>("PendingBalance")
-                        .HasColumnType("numeric");
+                    b.Property<long>("PendingBalance")
+                        .HasColumnType("bigint");
 
-                    b.Property<decimal>("ReservedBalance")
-                        .HasColumnType("numeric");
+                    b.Property<long>("ReservedBalance")
+                        .HasColumnType("bigint");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
 
                     b.HasKey("Id");
 
-                    b.ToTable("LedgerAccounts");
+                    b.HasIndex("MerchantId", "Currency")
+                        .IsUnique();
+
+                    b.ToTable("LedgerAccounts", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_LedgerAccounts_NonNegativeBalances", "\"AvailableBalance\" >= 0 AND \"PendingBalance\" >= 0 AND \"ReservedBalance\" >= 0");
+                        });
                 });
 
-            modelBuilder.Entity("Ledger.Infrastructure.Inbox.InboxMessage", b =>
+            modelBuilder.Entity("Ledger.Domain.Entities.ReconciliationReport", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("MismatchCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("RunAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("TotalAccounts")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RunAtUtc");
+
+                    b.ToTable("ReconciliationReports", (string)null);
+                });
+
+            modelBuilder.Entity("Ledger.Infrastructure.DeadLetter.DeadLetterRecord", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -60,6 +122,56 @@ namespace Ledger.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
+
+                    b.Property<string>("MessageId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("Queue")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("RetryCount")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReceivedAt");
+
+                    b.ToTable("DeadLetterRecords");
+                });
+
+            modelBuilder.Entity("Ledger.Infrastructure.Inbox.InboxMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
 
                     b.Property<string>("MessageId")
                         .IsRequired()
@@ -76,6 +188,9 @@ namespace Ledger.Infrastructure.Migrations
                     b.Property<DateTime?>("ProcessedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int>("State")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id");
 
                     b.HasIndex("MessageId")
@@ -90,10 +205,20 @@ namespace Ledger.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("CorrelationId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
                     b.Property<string>("EventType")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime?>("LeaseExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("LeaseToken")
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("OccurredOn")
                         .HasColumnType("timestamp with time zone");
@@ -105,7 +230,13 @@ namespace Ledger.Infrastructure.Migrations
                     b.Property<bool>("Processed")
                         .HasColumnType("boolean");
 
+                    b.Property<string>("TraceParent")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("Processed", "LeaseExpiresAt");
 
                     b.ToTable("OutboxMessages");
                 });
@@ -115,8 +246,15 @@ namespace Ledger.Infrastructure.Migrations
                     b.OwnsMany("Ledger.Domain.Entities.JournalEntry", "Journal", b1 =>
                         {
                             b1.Property<Guid>("Id")
-                                .ValueGeneratedOnAdd()
                                 .HasColumnType("uuid");
+
+                            b1.Property<string>("CreditAccount")
+                                .IsRequired()
+                                .HasColumnType("text");
+
+                            b1.Property<string>("DebitAccount")
+                                .IsRequired()
+                                .HasColumnType("text");
 
                             b1.Property<string>("Description")
                                 .IsRequired()
@@ -135,7 +273,7 @@ namespace Ledger.Infrastructure.Migrations
 
                             b1.HasKey("Id");
 
-                            b1.HasIndex("LedgerAccountId");
+                            b1.HasIndex("LedgerAccountId", "Timestamp");
 
                             b1.ToTable("JournalEntries", (string)null);
 
@@ -155,6 +293,9 @@ namespace Ledger.Infrastructure.Migrations
 
                                     b2.HasKey("JournalEntryId");
 
+                                    b2.HasIndex("Value")
+                                        .IsUnique();
+
                                     b2.ToTable("JournalEntries");
 
                                     b2.WithOwner()
@@ -166,8 +307,8 @@ namespace Ledger.Infrastructure.Migrations
                                     b2.Property<Guid>("JournalEntryId")
                                         .HasColumnType("uuid");
 
-                                    b2.Property<decimal>("Amount")
-                                        .HasColumnType("numeric")
+                                    b2.Property<long>("Amount")
+                                        .HasColumnType("bigint")
                                         .HasColumnName("Amount");
 
                                     b2.Property<string>("Currency")
@@ -192,6 +333,58 @@ namespace Ledger.Infrastructure.Migrations
                         });
 
                     b.Navigation("Journal");
+                });
+
+            modelBuilder.Entity("Ledger.Domain.Entities.ReconciliationReport", b =>
+                {
+                    b.OwnsMany("Ledger.Domain.Entities.ReconciliationLineItem", "Items", b1 =>
+                        {
+                            b1.Property<Guid>("Id")
+                                .HasColumnType("uuid");
+
+                            b1.Property<long>("ActualAvailable")
+                                .HasColumnType("bigint");
+
+                            b1.Property<long>("ActualPending")
+                                .HasColumnType("bigint");
+
+                            b1.Property<long>("ActualReserved")
+                                .HasColumnType("bigint");
+
+                            b1.Property<string>("Currency")
+                                .IsRequired()
+                                .HasMaxLength(3)
+                                .HasColumnType("character varying(3)");
+
+                            b1.Property<long>("ExpectedAvailable")
+                                .HasColumnType("bigint");
+
+                            b1.Property<long>("ExpectedPending")
+                                .HasColumnType("bigint");
+
+                            b1.Property<long>("ExpectedReserved")
+                                .HasColumnType("bigint");
+
+                            b1.Property<bool>("IsMatch")
+                                .HasColumnType("boolean");
+
+                            b1.Property<Guid>("MerchantId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<Guid>("ReconciliationReportId")
+                                .HasColumnType("uuid");
+
+                            b1.HasKey("Id");
+
+                            b1.HasIndex("ReconciliationReportId");
+
+                            b1.ToTable("ReconciliationItems", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("ReconciliationReportId");
+                        });
+
+                    b.Navigation("Items");
                 });
 #pragma warning restore 612, 618
         }

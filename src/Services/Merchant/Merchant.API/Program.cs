@@ -1,28 +1,30 @@
 using Asp.Versioning.ApiExplorer;
 using BuildingBlocks.Shared;
+using BuildingBlocks.Shared.Configuration;
 using BuildingBlocks.Shared.Data;
 using BuildingBlocks.Shared.HealthChecks;
 using BuildingBlocks.Shared.Middleware;
 using BuildingBlocks.Shared.RateLimiting;
 using BuildingBlocks.Shared.Versioning;
 using BuildingBlocks.Shared.Caching;
+using BuildingBlocks.Shared.Auth;
+using BuildingBlocks.Shared.Http;
 using Merchant.API.Middlewares;
 using Merchant.API.Services;
 using Merchant.Application;
 using Merchant.Infrastructure;
 using Merchant.Infrastructure.Persistence;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Diagnostics.HealthChecks;
-using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using OpenTelemetry.Metrics;
 using Serilog;
 using System.Reflection;
-using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Configuration.ValidateSecuritySecrets("MerchantDb");
+builder.Configuration.ValidateWebhookSecretEncryptionKey();
 
 builder.Host.UseSerilog((ctx, lc) => lc.ReadFrom.Configuration(ctx.Configuration));
 var otel = builder.AddPaymentSwitchObservability("Merchant");
@@ -34,6 +36,9 @@ builder.WebHost.ConfigureKestrel(options =>
     {
         listenOptions.Protocols = HttpProtocols.Http1AndHttp2;
     });
+    // gRPC (webhook-secret delivery) is ServiceOnly-gated and reachable only on
+    // the internal docker/k8s network (port 5001 is not published). Per
+    // TASK-004, that is the documented in-network exception to end-to-end TLS.
     options.ListenAnyIP(5001, listenOptions =>
     {
         listenOptions.Protocols = HttpProtocols.Http2;
@@ -44,101 +49,86 @@ builder.Services.AddGrpc();
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 
-builder.Services.AddSwaggerGen(c =>
+// TASK-046: Swagger/OpenAPI docs are dev/test-only. In Production the API
+// surface is nginx-only and discovery endpoints must not be exposed (see
+// docs/prod-exposure.md).
+if (!builder.Environment.IsProduction())
 {
-    var xmlFilename = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
-    c.AddServer(new OpenApiServer { Url = "/merchant" });
-    c.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, xmlFilename));
-    c.SwaggerDoc("v1", new OpenApiInfo { Title = "Merchant API", Version = "v1" });
-    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    builder.Services.AddSwaggerGen(c =>
     {
-        Name = "Authorization",
-        Type = SecuritySchemeType.ApiKey,
-        Scheme = "Bearer",
-        BearerFormat = "JWT",
-        In = ParameterLocation.Header,
-        Description = "Enter 'Bearer' [space] and then your token"
-    });
-    c.AddSecurityRequirement(document => new OpenApiSecurityRequirement
-    {
-        [new OpenApiSecuritySchemeReference("Bearer", document)] = []
-    });
-});
-
-var jwtSettings = builder.Configuration.GetSection("Jwt");
-var key = Encoding.UTF8.GetBytes(jwtSettings["Secret"]!);
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
-    {
-        options.TokenValidationParameters = new TokenValidationParameters
+        var xmlFilename = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+        c.AddServer(new OpenApiServer { Url = "/merchant" });
+        c.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, xmlFilename));
+        c.SwaggerDoc("v1", new OpenApiInfo { Title = "Merchant API", Version = "v1" });
+        c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
         {
-            ValidateIssuer = true,
-            ValidateAudience = true,
-            ValidateLifetime = true,
-            ValidateIssuerSigningKey = true,
-            ValidIssuer = jwtSettings["Issuer"],
-            ValidAudience = jwtSettings["Audience"],
-            IssuerSigningKey = new SymmetricSecurityKey(key)
-        };
+            Name = "Authorization",
+            Type = SecuritySchemeType.ApiKey,
+            Scheme = "Bearer",
+            BearerFormat = "JWT",
+            In = ParameterLocation.Header,
+            Description = "Enter 'Bearer' [space] and then your token"
+        });
+        c.AddSecurityRequirement(document => new OpenApiSecurityRequirement
+        {
+            [new OpenApiSecuritySchemeReference("Bearer", document)] = []
+        });
     });
+}
 
-builder.Services.AddAuthorization();
+builder.Services.AddPaymentSwitchJwtBearer(builder.Configuration);
 
-builder.Services.AddCors(options =>
+builder.Services.AddAuthorization(options =>
 {
-    options.AddPolicy("AllowFrontend", policy =>
-    {
-        policy.WithOrigins("http://localhost:5173")
-              .AllowAnyMethod()
-              .AllowAnyHeader();
-    });
+    options.AddPolicy(AuthPolicies.ServiceOnly, policy =>
+        policy.RequireClaim(ServiceTokenOptions.ClientTypeClaim, ServiceTokenOptions.ClientTypeService));
 });
+
+builder.Services.AddPaymentSwitchCors(builder.Configuration);
 
 builder.Services.AddMerchantApplication();
 builder.Services.AddMerchantInfrastructure(builder.Configuration);
 
 builder.Services.AddCorrelationId();
-builder.Services.AddPaymentSwitchRateLimiting();
+builder.Services.AddPaymentSwitchRateLimiting(builder.Configuration);
 builder.Services.AddPaymentSwitchVersioning();
 builder.Services.AddPaymentSwitchOutputCache();
 
 builder.Services.AddPaymentSwitchHealthChecks()
     .AddDbContextCheck<AppDbContext>("db", tags: ["ready"])
-    .AddCheck("rabbitmq", () =>
-    {
-        try
-        {
-            using var tcp = new System.Net.Sockets.TcpClient();
-            tcp.Connect(builder.Configuration["RabbitMQ:HostName"] ?? "localhost", 5672);
-            return HealthCheckResult.Healthy();
-        }
-        catch (Exception ex)
-        {
-            return HealthCheckResult.Unhealthy("RabbitMQ unreachable", ex);
-        }
-    }, tags: ["ready"]);
+    .AddRabbitMqHealthCheck(builder.Configuration);
 
 var app = builder.Build();
 
 app.MigrateDatabase<AppDbContext>();
 
+using (var scope = app.Services.CreateScope())
+{
+    var backfill = scope.ServiceProvider.GetRequiredService<Merchant.Infrastructure.Security.WebhookSecretEncryptionBackfill>();
+    await backfill.ExecuteAsync();
+}
+
 app.UsePaymentSwitchSecurityHeaders();
+app.UsePaymentSwitchForwardedHeaders(builder.Configuration);
 app.UseCorrelationId();
 app.UseRequestSizeLimit();
 app.UseMiddleware<ExceptionMiddleware>();
 app.UseSerilogRequestLogging();
 
-app.UseSwagger(c => c.RouteTemplate = "{documentName}/swagger.json");
-app.UseSwaggerUI(options =>
+if (!app.Environment.IsProduction())
 {
-    options.RoutePrefix = "swagger";
-    var provider = app.Services.GetRequiredService<IApiVersionDescriptionProvider>();
-    foreach (var description in provider.ApiVersionDescriptions)
+    app.UseSwagger(c => c.RouteTemplate = "{documentName}/swagger.json");
+    app.UseSwaggerUI(options =>
     {
-        options.SwaggerEndpoint($"../{description.GroupName}/swagger.json",
-            description.GroupName.ToUpperInvariant());
-    }
-});
+        options.RoutePrefix = "swagger";
+        var provider = app.Services.GetRequiredService<IApiVersionDescriptionProvider>();
+        foreach (var description in provider.ApiVersionDescriptions)
+        {
+            options.SwaggerEndpoint($"../{description.GroupName}/swagger.json",
+                description.GroupName.ToUpperInvariant());
+        }
+    });
+}
 
 app.UseCors("AllowFrontend");
 app.UseRateLimiter();

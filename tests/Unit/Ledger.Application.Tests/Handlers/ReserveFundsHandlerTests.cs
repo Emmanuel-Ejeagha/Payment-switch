@@ -1,4 +1,4 @@
-﻿using BuildingBlocks.Shared.Events;
+﻿using BuildingBlocks.Shared.Exceptions;
 using FluentValidation;
 using FluentValidation.Results;
 using Ledger.Application.Features.Commands.ReserveFunds;
@@ -13,57 +13,57 @@ public class ReserveFundsHandlerTests
 {
     private readonly Mock<ILedgerAccountRepository> _repoMock = new();
     private readonly Mock<IUnitOfWork> _uowMock = new();
-    private readonly Mock<IDomainEventDispatcher> _dispatcherMock = new();
     private readonly Mock<IValidator<ReserveFundsCommand>> _validatorMock = new();
     private readonly Mock<ILogger<ReserveFundsHandler>> _loggerMock = new();
     private readonly ReserveFundsHandler _handler;
 
     public ReserveFundsHandlerTests()
     {
-        _handler = new ReserveFundsHandler(_repoMock.Object, _uowMock.Object, _dispatcherMock.Object, _validatorMock.Object, _loggerMock.Object);
+        _handler = new ReserveFundsHandler(_repoMock.Object, _uowMock.Object, _validatorMock.Object, _loggerMock.Object);
     }
 
     [Fact]
     public async Task Handle_ValidCommand_ShouldReserveFunds()
     {
         var account = new LedgerAccount(Guid.NewGuid(), Guid.NewGuid(), "USD");
-        account.AvailableBalance = 200m; // internal setter via InternalsVisibleTo
+        account.AvailableBalance = 200L; // internal setter via InternalsVisibleTo
 
-        var command = new ReserveFundsCommand(account.MerchantId, 100m, "USD", "correlation-1");
+        var command = new ReserveFundsCommand(account.MerchantId, 100L, "USD", "correlation-1");
         SetupValidatorSuccess(command);
-        _repoMock.Setup(r => r.GetByMerchantIdAsync(account.MerchantId, It.IsAny<CancellationToken>())).ReturnsAsync(account);
+        _repoMock.Setup(r => r.GetByMerchantIdAndCurrencyAsync(account.MerchantId, "USD", It.IsAny<CancellationToken>())).ReturnsAsync(account);
         _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
         var result = await _handler.Handle(command);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(100m, account.AvailableBalance);
-        Assert.Equal(100m, account.PendingBalance);
-        Assert.Single(account.Journal, j => j.Type == EntryType.Debit);
-        _dispatcherMock.Verify(d => d.DispatchAsync(It.IsAny<IReadOnlyList<DomainEvent>>(), It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Equal(200L, account.AvailableBalance);
+        Assert.Equal(100L, account.PendingBalance);
+        Assert.Equal(100L, account.ReservedBalance);
+        Assert.Single(account.Journal, j => j.Type == EntryType.Credit && j.CreditAccount == GlAccountCode.Reserve);
     }
 
     [Fact]
-    public async Task Handle_AccountNotFound_ShouldFail()
+    public async Task Handle_AccountNotFound_AutoCreatesAccount()
     {
-        var command = new ReserveFundsCommand(Guid.NewGuid(), 100m, "USD", "corr");
+        var command = new ReserveFundsCommand(Guid.NewGuid(), 100L, "USD", "corr");
         SetupValidatorSuccess(command);
-        _repoMock.Setup(r => r.GetByMerchantIdAsync(command.MerchantId, It.IsAny<CancellationToken>())).ReturnsAsync((LedgerAccount?)null);
+        _repoMock.Setup(r => r.GetByMerchantIdAndCurrencyAsync(command.MerchantId, "USD", It.IsAny<CancellationToken>())).ReturnsAsync((LedgerAccount?)null);
+        _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
         var result = await _handler.Handle(command);
 
-        Assert.True(result.IsFailure);
-        Assert.Equal("Ledger.AccountNotFound", result.Errors[0].Code);
+        Assert.True(result.IsSuccess);
+        _repoMock.Verify(r => r.AddAsync(It.Is<LedgerAccount>(a => a.Currency == "USD"), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    public async Task Handle_InsufficientFunds_ShouldFail()
+    public async Task Handle_CurrencyMismatch_ShouldFail()
     {
         var account = new LedgerAccount(Guid.NewGuid(), Guid.NewGuid(), "USD");
-        account.AvailableBalance = 50m;
-        var command = new ReserveFundsCommand(account.MerchantId, 100m, "USD", "corr");
+        account.AvailableBalance = 50L;
+        var command = new ReserveFundsCommand(account.MerchantId, 100L, "EUR", "corr");
         SetupValidatorSuccess(command);
-        _repoMock.Setup(r => r.GetByMerchantIdAsync(account.MerchantId, It.IsAny<CancellationToken>())).ReturnsAsync(account);
+        _repoMock.Setup(r => r.GetByMerchantIdAndCurrencyAsync(account.MerchantId, "EUR", It.IsAny<CancellationToken>())).ReturnsAsync(account);
 
         var result = await _handler.Handle(command);
 
@@ -85,6 +85,28 @@ public class ReserveFundsHandlerTests
 
     private void SetupValidatorSuccess(ReserveFundsCommand command) =>
         _validatorMock.Setup(v => v.ValidateAsync(command, It.IsAny<CancellationToken>())).ReturnsAsync(new ValidationResult());
+
+    [Fact]
+    public async Task Handle_ConcurrentInsertRace_ConvergesOnWinnerAccount()
+    {
+        var merchantId = Guid.NewGuid();
+        var command = new ReserveFundsCommand(merchantId, 100L, "USD", "race-1");
+        var winner = new LedgerAccount(Guid.NewGuid(), merchantId, "USD");
+        SetupValidatorSuccess(command);
+        _repoMock.SetupSequence(r => r.GetByMerchantIdAndCurrencyAsync(merchantId, "USD", It.IsAny<CancellationToken>()))
+            .ReturnsAsync((LedgerAccount?)null)
+            .ReturnsAsync(winner);
+        _uowMock.SetupSequence(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new UniqueConstraintViolationException())
+            .ReturnsAsync(1);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(100L, winner.PendingBalance);
+        Assert.Equal(100L, winner.ReservedBalance);
+        _uowMock.Verify(u => u.ClearTrackedEntities(), Times.Once);
+    }
 
     private void SetupValidatorFailure(ReserveFundsCommand command, string property, string error) =>
         _validatorMock.Setup(v => v.ValidateAsync(command, It.IsAny<CancellationToken>())).ReturnsAsync(new ValidationResult(new[] { new ValidationFailure(property, error) }));

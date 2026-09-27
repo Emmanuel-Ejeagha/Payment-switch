@@ -9,6 +9,10 @@ public static class VersioningExtensions
     {
         services.AddApiVersioning(options =>
         {
+            // Contract (docs/api-versioning.md): the version segment is mandatory in
+            // the URL. A missing, unknown, unsupported, or malformed segment matches
+            // no route and is rejected with 404; supported versions are reported on
+            // 2xx responses via the `api-supported-versions` header.
             options.DefaultApiVersion = new ApiVersion(1, 0);
             options.AssumeDefaultVersionWhenUnspecified = true;
             options.ReportApiVersions = true;

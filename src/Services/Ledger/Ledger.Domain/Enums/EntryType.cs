@@ -1,8 +1,8 @@
 ﻿namespace Ledger.Domain.Enums;
 
-public enum EntryType 
-{ 
-    Debit, 
-    Credit 
+public enum EntryType
+{
+    Debit,
+    Credit
 }
 

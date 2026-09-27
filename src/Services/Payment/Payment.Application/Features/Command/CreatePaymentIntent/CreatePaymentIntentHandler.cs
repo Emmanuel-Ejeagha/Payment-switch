@@ -1,10 +1,11 @@
-﻿using BuildingBlocks.Shared.Events;
+﻿using BuildingBlocks.Shared.Exceptions;
 using BuildingBlocks.Shared.Results;
 using FluentValidation;
 using Payment.Application.DTOs;
 using Payment.Application.Interfaces;
 using Payment.Domain;
 using Payment.Domain.Entities;
+using Payment.Domain.Enums;
 using Payment.Domain.ValueObjects;
 using Microsoft.Extensions.Logging;
 
@@ -13,21 +14,27 @@ namespace Payment.Application.Features.Command.CreatePaymentIntent;
 public class CreatePaymentIntentHandler
 {
     private readonly IPaymentIntentRepository _repository;
+    private readonly IPaymentGatewayService _gateway;
+    private readonly IMerchantService _merchantService;
+    private readonly ICardTokenRepository _cardTokenRepository;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IDomainEventDispatcher _dispatcher;
     private readonly IValidator<CreatePaymentIntentCommand> _validator;
     private readonly ILogger<CreatePaymentIntentHandler> _logger;
 
     public CreatePaymentIntentHandler(
         IPaymentIntentRepository repository,
+        IPaymentGatewayService gateway,
+        IMerchantService merchantService,
+        ICardTokenRepository cardTokenRepository,
         IUnitOfWork unitOfWork,
-        IDomainEventDispatcher dispatcher,
         IValidator<CreatePaymentIntentCommand> validator,
         ILogger<CreatePaymentIntentHandler> logger)
     {
         _repository = repository;
+        _gateway = gateway;
+        _merchantService = merchantService;
+        _cardTokenRepository = cardTokenRepository;
         _unitOfWork = unitOfWork;
-        _dispatcher = dispatcher;
         _validator = validator;
         _logger = logger;
     }
@@ -41,22 +48,137 @@ public class CreatePaymentIntentHandler
 
         var existing = await _repository.GetByIdempotencyKeyAsync(command.MerchantId, command.IdempotencyKey, cancellationToken);
         if (existing is not null)
-            return PaymentErrors.IdempotencyKeyViolation(command.IdempotencyKey);
+        {
+            // Same key must mean the same request: a different amount or
+            // currency is a client bug, not a replay — fail loudly instead of
+            // returning someone else's intent.
+            // Currency is checked first: it is cheaper and more discriminating
+            // than the amount comparison, so a currency mismatch short-circuits.
+            if (!string.Equals(existing.Amount.Currency, command.Currency, StringComparison.OrdinalIgnoreCase)
+                || existing.Amount.Amount != command.Amount)
+            {
+                _logger.LogWarning("Idempotency key {Key} reused with different parameters for Merchant {MerchantId}", command.IdempotencyKey, command.MerchantId);
+                return PaymentErrors.IdempotencyKeyConflict(command.IdempotencyKey);
+            }
+
+            _logger.LogInformation("Replaying create for Merchant {MerchantId} with key {Key}", command.MerchantId, command.IdempotencyKey);
+            return ToResponse(existing);
+        }
 
         var amount = new Money(command.Amount, command.Currency);
         var paymentMethod = ResolvePaymentMethod(command.PaymentMethod);
         var idempotencyKey = new IdempotencyKey(command.IdempotencyKey);
         CardDetails? cardDetails = null;
         if (paymentMethod == PaymentMethod.Card)
-            cardDetails = new CardDetails(command.CardLastFour!, command.CardBrand!);
+        {
+            if (!string.IsNullOrWhiteSpace(command.CardToken))
+            {
+                var token = await _cardTokenRepository.GetByTokenAsync(command.MerchantId, command.CardToken, cancellationToken);
+                if (token is null)
+                    return new Error("Payment.InvalidCardToken", "The provided card token is invalid or does not belong to this merchant.");
+                cardDetails = new CardDetails(token.LastFour, token.Brand, token.Token);
+            }
+            else
+            {
+                cardDetails = new CardDetails(command.CardLastFour!, command.CardBrand!);
+            }
+        }
 
         var intent = new PaymentIntent(Guid.NewGuid(), command.MerchantId, amount, idempotencyKey, paymentMethod, cardDetails);
 
-        await _repository.AddAsync(intent, cancellationToken);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
-        await _dispatcher.DispatchAsync(intent.DomainEvents, cancellationToken);
+        // Deliberately a local: the CVC goes to the gateway and dies with this scope.
+        // It is never assigned to `intent`, which is what gets persisted.
+        var securityCode = CardSecurityCode.IsValid(command.SecurityCode)
+            ? new CardSecurityCode(command.SecurityCode!)
+            : null;
 
-        return new PaymentIntentResponse(intent.Id, intent.Status.Value, "fake-client-secret-" + intent.Id);
+        var configResult = await _merchantService.GetMerchantConfigAsync(command.MerchantId, cancellationToken);
+        if (!configResult.IsSuccess)
+            return new Error("Payment.MerchantConfigRetrievalFailed", "Unable to retrieve merchant configuration.");
+
+        var authResult = await _gateway.AuthorizeAsync(intent.MerchantId, intent.Amount, intent.CardDetails, securityCode, idempotencyKey.Value, cancellationToken: cancellationToken);
+        if (!authResult.IsSuccess)
+        {
+            intent.Fail();
+            await _unitOfWork.BeginTransactionAsync(cancellationToken);
+            await _repository.AddAsync(intent, cancellationToken);
+            try
+            {
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
+                await _unitOfWork.CommitAsync(cancellationToken);
+            }
+            catch (ConcurrencyConflictException)
+            {
+                await _unitOfWork.RollbackAsync(cancellationToken);
+                return PaymentErrors.ConcurrencyConflict;
+            }
+            catch (UniqueConstraintViolationException)
+            {
+                // Lost an insert race on the idempotency key: load the winner
+                // and replay it instead of failing.
+                await _unitOfWork.RollbackAsync(cancellationToken);
+                return await ReplayWinnerAsync(command, cancellationToken);
+            }
+            return new PaymentIntentResponse(intent.Id, intent.Status.Value, null);
+        }
+
+        var gwResponse = authResult.Value!;
+        var gatewayRef = new GatewayReference(gwResponse.GatewayReference!);
+
+        if (gwResponse.RequiresChallenge)
+        {
+            intent.RequireAction(gatewayRef, gwResponse.ProviderName);
+        }
+        else
+        {
+            var authCode = new AuthorizationCode(gwResponse.AuthorizationCode!);
+            intent.Authorize(authCode, gatewayRef, idempotencyKey.Value, gwResponse.ProviderName);
+
+            if (configResult.Value!.AutoCapture)
+                intent.Capture(idempotencyKey: DeriveCaptureKey(idempotencyKey.Value));
+        }
+
+        await _unitOfWork.BeginTransactionAsync(cancellationToken);
+        await _repository.AddAsync(intent, cancellationToken);
+        try
+        {
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            await _unitOfWork.CommitAsync(cancellationToken);
+        }
+        catch (ConcurrencyConflictException)
+        {
+            await _unitOfWork.RollbackAsync(cancellationToken);
+            return PaymentErrors.ConcurrencyConflict;
+        }
+        catch (UniqueConstraintViolationException)
+        {
+            await _unitOfWork.RollbackAsync(cancellationToken);
+            return await ReplayWinnerAsync(command, cancellationToken);
+        }
+
+        return ToResponse(intent);
+    }
+
+    private async Task<Result<PaymentIntentResponse>> ReplayWinnerAsync(
+        CreatePaymentIntentCommand command, CancellationToken cancellationToken)
+    {
+        var winner = await _repository.GetByIdempotencyKeyAsync(command.MerchantId, command.IdempotencyKey, cancellationToken);
+        if (winner is null)
+            return new Error("Payment.CreateFailed", "Could not create payment intent.");
+
+        if (!string.Equals(winner.Amount.Currency, command.Currency, StringComparison.OrdinalIgnoreCase)
+            || winner.Amount.Amount != command.Amount)
+        {
+            return PaymentErrors.IdempotencyKeyConflict(command.IdempotencyKey);
+        }
+
+        return ToResponse(winner);
+    }
+
+    private static PaymentIntentResponse ToResponse(PaymentIntent intent)
+    {
+        string? clientSecret = intent.Transactions.LastOrDefault(t => t.Type == TransactionType.Capture)?.Id.ToString();
+        return new PaymentIntentResponse(intent.Id, intent.Status.Value, clientSecret);
     }
 
     private static PaymentMethod ResolvePaymentMethod(string method) => method switch
@@ -66,4 +188,12 @@ public class CreatePaymentIntentHandler
         "MobileMoney" => PaymentMethod.MobileMoney,
         _ => throw new ArgumentException($"Unknown payment method: {method}")
     };
+
+    internal static string DeriveCaptureKey(string baseKey)
+    {
+        const string suffix = "-capture";
+        if (baseKey.Length + suffix.Length <= IdempotencyKey.MaxLength)
+            return baseKey + suffix;
+        return baseKey.Substring(0, IdempotencyKey.MaxLength - suffix.Length) + suffix;
+    }
 }

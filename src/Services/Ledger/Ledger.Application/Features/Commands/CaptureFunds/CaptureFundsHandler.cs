@@ -1,10 +1,13 @@
-﻿using BuildingBlocks.Shared.Events;
+﻿using BuildingBlocks.Shared.Exceptions;
 using BuildingBlocks.Shared.Results;
 using FluentValidation;
+using Ledger.Application.Common;
 using Ledger.Application.Interfaces;
+using Ledger.Application.Options;
 using Ledger.Domain.DomainErrors;
 using Ledger.Domain.ValueObjects;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Ledger.Application.Features.Commands.CaptureFunds;
 
@@ -12,21 +15,21 @@ public class CaptureFundsHandler
 {
     private readonly ILedgerAccountRepository _repository;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IDomainEventDispatcher _dispatcher;
     private readonly IValidator<CaptureFundsCommand> _validator;
+    private readonly LedgerOptions _options;
     private readonly ILogger<CaptureFundsHandler> _logger;
 
     public CaptureFundsHandler(
         ILedgerAccountRepository repository,
         IUnitOfWork unitOfWork,
-        IDomainEventDispatcher dispatcher,
         IValidator<CaptureFundsCommand> validator,
+        IOptions<LedgerOptions> options,
         ILogger<CaptureFundsHandler> logger)
     {
         _repository = repository;
         _unitOfWork = unitOfWork;
-        _dispatcher = dispatcher;
         _validator = validator;
+        _options = options.Value;
         _logger = logger;
     }
 
@@ -37,23 +40,42 @@ public class CaptureFundsHandler
         if (!validation.IsValid)
             return validation.Errors.Select(e => new Error(e.PropertyName, e.ErrorMessage)).ToList();
 
-        var account = await _repository.GetByMerchantIdAsync(command.MerchantId, cancellationToken);
+        var account = await _repository.GetByMerchantIdAndCurrencyAsync(command.MerchantId, command.Currency, cancellationToken);
         if (account is null)
             return LedgerErrors.AccountNotFound(command.MerchantId);
 
+        await _unitOfWork.BeginTransactionAsync(cancellationToken);
         try
         {
             var amount = new Money(command.Amount, command.Currency);
-            var correlationId = new CorrelationId(command.CorrelationId);
-            account.CaptureFunds(amount, correlationId);
+            account.CaptureFunds(amount, new CorrelationId(command.CorrelationId), command.EventOccurredOn);
+
+            var fee = FeeCalculator.Calculate(command.Amount, _options.FeeBasisPoints);
+            if (fee > 0)
+            {
+                _logger.LogInformation("Charging {Fee} processing fee for Merchant {MerchantId}", fee, command.MerchantId);
+                // JournalEntries.CorrelationId is unique (idempotency backstop), so
+                // the fee posting must carry a distinct correlation id or the second
+                // insert violates the index and the whole capture is rolled back.
+                account.ChargeFees(new Money(fee, command.Currency), new CorrelationId($"{command.CorrelationId}:fee"), command.EventOccurredOn);
+            }
         }
         catch (InvalidOperationException ex)
         {
+            await _unitOfWork.RollbackAsync(cancellationToken);
             return new Error("Ledger.CaptureFailed", ex.Message);
         }
 
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
-        await _dispatcher.DispatchAsync(account.DomainEvents, cancellationToken);
+        try
+        {
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            await _unitOfWork.CommitAsync(cancellationToken);
+        }
+        catch (ConcurrencyConflictException)
+        {
+            await _unitOfWork.RollbackAsync(cancellationToken);
+            return LedgerErrors.ConcurrencyConflict;
+        }
 
         return Result.Success();
     }

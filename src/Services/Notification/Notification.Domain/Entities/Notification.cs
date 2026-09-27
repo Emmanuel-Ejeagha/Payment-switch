@@ -3,6 +3,7 @@ using Notification.Domain.DomainEvents;
 using Notification.Domain.ValueObjects;
 
 [assembly: System.Runtime.CompilerServices.InternalsVisibleTo("Notification.Domain.Tests")]
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("Notification.API.IntegrationTests")]
 
 namespace Notification.Domain.Entities;
 
@@ -20,6 +21,17 @@ public class Notification : AggregateRoot
     public DateTime? NextRetryAt { get; internal set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime? ProcessedAt { get; private set; }
+    public Guid? LeaseToken { get; internal set; }
+    public DateTime? LeaseExpiresAt { get; internal set; }
+
+    public bool HasActiveLease(DateTime now) =>
+        LeaseExpiresAt.HasValue && LeaseExpiresAt.Value > now;
+
+    public void ReleaseLease()
+    {
+        LeaseToken = null;
+        LeaseExpiresAt = null;
+    }
 
     private Notification() : base() { }
 

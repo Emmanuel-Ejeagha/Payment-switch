@@ -7,6 +7,8 @@ package merchant;
 service MerchantService {
   rpc GetMerchantStatus (GetMerchantStatusRequest) returns (GetMerchantStatusResponse);
   rpc GetMerchantConfig (GetMerchantConfigRequest) returns (GetMerchantConfigResponse);
+  rpc ResolveApiKey (ResolveApiKeyRequest) returns (ResolveApiKeyResponse);
+  rpc GetMerchantContact (GetMerchantContactRequest) returns (GetMerchantContactResponse);
 }
 
 message GetMerchantStatusRequest {
@@ -24,4 +26,34 @@ message GetMerchantConfigRequest {
 message GetMerchantConfigResponse {
   string webhook_url = 1;
   repeated string enabled_payment_methods = 2;
+  bool auto_capture = 3;
+  string webhook_secret = 4;
+  // Dual-secret rotation (TASK-006): the previous secret stays valid during a
+  // grace window so live webhook consumers are not broken by rotation.
+  string previous_webhook_secret = 5;
+  int64 webhook_secret_rotated_at = 6; // Unix seconds UTC; 0 when never rotated
+}
+
+message ResolveApiKeyRequest {
+  string key_prefix = 1;
+  string key_value = 2;
+}
+
+message ResolveApiKeyResponse {
+  string merchant_id = 1;
+  string status = 2;
+  string environment = 3;
+}
+
+message GetMerchantContactRequest {
+  string merchant_id = 1;
+}
+
+message GetMerchantContactResponse {
+  string email = 1;
+  string business_name = 2;
+  // Identity user id of the merchant owner (TASK-036): lets downstream services
+  // enforce owner-scoped access to merchant-owned resources (e.g. webhook
+  // replay/test). Empty when the merchant has no owner.
+  string owner_id = 3;
 }

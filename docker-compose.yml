@@ -1,15 +1,29 @@
 services:
+  # Only nginx (:80/:443) is the public ingress. Every other published port is
+# bound to loopback (127.0.0.1) so it is reachable only from the host, not the
+# internet — Swagger/metrics/Hangfire and infra UIs stay out of reach
+# (TASK-046, docs/prod-exposure.md). Open only 80/443 in the EC2 security group.
   postgres:
     image: postgres:16-alpine
     restart: always
+    # Step 9.6: bound every service (values mirror the k8s requests/limits)
+    # so one runaway container cannot starve the host.
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.20'
+          memory: 256M
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     environment:
       POSTGRES_USER: paymentswitch
-      POSTGRES_PASSWORD: paymentswitch
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-            - ./infra/postgres/init-multiple-databases.sql:/docker-entrypoint-initdb.d/init-multiple-databases.sql
+      - ./infra/postgres/init-multiple-databases.sql:/docker-entrypoint-initdb.d/init-multiple-databases.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U paymentswitch"]
       interval: 5s
@@ -22,6 +36,21 @@ services:
   redis:
     image: redis:7-alpine
     restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+        reservations:
+          cpus: '0.10'
+          memory: 128M
+    # Step 9.3: gate dependents on a real PONG, not container start.
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     volumes:
       - redis_data:/data
     networks:
@@ -30,12 +59,34 @@ services:
   rabbitmq:
     image: rabbitmq:3-management-alpine
     restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+        reservations:
+          cpus: '0.20'
+          memory: 256M
+    # Step 8.1: the prometheus scrape target (rabbitmq:15692, see
+    # infra/prometheus/prometheus.yml) needs the plugin — it is not enabled
+    # in the upstream image by default. The outer entrypoint still runs (CMD
+    # override only) and the inner re-entry keeps RABBITMQ_DEFAULT_* handling.
+    command: ["sh", "-c", "rabbitmq-plugins enable --offline rabbitmq_prometheus && exec docker-entrypoint.sh rabbitmq-server"]
+    # Step 9.3: gate dependents on a live broker (node boot + plugin init on
+    # a cold volume can take a minute — hence the long start period).
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 6
+      start_period: 90s
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
+      - "127.0.0.1:15692:15692"
     environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:?Set RABBITMQ_DEFAULT_USER in .env}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:?Set RABBITMQ_DEFAULT_PASS in .env}
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:
@@ -44,6 +95,14 @@ services:
   jaeger:
     image: jaegertracing/all-in-one:1.58
     restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+        reservations:
+          cpus: '0.10'
+          memory: 256M
     environment:
       - COLLECTOR_OTLP_ENABLED=true
     networks:
@@ -52,20 +111,59 @@ services:
   prometheus:
     image: prom/prometheus:v2.53.0
     restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+        reservations:
+          cpus: '0.10'
+          memory: 256M
     volumes:
       - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./infra/prometheus/alerts.yml:/etc/prometheus/alerts.yml
       - prometheus_data:/prometheus
+    networks:
+      - paymentswitch-network
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+        reservations:
+          cpus: '0.05'
+          memory: 64M
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--storage.path=/alertmanager"
+    volumes:
+      - ./infra/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
     networks:
       - paymentswitch-network
 
   grafana:
     image: grafana/grafana:10.4.3
     restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+        reservations:
+          cpus: '0.10'
+          memory: 128M
     environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD in .env}
     volumes:
       - grafana_data:/var/lib/grafana
+      - ./infra/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ./infra/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+      - ./infra/grafana/provisioning/dashboards:/var/lib/grafana/dashboards
     networks:
       - paymentswitch-network
 
@@ -74,24 +172,54 @@ services:
       context: .
       dockerfile: src/Services/Identity/Identity.API/Dockerfile
     restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+        reservations:
+          cpus: '0.10'
+          memory: 128M
     ports:
-      - "5146:8080"
+      - "127.0.0.1:5146:8080"
+    # Step 9.3: readiness (Kestrel + migrations + DB + broker) gates the
+    # webs and nginx below, so cold starts order themselves.
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 120s
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development}
       - ASPNETCORE_URLS=http://0.0.0.0:8080
       - RunMigrations=true
-      - ConnectionStrings__IdentityDb=Host=postgres;Database=IdentityDb;Username=paymentswitch;Password=paymentswitch
-      - Jwt__Secret=${JWT_SECRET:-your-super-secret-key-minimum-32-bytes!}
+      - ConnectionStrings__IdentityDb=Host=postgres;Database=IdentityDb;Username=paymentswitch;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      - Jwt__Secret=${JWT_SECRET:?Set JWT_SECRET in .env}
+      - ServiceToken__Secret=${SERVICE_TOKEN_SECRET:?Set SERVICE_TOKEN_SECRET in .env}
+      - Jwt__PreviousSecret=${JWT_PREVIOUS_SECRET:-}
       - Jwt__Issuer=IdentityService
       - Jwt__Audience=PaymentSwitch
+      - Cors__AllowedOrigins=${CORS_ALLOWED_ORIGINS:-}
       - RabbitMQ__HostName=rabbitmq
-      - RabbitMQ__UserName=guest
-      - RabbitMQ__Password=guest
+      - RabbitMQ__UserName=${RABBITMQ_DEFAULT_USER:?Set RABBITMQ_DEFAULT_USER in .env}
+      - RabbitMQ__Password=${RABBITMQ_DEFAULT_PASS:?Set RABBITMQ_DEFAULT_PASS in .env}
+      - Seed__AdminEmail=${SEED_ADMIN_EMAIL:-admin@paymentswitch.com}
+      - Seed__AdminPassword=${SEED_ADMIN_PASSWORD:?Set SEED_ADMIN_PASSWORD in .env}
+      - EmailVerification__FrontendBaseUrl=${FRONTEND_BASE_URL:-http://localhost:3000}
+      - PasswordReset__FrontendBaseUrl=${FRONTEND_BASE_URL:-http://localhost:3000}
+      - PasswordReset__TokenLifetimeHours=${PASSWORD_RESET_TOKEN_LIFETIME_HOURS:-1}
+      - Smtp__Host=${SMTP_HOST:-}
+      - Smtp__Port=${SMTP_PORT:-587}
+      - Smtp__Username=${SMTP_USERNAME:-}
+      - Smtp__Password=${SMTP_PASSWORD:-}
+      - Smtp__FromAddress=${SMTP_FROM_ADDRESS:-noreply@paymentswitch.com}
+      - Smtp__FromName=${SMTP_FROM_NAME:-PaymentSwitch}
     depends_on:
       postgres:
         condition: service_healthy
       rabbitmq:
-        condition: service_started
+        condition: service_healthy
     networks:
       - paymentswitch-network
 
@@ -100,24 +228,44 @@ services:
       context: .
       dockerfile: src/Services/Merchant/Merchant.API/Dockerfile
     restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+        reservations:
+          cpus: '0.10'
+          memory: 128M
     ports:
-      - "5237:8080"
+      - "127.0.0.1:5237:8080"
+    # Step 9.3: readiness (Kestrel + migrations + DB + broker) gates the
+    # webs and nginx below, so cold starts order themselves.
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 120s
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development}
       - ASPNETCORE_URLS=http://0.0.0.0:8080
       - RunMigrations=true
-      - ConnectionStrings__MerchantDb=Host=postgres;Database=MerchantDb;Username=paymentswitch;Password=paymentswitch
-      - Jwt__Secret=${JWT_SECRET:-your-super-secret-key-minimum-32-bytes!}
+      - ConnectionStrings__MerchantDb=Host=postgres;Database=MerchantDb;Username=paymentswitch;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      - Jwt__Secret=${JWT_SECRET:?Set JWT_SECRET in .env}
+      - ServiceToken__Secret=${SERVICE_TOKEN_SECRET:?Set SERVICE_TOKEN_SECRET in .env}
+      - Jwt__PreviousSecret=${JWT_PREVIOUS_SECRET:-}
       - Jwt__Issuer=IdentityService
       - Jwt__Audience=PaymentSwitch
+      - Cors__AllowedOrigins=${CORS_ALLOWED_ORIGINS:-}
       - RabbitMQ__HostName=rabbitmq
-      - RabbitMQ__UserName=guest
-      - RabbitMQ__Password=guest
+      - RabbitMQ__UserName=${RABBITMQ_DEFAULT_USER:?Set RABBITMQ_DEFAULT_USER in .env}
+      - RabbitMQ__Password=${RABBITMQ_DEFAULT_PASS:?Set RABBITMQ_DEFAULT_PASS in .env}
+      - WebhookSecretEncryption__Key=${WEBHOOK_SECRET_ENCRYPTION_KEY:?Set WEBHOOK_SECRET_ENCRYPTION_KEY in .env}
     depends_on:
       postgres:
         condition: service_healthy
       rabbitmq:
-        condition: service_started
+        condition: service_healthy
     networks:
       - paymentswitch-network
 
@@ -126,24 +274,43 @@ services:
       context: .
       dockerfile: src/Services/Payment/Payment.API/Dockerfile
     restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+        reservations:
+          cpus: '0.10'
+          memory: 128M
     ports:
-      - "5118:8080"
+      - "127.0.0.1:5118:8080"
+    # Step 9.3: readiness (Kestrel + migrations + DB + broker) gates the
+    # webs and nginx below, so cold starts order themselves.
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 120s
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development}
       - ASPNETCORE_URLS=http://0.0.0.0:8080
       - RunMigrations=true
-      - ConnectionStrings__PaymentDb=Host=postgres;Database=PaymentDb;Username=paymentswitch;Password=paymentswitch
-      - Jwt__Secret=${JWT_SECRET:-your-super-secret-key-minimum-32-bytes!}
+      - ConnectionStrings__PaymentDb=Host=postgres;Database=PaymentDb;Username=paymentswitch;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      - Jwt__Secret=${JWT_SECRET:?Set JWT_SECRET in .env}
+      - ServiceToken__Secret=${SERVICE_TOKEN_SECRET:?Set SERVICE_TOKEN_SECRET in .env}
+      - Jwt__PreviousSecret=${JWT_PREVIOUS_SECRET:-}
       - Jwt__Issuer=IdentityService
       - Jwt__Audience=PaymentSwitch
+      - Cors__AllowedOrigins=${CORS_ALLOWED_ORIGINS:-}
       - RabbitMQ__HostName=rabbitmq
-      - RabbitMQ__UserName=guest
-      - RabbitMQ__Password=guest
+      - RabbitMQ__UserName=${RABBITMQ_DEFAULT_USER:?Set RABBITMQ_DEFAULT_USER in .env}
+      - RabbitMQ__Password=${RABBITMQ_DEFAULT_PASS:?Set RABBITMQ_DEFAULT_PASS in .env}
     depends_on:
       postgres:
         condition: service_healthy
       rabbitmq:
-        condition: service_started
+        condition: service_healthy
     networks:
       - paymentswitch-network
 
@@ -152,24 +319,43 @@ services:
       context: .
       dockerfile: src/Services/Ledger/Ledger.API/Dockerfile
     restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+        reservations:
+          cpus: '0.10'
+          memory: 128M
     ports:
-      - "5320:8080"
+      - "127.0.0.1:5320:8080"
+    # Step 9.3: readiness (Kestrel + migrations + DB + broker) gates the
+    # webs and nginx below, so cold starts order themselves.
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 120s
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development}
       - ASPNETCORE_URLS=http://0.0.0.0:8080
       - RunMigrations=true
-      - ConnectionStrings__LedgerDb=Host=postgres;Database=LedgerDb;Username=paymentswitch;Password=paymentswitch
-      - Jwt__Secret=${JWT_SECRET:-your-super-secret-key-minimum-32-bytes!}
+      - ConnectionStrings__LedgerDb=Host=postgres;Database=LedgerDb;Username=paymentswitch;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      - Jwt__Secret=${JWT_SECRET:?Set JWT_SECRET in .env}
+      - ServiceToken__Secret=${SERVICE_TOKEN_SECRET:?Set SERVICE_TOKEN_SECRET in .env}
+      - Jwt__PreviousSecret=${JWT_PREVIOUS_SECRET:-}
       - Jwt__Issuer=IdentityService
       - Jwt__Audience=PaymentSwitch
+      - Cors__AllowedOrigins=${CORS_ALLOWED_ORIGINS:-}
       - RabbitMQ__HostName=rabbitmq
-      - RabbitMQ__UserName=guest
-      - RabbitMQ__Password=guest
+      - RabbitMQ__UserName=${RABBITMQ_DEFAULT_USER:?Set RABBITMQ_DEFAULT_USER in .env}
+      - RabbitMQ__Password=${RABBITMQ_DEFAULT_PASS:?Set RABBITMQ_DEFAULT_PASS in .env}
     depends_on:
       postgres:
         condition: service_healthy
       rabbitmq:
-        condition: service_started
+        condition: service_healthy
     networks:
       - paymentswitch-network
 
@@ -178,24 +364,50 @@ services:
       context: .
       dockerfile: src/Services/Notification/Notification.API/Dockerfile
     restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+        reservations:
+          cpus: '0.10'
+          memory: 128M
     ports:
-      - "5281:8080"
+      - "127.0.0.1:5281:8080"
+    # Step 9.3: readiness (Kestrel + migrations + DB + broker) gates the
+    # webs and nginx below, so cold starts order themselves.
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 120s
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development}
       - ASPNETCORE_URLS=http://0.0.0.0:8080
       - RunMigrations=true
-      - ConnectionStrings__NotificationDb=Host=postgres;Database=NotificationDb;Username=paymentswitch;Password=paymentswitch
-      - Jwt__Secret=${JWT_SECRET:-your-super-secret-key-minimum-32-bytes!}
+      - ConnectionStrings__NotificationDb=Host=postgres;Database=NotificationDb;Username=paymentswitch;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      - Jwt__Secret=${JWT_SECRET:?Set JWT_SECRET in .env}
+      - ServiceToken__Secret=${SERVICE_TOKEN_SECRET:?Set SERVICE_TOKEN_SECRET in .env}
+      - Jwt__PreviousSecret=${JWT_PREVIOUS_SECRET:-}
       - Jwt__Issuer=IdentityService
       - Jwt__Audience=PaymentSwitch
+      - Cors__AllowedOrigins=${CORS_ALLOWED_ORIGINS:-}
       - RabbitMQ__HostName=rabbitmq
-      - RabbitMQ__UserName=guest
-      - RabbitMQ__Password=guest
+      - RabbitMQ__UserName=${RABBITMQ_DEFAULT_USER:?Set RABBITMQ_DEFAULT_USER in .env}
+      - RabbitMQ__Password=${RABBITMQ_DEFAULT_PASS:?Set RABBITMQ_DEFAULT_PASS in .env}
+      - Smtp__Host=${SMTP_HOST:-}
+      - Smtp__Port=${SMTP_PORT:-587}
+      - Smtp__Username=${SMTP_USERNAME:-}
+      - Smtp__Password=${SMTP_PASSWORD:-}
+      - Smtp__FromAddress=${SMTP_FROM_ADDRESS:-noreply@paymentswitch.com}
+      - Smtp__FromName=${SMTP_FROM_NAME:-PaymentSwitch}
+      - Sms__Enabled=${SMS_ENABLED:-false}
     depends_on:
       postgres:
         condition: service_healthy
       rabbitmq:
-        condition: service_started
+        condition: service_healthy
     networks:
       - paymentswitch-network
 
@@ -204,41 +416,205 @@ services:
       context: .
       dockerfile: src/Services/Settlement/Settlement.API/Dockerfile
     restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+        reservations:
+          cpus: '0.10'
+          memory: 128M
     ports:
-      - "5392:8080"
+      - "127.0.0.1:5392:8080"
+    # Step 9.3: readiness (Kestrel + migrations + DB + broker) gates the
+    # webs and nginx below, so cold starts order themselves.
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 120s
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development}
       - ASPNETCORE_URLS=http://0.0.0.0:8080
       - RunMigrations=true
-      - ConnectionStrings__SettlementDb=Host=postgres;Database=SettlementDb;Username=paymentswitch;Password=paymentswitch
-      - Jwt__Secret=${JWT_SECRET:-your-super-secret-key-minimum-32-bytes!}
+      - ConnectionStrings__SettlementDb=Host=postgres;Database=SettlementDb;Username=paymentswitch;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      - Jwt__Secret=${JWT_SECRET:?Set JWT_SECRET in .env}
+      - ServiceToken__Secret=${SERVICE_TOKEN_SECRET:?Set SERVICE_TOKEN_SECRET in .env}
+      - Jwt__PreviousSecret=${JWT_PREVIOUS_SECRET:-}
       - Jwt__Issuer=IdentityService
       - Jwt__Audience=PaymentSwitch
+      - Cors__AllowedOrigins=${CORS_ALLOWED_ORIGINS:-}
       - RabbitMQ__HostName=rabbitmq
-      - RabbitMQ__UserName=guest
-      - RabbitMQ__Password=guest
+      - RabbitMQ__UserName=${RABBITMQ_DEFAULT_USER:?Set RABBITMQ_DEFAULT_USER in .env}
+      - RabbitMQ__Password=${RABBITMQ_DEFAULT_PASS:?Set RABBITMQ_DEFAULT_PASS in .env}
     depends_on:
       postgres:
         condition: service_healthy
       rabbitmq:
-        condition: service_started
+        condition: service_healthy
+    networks:
+      - paymentswitch-network
+
+  merchant-web:
+    build:
+      context: .
+      dockerfile: apps/merchant/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${FRONTEND_BASE_URL:-http://localhost}
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+        reservations:
+          cpus: '0.05'
+          memory: 128M
+    environment:
+      - NEXT_PUBLIC_API_URL=${FRONTEND_BASE_URL:-http://localhost}
+    # Step 9.3: prove the standalone server is up (see
+    # apps/merchant/src/app/api/health/route.ts).
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 90s
+    depends_on:
+      identity-api:
+        condition: service_healthy
+      merchant-api:
+        condition: service_healthy
+      payment-api:
+        condition: service_healthy
+      ledger-api:
+        condition: service_healthy
+      notification-api:
+        condition: service_healthy
+      settlement-api:
+        condition: service_healthy
+    networks:
+      - paymentswitch-network
+
+  admin-web:
+    build:
+      context: .
+      dockerfile: apps/admin/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${FRONTEND_BASE_URL:-http://localhost}
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+        reservations:
+          cpus: '0.05'
+          memory: 128M
+    environment:
+      - NEXT_PUBLIC_API_URL=${FRONTEND_BASE_URL:-http://localhost}
+    # Step 9.3: prove the standalone server is up (see
+    # apps/admin/src/app/api/health/route.ts).
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:3001/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 90s
+    depends_on:
+      identity-api:
+        condition: service_healthy
+      merchant-api:
+        condition: service_healthy
+      payment-api:
+        condition: service_healthy
+      ledger-api:
+        condition: service_healthy
+      notification-api:
+        condition: service_healthy
+      settlement-api:
+        condition: service_healthy
     networks:
       - paymentswitch-network
 
   nginx:
     image: nginx:alpine
     restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+        reservations:
+          cpus: '0.05'
+          memory: 64M
     volumes:
       - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      # Dev serves plain HTTP on :80 only (ports below). Production TLS
+      # (:443 + tls server blocks) comes from docker-compose.prod.yml
+      # (Step 9.6) — see docs/tls.md. Do not add 443 here: an operator who
+      # never opts into the overlay must not bind a port nothing serves.
+      - ./infra/nginx/http:/etc/nginx/tls:ro
     ports:
       - "80:80"
+    # Step 9.3: prove the ingress serves through to a healthy upstream
+    # (catches bad mounts/routes, not just a running nginx master).
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost/identity/health/live | grep -q Healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 60s
     depends_on:
-      - identity-api
-      - merchant-api
-      - payment-api
-      - ledger-api
-      - notification-api
-      - settlement-api
+      identity-api:
+        condition: service_healthy
+      merchant-api:
+        condition: service_healthy
+      payment-api:
+        condition: service_healthy
+      ledger-api:
+        condition: service_healthy
+      notification-api:
+        condition: service_healthy
+      settlement-api:
+        condition: service_healthy
+      merchant-web:
+        condition: service_healthy
+      admin-web:
+        condition: service_healthy
+    networks:
+      - paymentswitch-network
+
+  # Step 10.1: nightly backup job. Runs pg-backup.sh on a daily loop against
+  # the postgres service and keeps 14 dailies in the pgbackups volume (plus
+  # SHA256SUMS). Uses the postgres image so pg_dump matches the server major
+  # version. Off-host copies are a separate host-cron step (see runbook §3).
+  backup:
+    image: postgres:16-alpine
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+        reservations:
+          cpus: '0.05'
+          memory: 128M
+    environment:
+      - PGHOST=postgres
+      - PGPORT=5432
+      - PGUSER=paymentswitch
+      - PGPASSWORD=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      - BACKUP_DIR=/backups
+      - KEEP_DAILY=14
+    command: ["sh", "-c", "while true; do /backup/pg-backup.sh; sleep 86400; done"]
+    volumes:
+      - ./infra/backup:/backup:ro
+      - pgbackups:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
     networks:
       - paymentswitch-network
 
@@ -248,6 +624,10 @@ volumes:
   rabbitmq_data:
   prometheus_data:
   grafana_data:
+  # Step 10.1: nightly backup artifacts (see the backup service below and
+  # infra/backup/). Sync off-host (S3) from the host cron — a volume alone
+  # is not a backup.
+  pgbackups:
 
 networks:
   paymentswitch-network:

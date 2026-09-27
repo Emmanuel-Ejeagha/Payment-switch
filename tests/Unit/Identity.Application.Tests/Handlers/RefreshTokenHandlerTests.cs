@@ -1,5 +1,5 @@
 ﻿using BuildingBlocks.Shared;
-using BuildingBlocks.Shared.Events;
+using BuildingBlocks.Shared.Exceptions;
 using FluentValidation;
 using FluentValidation.Results;
 using Identity.Application.Commands.Auth.Tokens;
@@ -15,7 +15,6 @@ public class RefreshTokenHandlerTests
     private readonly Mock<IUserRepository> _userRepositoryMock = new();
     private readonly Mock<ITokenService> _tokenServiceMock = new();
     private readonly Mock<IUnitOfWork> _unitOfWorkMock = new();
-    private readonly Mock<IDomainEventDispatcher> _dispatcherMock = new();
     private readonly Mock<IValidator<RefreshTokenCommand>> _validatorMock = new();
     private readonly Mock<ILogger<RefreshTokenHandler>> _loggerMock = new();
     private readonly RefreshTokenHandler _handler;
@@ -26,8 +25,10 @@ public class RefreshTokenHandlerTests
             _userRepositoryMock.Object,
             _tokenServiceMock.Object,
             _unitOfWorkMock.Object,
-            _dispatcherMock.Object,
             _validatorMock.Object, _loggerMock.Object);
+
+        _tokenServiceMock.Setup(t => t.HashRefreshToken(It.IsAny<string>()))
+            .Returns<string>(token => $"hash-{token}");
     }
 
     [Fact]
@@ -37,7 +38,7 @@ public class RefreshTokenHandlerTests
         var command = new RefreshTokenCommand("valid_refresh_token");
         var user = CreateUserWithRefreshToken("valid_refresh_token");
         SetupValidatorSuccess(command);
-        _userRepositoryMock.Setup(r => r.FindByRefreshTokenAsync("valid_refresh_token", It.IsAny<CancellationToken>()))
+        _userRepositoryMock.Setup(r => r.FindByRefreshTokenAsync("hash-valid_refresh_token", It.IsAny<CancellationToken>()))
             .ReturnsAsync(user);
         _tokenServiceMock.Setup(t => t.GenerateAccessToken(user))
             .Returns("new_access_token");
@@ -51,10 +52,56 @@ public class RefreshTokenHandlerTests
 
         // Assert
         Assert.True(result.IsSuccess);
-        Assert.Equal("new_access_token", result.Value.AccessToken);
-        Assert.Equal("new_refresh_token", result.Value.RefreshToken);
-        Assert.True(user.RefreshTokens.First(t => t.Value == "valid_refresh_token").IsRevoked);
-        Assert.Contains(user.RefreshTokens, t => t.Value == "new_refresh_token");
+        Assert.Equal("new_access_token", result.Value!.AccessToken);
+        Assert.Equal("new_refresh_token", result.Value!.RefreshToken);
+        Assert.True(user.RefreshTokens.First(t => t.Value == "hash-valid_refresh_token").IsRevoked);
+        Assert.Contains(user.RefreshTokens, t => t.Value == "hash-new_refresh_token");
+    }
+
+    [Fact]
+    public async Task Handle_ValidToken_ShouldPruneStaleRefreshTokens()
+    {
+        var command = new RefreshTokenCommand("valid_refresh_token");
+        var user = CreateUserWithRefreshToken("valid_refresh_token");
+        SetupValidatorSuccess(command);
+        _userRepositoryMock.Setup(r => r.FindByRefreshTokenAsync("hash-valid_refresh_token", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+        _tokenServiceMock.Setup(t => t.GenerateAccessToken(user)).Returns("new_access_token");
+        _tokenServiceMock.Setup(t => t.GenerateRefreshToken()).Returns("new_refresh_token");
+        _userRepositoryMock.Setup(r => r.PruneRefreshTokensAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(2);
+        _unitOfWorkMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsSuccess);
+        _userRepositoryMock.Verify(r => r.PruneRefreshTokensAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_ValidToken_ShouldEnforceRefreshTokenCap()
+    {
+        var command = new RefreshTokenCommand("valid_refresh_token");
+        var user = CreateUserWithRefreshToken("valid_refresh_token");
+        for (var i = 0; i < User.MaxActiveRefreshTokens + 2; i++)
+            user.AddRefreshToken($"hash-old-{i}", DateTime.UtcNow.AddDays(i + 1));
+        SetupValidatorSuccess(command);
+        _userRepositoryMock.Setup(r => r.FindByRefreshTokenAsync("hash-valid_refresh_token", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+        _tokenServiceMock.Setup(t => t.GenerateAccessToken(user)).Returns("new_access_token");
+        _tokenServiceMock.Setup(t => t.GenerateRefreshToken()).Returns("new_refresh_token");
+        _userRepositoryMock.Setup(r => r.PruneRefreshTokensAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(0);
+        _unitOfWorkMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsSuccess);
+        // The current token is revoked by rotation; exactly 3 others must be
+        // evicted by the cap so the account stays within MaxActiveRefreshTokens.
+        Assert.Equal(4, user.RefreshTokens.Count(t => t.IsRevoked));
     }
 
     [Fact]
@@ -64,7 +111,7 @@ public class RefreshTokenHandlerTests
         var command = new RefreshTokenCommand("expired_token");
         var user = CreateUserWithExpiredRefreshToken("expired_token");
         SetupValidatorSuccess(command);
-        _userRepositoryMock.Setup(r => r.FindByRefreshTokenAsync("expired_token", It.IsAny<CancellationToken>()))
+        _userRepositoryMock.Setup(r => r.FindByRefreshTokenAsync("hash-expired_token", It.IsAny<CancellationToken>()))
             .ReturnsAsync(user);
 
         // Act
@@ -76,14 +123,16 @@ public class RefreshTokenHandlerTests
     }
 
     [Fact]
-    public async Task Handle_RevokedToken_ShouldReturnFailure()
+    public async Task Handle_RevokedToken_ShouldDetectReuseAndRevokeAll()
     {
         // Arrange
         var command = new RefreshTokenCommand("revoked_token");
         var user = CreateUserWithRefreshToken("revoked_token");
-        user.RevokeRefreshToken("revoked_token"); // mark revoked
+        user.AddRefreshToken("hash-another_token", DateTime.UtcNow.AddDays(1));
+        user.RevokeRefreshToken("hash-revoked_token");
+        user.RevokeRefreshToken("hash-another_token");
         SetupValidatorSuccess(command);
-        _userRepositoryMock.Setup(r => r.FindByRefreshTokenAsync("revoked_token", It.IsAny<CancellationToken>()))
+        _userRepositoryMock.Setup(r => r.FindByRefreshTokenAsync("hash-revoked_token", It.IsAny<CancellationToken>()))
             .ReturnsAsync(user);
 
         // Act
@@ -91,7 +140,8 @@ public class RefreshTokenHandlerTests
 
         // Assert
         Assert.True(result.IsFailure);
-        Assert.Equal("Identity.RefreshTokenInvalidOrExpired", result.Errors[0].Code);
+        Assert.Equal("Identity.RefreshTokenReuseDetected", result.Errors[0].Code);
+        Assert.All(user.RefreshTokens, t => Assert.True(t.IsRevoked));
     }
 
     [Fact]
@@ -100,7 +150,7 @@ public class RefreshTokenHandlerTests
         // Arrange
         var command = new RefreshTokenCommand("nonexistent");
         SetupValidatorSuccess(command);
-        _userRepositoryMock.Setup(r => r.FindByRefreshTokenAsync("nonexistent", It.IsAny<CancellationToken>()))
+        _userRepositoryMock.Setup(r => r.FindByRefreshTokenAsync("hash-nonexistent", It.IsAny<CancellationToken>()))
             .ReturnsAsync((User?)null);
 
         // Act
@@ -129,7 +179,7 @@ public class RefreshTokenHandlerTests
     private static User CreateUserWithRefreshToken(string tokenValue)
     {
         var user = new User(Guid.NewGuid(), new Email("user@example.com"), new PasswordHash("hashed"), new FullName("User"));
-        user.AddRefreshToken(tokenValue, DateTime.UtcNow.AddDays(1));
+        user.AddRefreshToken($"hash-{tokenValue}", DateTime.UtcNow.AddDays(1));
         user.ClearDomainEvents();
         return user;
     }
@@ -137,7 +187,7 @@ public class RefreshTokenHandlerTests
     private static User CreateUserWithExpiredRefreshToken(string tokenValue)
     {
         var user = new User(Guid.NewGuid(), new Email("user@example.com"), new PasswordHash("hashed"), new FullName("User"));
-        user.AddRefreshToken(tokenValue, DateTime.UtcNow.AddDays(-1)); // expired
+        user.AddRefreshToken($"hash-{tokenValue}", DateTime.UtcNow.AddDays(-1)); // expired
         user.ClearDomainEvents();
         return user;
     }
@@ -148,9 +198,96 @@ public class RefreshTokenHandlerTests
             .ReturnsAsync(new ValidationResult());
     }
 
+    [Fact]
+    public async Task Handle_LockedOutUser_ShouldRejectWithoutRotating()
+    {
+        var command = new RefreshTokenCommand("valid_refresh_token");
+        var user = CreateUserWithRefreshToken("valid_refresh_token");
+        for (var i = 0; i < User.MaxAccessFailedAttempts; i++)
+            user.RegisterFailedLogin(DateTime.UtcNow);
+        SetupValidatorSuccess(command);
+        _userRepositoryMock.Setup(r => r.FindByRefreshTokenAsync("hash-valid_refresh_token", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Identity.AccountLocked", result.Errors[0].Code);
+        _tokenServiceMock.Verify(t => t.GenerateAccessToken(It.IsAny<User>()), Times.Never);
+        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_DeactivatedUser_ShouldRejectWithoutRotating()
+    {
+        var command = new RefreshTokenCommand("live_refresh_token");
+        var user = CreateUserWithRefreshToken("old_refresh_token");
+        user.Deactivate();
+        // A token that stayed live past deactivation (e.g. legacy rows): the
+        // inactive check must still refuse to rotate it.
+        user.AddRefreshToken("hash-live_refresh_token", DateTime.UtcNow.AddDays(1));
+        SetupValidatorSuccess(command);
+        _userRepositoryMock.Setup(r => r.FindByRefreshTokenAsync("hash-live_refresh_token", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Identity.UserInactive", result.Errors[0].Code);
+        _tokenServiceMock.Verify(t => t.GenerateAccessToken(It.IsAny<User>()), Times.Never);
+        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     private void SetupValidatorFailure(RefreshTokenCommand command, string propertyName, string errorMessage)
     {
         _validatorMock.Setup(v => v.ValidateAsync(command, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ValidationResult(new[] { new ValidationFailure(propertyName, errorMessage) }));
+    }
+
+    [Fact]
+    public async Task Handle_ConcurrencyConflictWithRevokedToken_ReturnsReuseError()
+    {
+        // Lost race where the other side already rotated: the presented token
+        // is dead on reload, so this is a replay — revoke everything.
+        var command = new RefreshTokenCommand("valid_refresh_token");
+        var user = CreateUserWithRefreshToken("valid_refresh_token");
+        SetupValidatorSuccess(command);
+        _userRepositoryMock.Setup(r => r.FindByRefreshTokenAsync("hash-valid_refresh_token", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+        _unitOfWorkMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new ConcurrencyConflictException());
+
+        var reloaded = CreateUserWithRefreshToken("valid_refresh_token");
+        reloaded.RevokeAllRefreshTokens();
+        _userRepositoryMock.Setup(r => r.GetByIdAsync(user.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(reloaded);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Identity.RefreshTokenReuseDetected", result.Errors[0].Code);
+    }
+
+    [Fact]
+    public async Task Handle_ConcurrencyConflictWithLiveToken_ReturnsConflictError()
+    {
+        // Lost race against an unrelated update: the token is still live, so
+        // report a retryable conflict instead of minting a second session.
+        var command = new RefreshTokenCommand("valid_refresh_token");
+        var user = CreateUserWithRefreshToken("valid_refresh_token");
+        SetupValidatorSuccess(command);
+        _userRepositoryMock.Setup(r => r.FindByRefreshTokenAsync("hash-valid_refresh_token", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+        _unitOfWorkMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new ConcurrencyConflictException());
+
+        var reloaded = CreateUserWithRefreshToken("valid_refresh_token");
+        _userRepositoryMock.Setup(r => r.GetByIdAsync(user.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(reloaded);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Identity.ConcurrencyConflict", result.Errors[0].Code);
     }
 }

@@ -1,4 +1,5 @@
-﻿namespace Merchant.Application.Features.Queries.GetMerchantByEmail;
+﻿using Merchant.Application.Auth;
 
-public record GetMerchantByEmailQuery(string Email);
+namespace Merchant.Application.Features.Queries.GetMerchantByEmail;
 
+public record GetMerchantByEmailQuery(string Email, CallerContext Caller);

@@ -24,7 +24,7 @@ services:
       livenessPath: /health/live
       readinessPath: /health/ready
     hpa:
-      enabled: false
+      enabled: true
       minReplicas: 1
       maxReplicas: 3
       targetCPUUtilizationPercentage: 80
@@ -33,6 +33,8 @@ services:
     enabled: true
     name: payment
     replicaCount: 1
+    # Journal/payment rows are financial records: 7 years (Step 9.5).
+    retentionBusinessDays: 2557
     image:
       repository: paymentswitch/payment-api
       tag: latest
@@ -48,7 +50,7 @@ services:
       livenessPath: /health/live
       readinessPath: /health/ready
     hpa:
-      enabled: false
+      enabled: true
       minReplicas: 1
       maxReplicas: 3
       targetCPUUtilizationPercentage: 80
@@ -72,7 +74,7 @@ services:
       livenessPath: /health/live
       readinessPath: /health/ready
     hpa:
-      enabled: false
+      enabled: true
       minReplicas: 1
       maxReplicas: 3
       targetCPUUtilizationPercentage: 80
@@ -81,6 +83,8 @@ services:
     enabled: true
     name: ledger
     replicaCount: 1
+    # Journal entries are financial records: 7 years (Step 9.5).
+    retentionBusinessDays: 2557
     image:
       repository: paymentswitch/ledger-api
       tag: latest
@@ -96,7 +100,7 @@ services:
       livenessPath: /health/live
       readinessPath: /health/ready
     hpa:
-      enabled: false
+      enabled: true
       minReplicas: 1
       maxReplicas: 3
       targetCPUUtilizationPercentage: 80
@@ -105,6 +109,8 @@ services:
     enabled: true
     name: notification
     replicaCount: 1
+    # Delivered notifications: 90 days (Step 9.5).
+    retentionBusinessDays: 90
     image:
       repository: paymentswitch/notification-api
       tag: latest
@@ -120,7 +126,7 @@ services:
       livenessPath: /health/live
       readinessPath: /health/ready
     hpa:
-      enabled: false
+      enabled: true
       minReplicas: 1
       maxReplicas: 3
       targetCPUUtilizationPercentage: 80
@@ -144,7 +150,7 @@ services:
       livenessPath: /health/live
       readinessPath: /health/ready
     hpa:
-      enabled: false
+      enabled: true
       minReplicas: 1
       maxReplicas: 3
       targetCPUUtilizationPercentage: 80
@@ -153,15 +159,113 @@ config:
   jwt:
     issuer: "IdentityService"
     audience: "PaymentSwitch"
+    # REQUIRED: provide a strong secret via --set config.jwt.secret="..." or a secrets values file
+    secret: ""
+    # Optional: the previous signing key during a rotation dual-write window.
+    # Set alongside config.jwt.secret on the first rotation step; remove once
+    # the window closes (see infra/secrets/rotate-jwt.sh).
+    previousSecret: ""
+  serviceToken:
+    # REQUIRED: dedicated inter-service secret, must differ from config.jwt.secret.
+    # Provide via --set config.serviceToken.secret="..." or a secrets values file.
+    secret: ""
   rabbitmq:
     hostName: "rabbitmq"
-    userName: "guest"
+    # REQUIRED: provide a strong username/password via --set or a secrets values file
+    userName: "paymentswitch"
+    # REQUIRED: provide a strong password via --set config.rabbitmq.password="..."
+    password: ""
+  postgres:
+    hostName: "postgres"
+    userName: "paymentswitch"
+    # REQUIRED: provide a strong password via --set config.postgres.password="..."
+    password: ""
+  seed:
+    adminEmail: "admin@paymentswitch.com"
+    # REQUIRED: provide a strong admin password via --set config.seed.adminPassword="..."
+    adminPassword: ""
+  webhookSecretEncryption:
+    # REQUIRED: AES-256 key (base64) used by the Merchant service to encrypt
+    # webhook secrets at rest (TASK-006). See Merchant.API webhook secret config.
+    key: ""
+  emailVerification:
+    frontendBaseUrl: "http://localhost:3000"
+  passwordReset:
+    frontendBaseUrl: "http://localhost:3000"
+    tokenLifetimeHours: 1
+  smtp:
+    host: ""
+    port: 587
+    username: ""
+    password: ""
+    fromAddress: "noreply@paymentswitch.com"
+    fromName: "PaymentSwitch"
+  sms:
+    enabled: false
+  retention:
+    # Shared archival-sweep tuning (Step 9.5); per-service business-record
+    # retention differs, so services.payment/ledger/notification carry
+    # retentionBusinessDays below. Only those three run retention workers.
+    cleanupIntervalMinutes: 60
+    batchSize: 100
+    messageRetentionDays: 7
+  grafana:
+    adminUser: "admin"
+    adminPassword: ""
+  frontend:
+    # NEXT_PUBLIC_API_URL is inlined at build time; set the HTTPS origin (e.g.
+    # https://paymentswitch.example.com). See docs/tls.md.
+    apiUrl: "http://localhost"
+
+frontends:
+  merchant:
+    enabled: true
+    name: merchant-web
+    replicaCount: 1
+    image:
+      repository: paymentswitch/merchant-web
+      tag: latest
+    containerPort: 3000
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    hpa:
+      enabled: true
+      minReplicas: 1
+      maxReplicas: 3
+      targetCPUUtilizationPercentage: 80
+  admin:
+    enabled: true
+    name: admin-web
+    replicaCount: 1
+    image:
+      repository: paymentswitch/admin-web
+      tag: latest
+    containerPort: 3001
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    hpa:
+      enabled: true
+      minReplicas: 1
+      maxReplicas: 3
+      targetCPUUtilizationPercentage: 80
 
 infrastructure:
   postgres:
     enabled: true
     image: postgres:16-alpine
     port: 5432
+    storageSize: 1Gi
+    storageClassName: ""
     resources:
       requests:
         cpu: 200m
@@ -174,6 +278,7 @@ infrastructure:
     image: rabbitmq:3-management-alpine
     port: 5672
     managementPort: 15672
+    prometheusPort: 15692
     resources:
       requests:
         cpu: 200m
@@ -198,3 +303,10 @@ ingress:
   tls:
     enabled: false
     secretName: payment-switch-tls
+
+networkPolicy:
+  enabled: true
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1

@@ -1,0 +1,50 @@
+name: E2E Nightly
+
+# Step 9.8: the cross-service E2E suite (register -> verify -> onboard ->
+# authorize -> capture -> ledger -> notification -> settlement, plus
+# duplicate/retry/DLQ scenarios) runs nightly against fresh containers,
+# independent of PR traffic. k6 load/soak keep their own schedule
+# (k6-nightly.yml).
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-nightly
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    name: E2E Integration Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/Directory.Packages.props', '**/packages.lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore dependencies
+        run: dotnet restore PaymentSwitch.slnx
+
+      - name: Build solution
+        run: dotnet build PaymentSwitch.slnx --configuration Release --no-restore
+
+      - name: Pre-pull Postgres image
+        run: docker pull postgres:16-alpine
+
+      - name: Pre-pull RabbitMQ image
+        run: docker pull rabbitmq:3-management-alpine
+
+      - name: E2E tests
+        run: dotnet test tests/Integration/E2E.IntegrationTests --configuration Release --no-build

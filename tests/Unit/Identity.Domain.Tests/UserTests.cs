@@ -23,7 +23,6 @@ public class UserTests
         Assert.True(user.IsActive);
         Assert.Contains("Merchant", user.Roles);
         Assert.Empty(user.RefreshTokens);
-        Assert.Empty(user.ApiKeys);
         Assert.NotEmpty(user.DomainEvents); // UserRegistered event
         Assert.Single(user.DomainEvents, e => e is UserRegisteredDomainEvent);
     }
@@ -66,28 +65,38 @@ public class UserTests
     }
 
     [Fact]
-    public void GenerateApiKey_ShouldAddKeyAndRaiseEvent()
+    public void AddRole_LowercaseOrPadded_ShouldStoreCanonicalOnce()
     {
         var user = CreateUser();
-        var keyId = Guid.NewGuid();
-        var keyHash = "abc123";
-        user.GenerateApiKey(keyHash, "live");
-
-        Assert.Single(user.ApiKeys);
-        Assert.Equal(keyHash, user.ApiKeys[0].KeyHash);
-        Assert.Contains(user.DomainEvents, e => e is ApiKeyGeneratedDomainEvent);
+        user.AddRole("admin");
+        user.AddRole(" ADMIN ");
+        Assert.Single(user.Roles, r => r == "Admin");
     }
 
     [Fact]
-    public void RevokeApiKey_ShouldRevokeAndRaiseEvent()
+    public void AddRole_UnknownRole_ShouldThrow()
     {
         var user = CreateUser();
-        var apiKey = user.GenerateApiKey("hash", "test");
-        user.ClearDomainEvents();
+        Assert.Throws<ArgumentException>(() => user.AddRole("root"));
+    }
 
-        user.RevokeApiKey(apiKey.Id);
-        Assert.NotNull(apiKey.RevokedAt);
-        Assert.Single(user.DomainEvents, e => e is ApiKeyRevokedDomainEvent);
+    [Fact]
+    public void RemoveRole_DifferentCasing_ShouldRemove()
+    {
+        var user = CreateUser();
+        user.AddRole("Admin");
+        user.RemoveRole("ADMIN");
+        Assert.DoesNotContain("Admin", user.Roles);
+    }
+
+    [Fact]
+    public void HasRole_ShouldMatchCaseInsensitively()
+    {
+        var user = CreateUser();
+        Assert.True(user.HasRole("merchant"));
+        Assert.True(user.HasRole(" MERCHANT "));
+        Assert.False(user.HasRole("Admin"));
+        Assert.False(user.HasRole(""));
     }
 
     [Fact]
@@ -112,7 +121,20 @@ public class UserTests
     public void RevokeRefreshToken_UnknownToken_ShouldNotThrow()
     {
         var user = CreateUser();
-        user.RevokeRefreshToken("nonexistent"); 
+        user.RevokeRefreshToken("nonexistent");
+    }
+
+    [Fact]
+    public void RevokeAllRefreshTokens_ShouldRevokeEveryToken()
+    {
+        var user = CreateUser();
+        user.AddRefreshToken("token1", DateTime.UtcNow.AddDays(1));
+        user.AddRefreshToken("token2", DateTime.UtcNow.AddDays(1));
+        user.AddRefreshToken("token3", DateTime.UtcNow.AddDays(1));
+
+        user.RevokeAllRefreshTokens();
+
+        Assert.All(user.RefreshTokens, t => Assert.True(t.IsRevoked));
     }
 
     private static User CreateUser()

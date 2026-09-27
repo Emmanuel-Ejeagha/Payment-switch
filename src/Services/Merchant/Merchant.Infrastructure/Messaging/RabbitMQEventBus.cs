@@ -1,4 +1,6 @@
 ﻿using System.Text;
+using BuildingBlocks.Shared.Messaging;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
 
@@ -7,45 +9,58 @@ namespace Merchant.Infrastructure.Messaging;
 public class RabbitMQEventBus : IEventBus, IDisposable
 {
     private readonly RabbitMQSettings _settings;
-    private readonly IConnection _connection;
-    private readonly IChannel _channel;
+    private readonly RabbitMqChannelPool _channelPool;
     private bool _disposed;
 
-    public RabbitMQEventBus(IOptions<RabbitMQSettings> settings)
+    public RabbitMQEventBus(IOptions<RabbitMQSettings> settings, ILogger<RabbitMQEventBus> logger)
     {
         _settings = settings.Value;
-        var factory = new ConnectionFactory
-        {
-            HostName = _settings.HostName,
-            UserName = _settings.UserName,
-            Password = _settings.Password
-        };
-
-        _connection = factory.CreateConnectionAsync().GetAwaiter().GetResult();
-        _channel = _connection.CreateChannelAsync().GetAwaiter().GetResult();
-
-        _channel.ExchangeDeclareAsync(
-            exchange: _settings.ExchangeName,
-            type: ExchangeType.Topic,
-            durable: true).GetAwaiter().GetResult();
+        _channelPool = new RabbitMqChannelPool(
+            () => new ConnectionFactory
+            {
+                HostName = _settings.HostName,
+                Port = _settings.Port,
+                UserName = _settings.UserName,
+                Password = _settings.Password,
+                ClientProvidedName = "merchant-bus"
+            },
+            channel => channel.ExchangeDeclareAsync(
+                exchange: _settings.ExchangeName,
+                type: ExchangeType.Topic,
+                durable: true),
+            logger);
     }
 
-    public async Task PublishAsync(string eventType, string payload, CancellationToken cancellationToken = default)
+    public async Task PublishAsync(string eventType, string payload, string? messageId = null, string? correlationId = null, CancellationToken cancellationToken = default)
     {
         var body = Encoding.UTF8.GetBytes(payload);
         var properties = new BasicProperties
         {
             Persistent = true,
-            ContentType = "application/json"
+            ContentType = "application/json",
+            MessageId = messageId,
+            CorrelationId = correlationId
         };
+        var headers = new Dictionary<string, object?>();
+        RabbitMqTracing.InjectTracingContext(headers);
+        if (headers.Count > 0)
+            properties.Headers = headers;
 
-        await _channel.BasicPublishAsync(
-            exchange: _settings.ExchangeName,
-            routingKey: eventType,
-            mandatory: false,
-            basicProperties: properties,
-            body: body,
-            cancellationToken: cancellationToken);
+        var channel = await _channelPool.GetChannelAsync(cancellationToken);
+        try
+        {
+            await channel.BasicPublishAsync(
+                exchange: _settings.ExchangeName,
+                routingKey: eventType,
+                mandatory: false,
+                basicProperties: properties,
+                body: body,
+                cancellationToken: cancellationToken);
+        }
+        finally
+        {
+            await _channelPool.ReturnAsync(channel);
+        }
     }
 
     protected virtual void Dispose(bool disposing)
@@ -54,10 +69,7 @@ public class RabbitMQEventBus : IEventBus, IDisposable
         {
             if (disposing)
             {
-                _channel?.CloseAsync().GetAwaiter().GetResult();
-                _connection?.CloseAsync().GetAwaiter().GetResult();
-                _channel?.Dispose();
-                _connection?.Dispose();
+                _channelPool.Dispose();
             }
             _disposed = true;
         }

@@ -1,4 +1,5 @@
 ﻿using BuildingBlocks.Shared.Aggregate;
+using BuildingBlocks.Shared.Auth;
 using Identity.Domain.DomainEvents;
 using Identity.Domain.ValueObjects;
 
@@ -6,16 +7,23 @@ namespace Identity.Domain.Entities;
 
 public class User : AggregateRoot
 {
-    public Email Email { get; private set; }
-    public PasswordHash PasswordHash { get; private set; }
-    public FullName FullName { get; private set; }
+    public Email Email { get; private set; } = null!;
+    public PasswordHash PasswordHash { get; private set; } = null!;
+    public FullName FullName { get; private set; } = null!;
     public bool IsActive { get; private set; }
+    public bool EmailConfirmed { get; private set; }
+    public DateTime? EmailVerifiedAt { get; private set; }
+    public string? EmailVerificationTokenHash { get; private set; }
+    public DateTime? EmailVerificationTokenExpiresAt { get; private set; }
+    public string? PasswordResetTokenHash { get; private set; }
+    public DateTime? PasswordResetTokenExpiresAt { get; private set; }
+    public int AccessFailedCount { get; private set; }
+    public DateTime? LockoutEnd { get; private set; }
+    public uint RowVersion { get; private set; }
     private readonly List<string> _roles = new();
     private readonly List<TokenValue> _refreshTokens = new();
-    private readonly List<ApiKey> _apiKeys = new();
     public IReadOnlyList<string> Roles => _roles.AsReadOnly();
     public IReadOnlyList<TokenValue> RefreshTokens => _refreshTokens.AsReadOnly();
-    public IReadOnlyList<ApiKey> ApiKeys => _apiKeys.AsReadOnly();
 
     private User() : base() { }
 
@@ -25,57 +33,210 @@ public class User : AggregateRoot
         PasswordHash = passwordHash ?? throw new ArgumentNullException(nameof(passwordHash));
         FullName = fullName ?? throw new ArgumentNullException(nameof(fullName));
         IsActive = true;
-        _roles = new List<string> { "Merchant" }; // default role
+        _roles = new List<string> { RoleNames.Merchant }; // default role
         AddDomainEvent(new UserRegisteredDomainEvent(Id, email.Value, fullName.Value));
     }
 
+    /// <summary>
+    /// Sets a new password and revokes every existing refresh token, forcing
+    /// all current sessions to re-authenticate.
+    /// </summary>
     public void ChangePassword(PasswordHash newPasswordHash)
     {
         PasswordHash = newPasswordHash ?? throw new ArgumentNullException(nameof(newPasswordHash));
+        RevokeAllRefreshTokens();
+    }
+
+    /// <summary>
+    /// Registers a new password-reset token, replacing any outstanding one
+    /// (so requesting another reset invalidates the previous link).
+    /// </summary>
+    public void InitiatePasswordReset(string tokenHash, DateTime expiresAtUtc)
+    {
+        PasswordResetTokenHash = tokenHash ?? throw new ArgumentNullException(nameof(tokenHash));
+        PasswordResetTokenExpiresAt = expiresAtUtc;
+    }
+
+    /// <summary>
+    /// Attempts to reset the password with the supplied hashed token. The token
+    /// is single-use: a successful reset clears it and revokes all sessions.
+    /// </summary>
+    public PasswordResetResult ResetPassword(string tokenHash, PasswordHash newPasswordHash)
+    {
+        if (string.IsNullOrEmpty(PasswordResetTokenHash))
+            return PasswordResetResult.NoToken;
+
+        if (!string.Equals(PasswordResetTokenHash, tokenHash, StringComparison.Ordinal))
+            return PasswordResetResult.InvalidToken;
+
+        if (PasswordResetTokenExpiresAt is null || PasswordResetTokenExpiresAt < DateTime.UtcNow)
+            return PasswordResetResult.TokenExpired;
+
+        PasswordHash = newPasswordHash ?? throw new ArgumentNullException(nameof(newPasswordHash));
+        PasswordResetTokenHash = null;
+        PasswordResetTokenExpiresAt = null;
+        RevokeAllRefreshTokens();
+        return PasswordResetResult.Success;
+    }
+
+    /// <summary>
+    /// Registers a new verification token for an unconfirmed email, replacing any
+    /// outstanding token (so a resend invalidates the previous one).
+    /// </summary>
+    public void InitiateEmailVerification(string tokenHash, DateTime expiresAtUtc)
+    {
+        if (EmailConfirmed)
+            throw new InvalidOperationException("Email is already confirmed.");
+
+        EmailVerificationTokenHash = tokenHash ?? throw new ArgumentNullException(nameof(tokenHash));
+        EmailVerificationTokenExpiresAt = expiresAtUtc;
+    }
+
+    /// <summary>
+    /// Attempts to confirm the email with the supplied hashed token.
+    /// The token is single-use: a successful confirmation clears it.
+    /// </summary>
+    public EmailVerificationResult VerifyEmail(string tokenHash)
+    {
+        if (EmailConfirmed)
+            return EmailVerificationResult.AlreadyConfirmed;
+
+        if (string.IsNullOrEmpty(EmailVerificationTokenHash))
+            return EmailVerificationResult.NoToken;
+
+        if (!string.Equals(EmailVerificationTokenHash, tokenHash, StringComparison.Ordinal))
+            return EmailVerificationResult.InvalidToken;
+
+        if (EmailVerificationTokenExpiresAt is null || EmailVerificationTokenExpiresAt < DateTime.UtcNow)
+            return EmailVerificationResult.TokenExpired;
+
+        EmailConfirmed = true;
+        EmailVerifiedAt = DateTime.UtcNow;
+        EmailVerificationTokenHash = null;
+        EmailVerificationTokenExpiresAt = null;
+        return EmailVerificationResult.Success;
+    }
+
+    /// <summary>
+    /// Marks an account verified without going through the token flow
+    /// (e.g. seeded bootstrap admin).
+    /// </summary>
+    public void MarkEmailConfirmed()
+    {
+        EmailConfirmed = true;
+        EmailVerifiedAt = DateTime.UtcNow;
+        EmailVerificationTokenHash = null;
+        EmailVerificationTokenExpiresAt = null;
     }
 
     public void Activate() => IsActive = true;
-    public void Deactivate() => IsActive = false;
 
+    /// <summary>
+    /// Deactivates the account and revokes every refresh token, so a
+    /// suspended user cannot keep minting access tokens (see Step 2.1).
+    /// </summary>
+    public void Deactivate()
+    {
+        IsActive = false;
+        RevokeAllRefreshTokens();
+    }
+
+    /// <summary>Consecutive failed sign-in attempts tolerated before the account is locked.</summary>
+    public const int MaxAccessFailedAttempts = 5;
+
+    /// <summary>How long the account stays locked after too many failed attempts.</summary>
+    public const int LockoutDurationMinutes = 15;
+
+    /// <summary>
+    /// Returns true while the account is locked (within the lockout window).
+    /// </summary>
+    public bool IsLockedOut(DateTime utcNow) => LockoutEnd is not null && LockoutEnd > utcNow;
+
+    /// <summary>
+    /// Records a failed sign-in attempt. Once the configured threshold is reached
+    /// the counter is reset and the account is locked for the lockout window.
+    /// </summary>
+    public void RegisterFailedLogin(DateTime utcNow)
+    {
+        AccessFailedCount++;
+        if (AccessFailedCount < MaxAccessFailedAttempts)
+            return;
+
+        AccessFailedCount = 0;
+        LockoutEnd = utcNow.AddMinutes(LockoutDurationMinutes);
+    }
+
+    /// <summary>
+    /// Clears the failed-attempt counter and any active lockout (e.g. on success).
+    /// </summary>
+    public void ResetAccessFailedCount()
+    {
+        AccessFailedCount = 0;
+        LockoutEnd = null;
+    }
+
+    /// <summary>
+    /// Adds a role, normalizing to canonical casing (Step 7.5: roles are
+    /// case-insensitive — "admin" and " Admin " both store "Admin", never a
+    /// duplicate). Throws on unknown roles; validate user input with the
+    /// command validator first.
+    /// </summary>
     public void AddRole(string role)
     {
-        if (!_roles.Contains(role))
-            _roles.Add(role);
+        var canonical = RoleNames.Normalize(role)
+            ?? throw new ArgumentException($"Unknown role '{role}'.", nameof(role));
+        if (!HasRole(canonical))
+            _roles.Add(canonical);
     }
 
     public void RemoveRole(string role)
     {
-        _roles.Remove(role);
+        var canonical = RoleNames.Normalize(role);
+        if (canonical is null)
+            return;
+        _roles.RemoveAll(r => string.Equals(r, canonical, StringComparison.OrdinalIgnoreCase));
     }
 
-    public ApiKey GenerateApiKey(string keyHash, string environment)
-    {
-        var apiKey = new ApiKey(keyHash, environment);
-        _apiKeys.Add(apiKey);
-        AddDomainEvent(new ApiKeyGeneratedDomainEvent(Id, Guid.Empty, environment));
-        return apiKey;
-    }
+    /// <summary>Case-insensitive role membership check.</summary>
+    public bool HasRole(string role) =>
+        !string.IsNullOrWhiteSpace(role) &&
+        _roles.Any(r => string.Equals(r, role.Trim(), StringComparison.OrdinalIgnoreCase));
 
-    public void RevokeApiKey(Guid keyId)
+    public TokenValue AddRefreshToken(string tokenHash, DateTime expiresAt)
     {
-        var apiKey = _apiKeys.FirstOrDefault(k => k.Id == keyId);
-        if (apiKey == null)
-            throw new InvalidOperationException("API key not found.");
-        apiKey.Revoke();
-        AddDomainEvent(new ApiKeyRevokedDomainEvent(Id, keyId));
-    }
-
-    public TokenValue AddRefreshToken(string tokenValue, DateTime expiresAt)
-    {
-        var token = new TokenValue(tokenValue, expiresAt);
+        var token = new TokenValue(tokenHash, expiresAt);
         _refreshTokens.Add(token);
         return token;
     }
 
-    public void RevokeRefreshToken(string tokenValue)
+    /// <summary>Maximum concurrently active refresh tokens kept per account.</summary>
+    public const int MaxActiveRefreshTokens = 10;
+
+    /// <summary>
+    /// Revokes the oldest active refresh tokens beyond the cap so a single account
+    /// cannot accumulate an unbounded number of sessions.
+    /// </summary>
+    public void EnforceRefreshTokenCap(int maxActive = MaxActiveRefreshTokens)
     {
-        var token = _refreshTokens.FirstOrDefault(t => t.Value == tokenValue);
+        var active = _refreshTokens
+            .Where(t => !t.IsRevoked && t.ExpiresAt > DateTime.UtcNow)
+            .OrderBy(t => t.ExpiresAt)
+            .ToList();
+
+        foreach (var token in active.Take(Math.Max(active.Count - maxActive, 0)))
+            token.Revoke();
+    }
+
+    public void RevokeRefreshToken(string tokenHash)
+    {
+        var token = _refreshTokens.FirstOrDefault(t => t.Value == tokenHash);
         if (token != null)
+            token.Revoke();
+    }
+
+    public void RevokeAllRefreshTokens()
+    {
+        foreach (var token in _refreshTokens)
             token.Revoke();
     }
 }
