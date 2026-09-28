@@ -61,6 +61,8 @@ public class EmailSender : IEmailSender
             _logger.LogInformation("EMAIL SENT: To={Recipient}, Subject={Subject}", DataMasker.MaskEmail(message.To), message.Subject);
             return Result.Success();
         }
+        // codeql[cs/catch-of-all-exceptions]: SMTP failures are converted to a
+        // Result error, never rethrown; the caller decides how to handle it.
         catch (Exception ex)
         {
             _logger.LogError(ex, "EMAIL FAILED: To={Recipient}, Subject={Subject}", DataMasker.MaskEmail(message.To), message.Subject);

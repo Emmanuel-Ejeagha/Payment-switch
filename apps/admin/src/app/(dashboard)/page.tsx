@@ -48,8 +48,13 @@ export default function DashboardPage() {
           const pending = list.filter((m) => m.status === "Pending").length
           const suspended = list.filter((m) => m.status === "Suspended").length
 
+          // The list endpoint is paginated; the total comes from the
+          // x-total-count response header, not the sample length.
+          const headerTotal = Number(merchantsRes.headers.get("x-total-count"))
+          const total = Number.isFinite(headerTotal) && headerTotal >= 0 ? headerTotal : list.length
+
           setStats({
-            total: list.length,
+            total,
             active,
             pending,
             suspended,

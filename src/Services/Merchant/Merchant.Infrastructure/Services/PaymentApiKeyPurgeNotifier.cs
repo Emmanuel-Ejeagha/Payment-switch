@@ -60,6 +60,8 @@ public sealed class PaymentApiKeyPurgeNotifier : IApiKeyRevocationNotifier
                     "API-key purge notify for merchant {MerchantId} returned {StatusCode}; cache TTL backstops",
                     merchantId, (int)response.StatusCode);
         }
+        // codeql[cs/catch-of-all-exceptions]: best-effort cross-service notify;
+        // the API-key cache TTL backstops a failed notification.
         catch (Exception ex)
         {
             _logger.LogWarning(ex,
