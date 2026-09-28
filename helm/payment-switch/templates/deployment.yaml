@@ -36,11 +36,158 @@ spec:
           imagePullPolicy: {{ $.Values.global.imagePullPolicy }}
           ports:
             - containerPort: {{ $svc.containerPort }}
-          envFrom:
-            - configMapRef:
-                name: payment-switch-config
-            - secretRef:
-                name: payment-switch-secret
+          # Step 9.5: explicit env mirroring the k8s manifests (no catch-all
+          # import: every key is declared, secrets stay in the Secret and
+          # non-secret config in the ConfigMap).
+          env:
+            - name: ConnectionStrings__{{ $svc.name | title }}Db
+              valueFrom:
+                secretKeyRef:
+                  name: payment-switch-secret
+                  key: ConnectionStrings__{{ $svc.name | title }}Db
+            - name: Jwt__Secret
+              valueFrom:
+                secretKeyRef:
+                  name: payment-switch-secret
+                  key: Jwt__Secret
+            - name: ServiceToken__Secret
+              valueFrom:
+                secretKeyRef:
+                  name: payment-switch-secret
+                  key: ServiceToken__Secret
+            - name: Jwt__PreviousSecret
+              valueFrom:
+                secretKeyRef:
+                  name: payment-switch-secret
+                  key: Jwt__PreviousSecret
+                  optional: true
+            - name: Jwt__Issuer
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-switch-config
+                  key: Jwt__Issuer
+            - name: Jwt__Audience
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-switch-config
+                  key: Jwt__Audience
+            - name: RabbitMQ__HostName
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-switch-config
+                  key: RabbitMQ__HostName
+            - name: RabbitMQ__UserName
+              valueFrom:
+                secretKeyRef:
+                  name: payment-switch-secret
+                  key: RabbitMQ__UserName
+            - name: RabbitMQ__Password
+              valueFrom:
+                secretKeyRef:
+                  name: payment-switch-secret
+                  key: RabbitMQ__Password
+            {{- if eq $svc.name "identity" }}
+            - name: Smtp__Host
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-switch-config
+                  key: Smtp__Host
+            - name: Smtp__Port
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-switch-config
+                  key: Smtp__Port
+            - name: Smtp__Username
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-switch-config
+                  key: Smtp__Username
+            - name: Smtp__Password
+              valueFrom:
+                secretKeyRef:
+                  name: payment-switch-secret
+                  key: Smtp__Password
+            - name: Smtp__FromAddress
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-switch-config
+                  key: Smtp__FromAddress
+            - name: Smtp__FromName
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-switch-config
+                  key: Smtp__FromName
+            - name: Seed__AdminEmail
+              value: {{ $.Values.config.seed.adminEmail | quote }}
+            - name: Seed__AdminPassword
+              valueFrom:
+                secretKeyRef:
+                  name: payment-switch-secret
+                  key: Seed__AdminPassword
+            {{- end }}
+            {{- if eq $svc.name "merchant" }}
+            - name: WebhookSecretEncryption__Key
+              valueFrom:
+                secretKeyRef:
+                  name: payment-switch-secret
+                  key: WebhookSecretEncryption__Key
+            {{- end }}
+            {{- if eq $svc.name "notification" }}
+            - name: Smtp__Host
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-switch-config
+                  key: Smtp__Host
+            - name: Smtp__Port
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-switch-config
+                  key: Smtp__Port
+            - name: Smtp__Username
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-switch-config
+                  key: Smtp__Username
+            - name: Smtp__Password
+              valueFrom:
+                secretKeyRef:
+                  name: payment-switch-secret
+                  key: Smtp__Password
+            - name: Smtp__FromAddress
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-switch-config
+                  key: Smtp__FromAddress
+            - name: Smtp__FromName
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-switch-config
+                  key: Smtp__FromName
+            - name: Sms__Enabled
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-switch-config
+                  key: Sms__Enabled
+            {{- end }}
+            {{- if $svc.retentionBusinessDays }}
+            - name: Retention__CleanupIntervalMinutes
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-switch-config
+                  key: Retention__CleanupIntervalMinutes
+            - name: Retention__BatchSize
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-switch-config
+                  key: Retention__BatchSize
+            - name: Retention__MessageRetentionDays
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-switch-config
+                  key: Retention__MessageRetentionDays
+            - name: Retention__BusinessRetentionDays
+              value: {{ $svc.retentionBusinessDays | quote }}
+            {{- end }}
           resources:
             {{- toYaml $svc.resources | nindent 12 }}
           securityContext:

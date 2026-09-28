@@ -26,7 +26,7 @@ export default function SettlementsPage() {
       if (res.ok) setBatches(await res.json())
       setLoading(false)
     }
-    load()
+    void load()
   }, [skip])
 
   const handleTrigger = async () => {
