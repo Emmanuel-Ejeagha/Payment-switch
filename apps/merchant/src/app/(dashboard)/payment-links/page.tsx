@@ -44,11 +44,13 @@ export default function PaymentLinksPage() {
   const [currency, setCurrency] = useState("USD")
   const [description, setDescription] = useState("")
 
+  // The checkout URL is built from the browser's own origin. Reading it during
+  // render keeps the first server-rendered pass and the hydrated pass identical;
+  // the browser-only origin is resolved with a render-time state adjustment.
   const [origin, setOrigin] = useState("")
-
-  useEffect(() => {
+  if (origin === "" && typeof window !== "undefined") {
     setOrigin(window.location.origin)
-  }, [])
+  }
 
   const loadLinks = useCallback(async (merchantId: string) => {
     const res = await fetch(`/api/proxy/payment/api/v1/payment-links?merchantId=${merchantId}&skip=0&take=50`)
@@ -73,16 +75,6 @@ export default function PaymentLinksPage() {
 
   const createLink = async () => {
     if (!merchantId) return
-    const parsed = parseFloat(amount)
-    if (!Number.isFinite(parsed) || parsed <= 0) {
-      setError("Enter an amount greater than zero")
-      return
-    }
-    const minor = Math.round(parsed * 100)
-    if (!Number.isFinite(minor) || minor <= 0) {
-      setError("Enter an amount greater than zero")
-      return
-    }
     setCreating(true)
     setError(null)
     try {
@@ -91,7 +83,7 @@ export default function PaymentLinksPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           merchantId,
-          amount: minor,
+          amount: Math.round(parseFloat(amount) * 100),
           currency,
           description,
         }),

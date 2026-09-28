@@ -18,9 +18,6 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 # the workspace root and hoisted node_modules.
 COPY package.json package-lock.json* ./
 COPY --from=deps /app/node_modules ./node_modules
-# @vitejs/plugin-react and other dev deps are nested under the workspace by the
-# lockfile (not hoisted to root); the builder needs them to type-check.
-COPY --from=deps /app/apps/admin/node_modules ./apps/admin/node_modules
 COPY packages packages
 COPY apps/admin apps/admin
 RUN cd apps/admin && npm run build
@@ -39,8 +36,4 @@ COPY --from=builder /app/apps/admin/.next/static ./apps/admin/.next/static
 COPY --from=builder /app/apps/admin/public ./apps/admin/public
 USER nextjs
 EXPOSE 3001
-# Step 9.4: container-level liveness (applies outside compose, which sets its
-# own healthcheck). The /api/health route answers without touching backends.
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD wget -q -O /dev/null http://localhost:3001/api/health || exit 1
 CMD ["node", "apps/admin/server.js"]
