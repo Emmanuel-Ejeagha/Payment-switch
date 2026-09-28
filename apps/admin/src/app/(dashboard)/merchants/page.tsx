@@ -12,19 +12,9 @@ export default function MerchantsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState("")
-  const [debouncedSearch, setDebouncedSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("All")
   const [skip, setSkip] = useState(0)
-  const [totalCount, setTotalCount] = useState(0)
   const take = 10
-
-  useEffect(() => {
-    const t = setTimeout(() => {
-      setDebouncedSearch(search)
-      setSkip(0)
-    }, 300)
-    return () => clearTimeout(t)
-  }, [search])
 
   useEffect(() => {
     async function load() {
@@ -32,7 +22,7 @@ export default function MerchantsPage() {
       setError(null)
       try {
         const params = new URLSearchParams({ skip: String(skip), take: String(take) })
-        if (debouncedSearch) params.set("search", debouncedSearch)
+        if (search) params.set("search", search)
 
         const res = await fetch(apiUrl(`/api/proxy/merchant/api/v1/merchants?${params}`))
 
@@ -49,8 +39,6 @@ export default function MerchantsPage() {
 
         const data: MerchantDto[] = await res.json()
         setMerchants(data)
-        const total = res.headers.get("x-total-count")
-        setTotalCount(total ? parseInt(total, 10) : data.length)
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load merchants")
       } finally {
@@ -59,7 +47,7 @@ export default function MerchantsPage() {
     }
 
     load()
-  }, [skip, debouncedSearch])
+  }, [skip, search])
 
   const filtered = merchants.filter((m) =>
     statusFilter === "All" ? true : m.status === statusFilter,
@@ -79,9 +67,8 @@ export default function MerchantsPage() {
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <input
             placeholder="Search merchants..."
-            aria-label="Search merchants"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); setSkip(0) }}
             className="flex h-10 w-full rounded-lg border border-input bg-background pl-10 pr-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           />
         </div>
@@ -160,7 +147,7 @@ export default function MerchantsPage() {
 
           <div className="flex items-center justify-between text-sm text-muted-foreground">
             <p>
-              Showing {merchants.length === 0 ? 0 : skip + 1}–{skip + filtered.length} of {totalCount}
+              Showing {skip + 1}–{skip + filtered.length}
             </p>
             <div className="flex items-center gap-2">
               <button
@@ -172,7 +159,7 @@ export default function MerchantsPage() {
               </button>
               <button
                 onClick={() => setSkip(skip + take)}
-                disabled={skip + take >= totalCount}
+                disabled={filtered.length < take}
                 className="inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
               >
                 Next <ChevronRight className="h-4 w-4" />
