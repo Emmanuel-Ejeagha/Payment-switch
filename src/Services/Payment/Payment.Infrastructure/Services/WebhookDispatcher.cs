@@ -122,6 +122,58 @@ public static class WebhookSignature
             return false;
         }
     }
+
+    /// <summary>
+    /// Dual-secret verification without rotation metadata (Step 1.2
+    /// contract, kept for compatibility): tries the current secret, then the
+    /// previous secret with no grace bound. Prefer the full overload with
+    /// <paramref name="rotatedAtUtc"/>/grace so stale secrets stop verifying.
+    /// </summary>
+    public static bool VerifyWithRotation(
+        string? currentSecret,
+        string? previousSecret,
+        byte[] payload,
+        string? timestamp,
+        string? signature)
+    {
+        if (string.IsNullOrWhiteSpace(timestamp) || string.IsNullOrWhiteSpace(signature))
+            return false;
+
+        return Verify(currentSecret, payload, timestamp, signature)
+            || (!string.IsNullOrWhiteSpace(previousSecret)
+                && Verify(previousSecret, payload, timestamp, signature));
+    }
+
+    /// <summary>
+    /// Dual-secret verification for the rotation grace window (TASK-006 / Step 7.3).
+    /// Tries the current secret first, then the previous secret when it is still
+    /// within <paramref name="gracePeriod"/> of <paramref name="rotatedAtUtc"/>.
+    /// Freshness is enforced inside <see cref="Verify"/> (default 5 minutes).
+    /// </summary>
+    public static bool VerifyWithRotation(
+        string? currentSecret,
+        string? previousSecret,
+        DateTime? rotatedAtUtc,
+        byte[] payload,
+        string timestamp,
+        string signature,
+        TimeSpan gracePeriod,
+        TimeSpan? maxAge = null,
+        DateTime? nowUtc = null)
+    {
+        var window = maxAge ?? DefaultFreshnessWindow;
+        if (Verify(currentSecret, payload, timestamp, signature, window))
+            return true;
+
+        if (string.IsNullOrWhiteSpace(previousSecret) || rotatedAtUtc is null)
+            return false;
+
+        var now = nowUtc ?? DateTime.UtcNow;
+        if (now - rotatedAtUtc.Value >= gracePeriod)
+            return false;
+
+        return Verify(previousSecret, payload, timestamp, signature, window);
+    }
 }
 
 /// <summary>

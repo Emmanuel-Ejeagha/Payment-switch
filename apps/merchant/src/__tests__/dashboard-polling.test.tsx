@@ -16,10 +16,11 @@ describe("dashboard polling visibility guard", () => {
 })
 
 describe("payment-links origin effect", () => {
-  it("sets origin in useEffect not during render", () => {
+  it("initializes origin lazily, not via setState-in-effect", () => {
     const content = fs.readFileSync("src/app/(dashboard)/payment-links/page.tsx", "utf-8")
-    expect(content).toContain("useEffect(() => {")
-    expect(content).toContain("setOrigin(window.location.origin)")
+    expect(content).toContain("typeof window ===")
+    expect(content).toContain("window.location.origin")
+    expect(content).not.toContain("setOrigin(window.location.origin)")
     expect(content).not.toContain('if (origin === "" && typeof window !== "undefined")')
   })
 })

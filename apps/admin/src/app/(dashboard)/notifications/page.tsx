@@ -35,7 +35,7 @@ export default function NotificationsPage() {
       if (res.ok) setNotifications(await res.json())
       setLoading(false)
     }
-    load()
+    void load()
   }, [skip, statusFilter, channelFilter])
 
   return (

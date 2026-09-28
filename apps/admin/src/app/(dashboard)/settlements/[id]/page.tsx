@@ -24,7 +24,7 @@ export default function SettlementDetailPage() {
       if (res.ok) setBatch(await res.json())
       setLoading(false)
     }
-    load()
+    void load()
   }, [id])
 
   useEffect(() => {
