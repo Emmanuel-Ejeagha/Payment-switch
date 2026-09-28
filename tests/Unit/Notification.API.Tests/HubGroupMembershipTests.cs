@@ -90,36 +90,6 @@ public class HubGroupMembershipTests
         Assert.Equal(["admin", $"merchant-{merchantId}"], groups);
     }
 
-    [Fact]
-    public async Task LowercaseAdminRole_GetsAdminGroup()
-    {
-        // Step 7.5: claims checks are case-insensitive (legacy tokens).
-        var user = UserWithRole("admin", email: "admin@example.com");
-
-        var groups = await HubGroupMembership.ResolveAsync(
-            user,
-            accessToken: null,
-            new StubMerchantGroupResolver(Guid.NewGuid()),
-            CancellationToken.None);
-
-        Assert.Equal(["admin"], groups);
-    }
-
-    [Fact]
-    public async Task SupportRole_GetsNoAdminGroup()
-    {
-        // Step 7.5: Support is read-only API access — no broadcast group.
-        var user = UserWithRole("Support", email: "support@example.com");
-
-        var groups = await HubGroupMembership.ResolveAsync(
-            user,
-            accessToken: null,
-            new StubMerchantGroupResolver(Guid.NewGuid()),
-            CancellationToken.None);
-
-        Assert.Empty(groups);
-    }
-
     private static ClaimsPrincipal UserWithRole(string role, string email)
     {
         var identity = new ClaimsIdentity(

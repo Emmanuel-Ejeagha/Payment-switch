@@ -10,9 +10,8 @@ using Settlement.Infrastructure.Services;
 namespace Settlement.API.IntegrationTests;
 
 /// <summary>
-/// Proves the unique (BatchDate, Currency) backstop: concurrent settlement
-/// triggers for the same date must yield exactly one batch per currency and
-/// both callers see its id.
+/// Proves the unique BatchDate backstop: concurrent settlement triggers for the
+/// same date must yield exactly one batch and both callers see its id.
 /// </summary>
 public class ConcurrentTriggerTests : IClassFixture<SettlementApiFactory>
 {
@@ -46,7 +45,7 @@ public class ConcurrentTriggerTests : IClassFixture<SettlementApiFactory>
         var results = await Task.WhenAll(handler1.Handle(command), handler2.Handle(command));
 
         Assert.All(results, r => Assert.True(r.IsSuccess));
-        Assert.Equal(results[0].Value!.BatchIds, results[1].Value!.BatchIds);
+        Assert.Equal(results[0].Value!.Id, results[1].Value!.Id);
 
         using var dbScope = host.Services.CreateScope();
         var db = dbScope.ServiceProvider.GetRequiredService<AppDbContext>();
