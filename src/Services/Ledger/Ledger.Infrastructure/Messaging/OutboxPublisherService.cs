@@ -88,6 +88,8 @@ public class OutboxPublisherService : BackgroundService
                     OutboxMetrics.RecordPublished();
                     _logger.LogInformation("Published outbox message {Id} ({Type})", msg.Id, msg.EventType);
                 }
+                // codeql[cs/catch-of-all-exceptions]: per-message publish; the lease
+                // is released and the dispatcher moves on to the next message.
                 catch (Exception ex)
                 {
                     msg.ReleaseLease();

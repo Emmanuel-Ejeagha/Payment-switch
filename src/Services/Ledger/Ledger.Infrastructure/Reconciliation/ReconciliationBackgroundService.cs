@@ -47,6 +47,8 @@ public class ReconciliationBackgroundService : BackgroundService
             {
                 await RunReconciliationAsync(stoppingToken);
             }
+            // codeql[cs/catch-of-all-exceptions]: scheduled job loop; a failed run
+            // is logged and retried on the next tick, never crashes the host.
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Reconciliation background job failed.");

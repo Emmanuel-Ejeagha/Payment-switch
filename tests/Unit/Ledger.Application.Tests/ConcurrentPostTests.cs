@@ -25,7 +25,8 @@ public class ConcurrentPostTests
         // First save succeeds, second would throw concurrency
         var saveCount = 0;
         uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(() => {
+            .ReturnsAsync(() =>
+            {
                 saveCount++;
                 if (saveCount == 2) throw new ConcurrencyConflictException();
                 return 1;

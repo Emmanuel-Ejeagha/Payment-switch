@@ -179,6 +179,7 @@ jobs:
           helm template payment-switch helm/payment-switch --namespace payment-switch
           --set config.postgres.password=dummy
           --set config.jwt.secret=0123456789abcdef0123456789abcdef
+          --set config.serviceToken.secret=dummy-service-token-secret-0123456789abcdef
           --set config.rabbitmq.password=dummy
           --set config.seed.adminPassword=dummy
           --set config.webhookSecretEncryption.key=dummy

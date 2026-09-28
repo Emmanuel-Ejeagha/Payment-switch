@@ -47,14 +47,16 @@ public static class DependencyInjection
             s => !isProduction || !string.IsNullOrWhiteSpace(s.Host),
             "Smtp:Host must be configured in Production");
         services.AddValidatedOptions<EmailVerificationOptions>(configuration, "EmailVerification",
-            s => {
+            s =>
+            {
                 if (!isProduction) return true;
                 if (string.IsNullOrWhiteSpace(s.FrontendBaseUrl)) return false;
                 return Uri.TryCreate(s.FrontendBaseUrl, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps;
             },
             "EmailVerification:FrontendBaseUrl must be an https URL in Production");
         services.AddValidatedOptions<PasswordResetOptions>(configuration, "PasswordReset",
-            s => {
+            s =>
+            {
                 if (!isProduction) return true;
                 if (string.IsNullOrWhiteSpace(s.FrontendBaseUrl)) return false;
                 return Uri.TryCreate(s.FrontendBaseUrl, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps;

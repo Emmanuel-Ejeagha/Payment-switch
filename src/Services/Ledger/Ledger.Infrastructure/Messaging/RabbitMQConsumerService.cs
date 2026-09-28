@@ -61,6 +61,8 @@ public class RabbitMQConsumerService : BackgroundService
             {
                 break;
             }
+            // codeql[cs/catch-of-all-exceptions]: intentional resilient-consumer loop;
+            // a poison message must be logged and retried, never crash the host.
             catch (Exception ex)
             {
                 _logger.LogError(ex, "RabbitMQ consumer error. Retrying in 10 seconds...");
@@ -180,6 +182,8 @@ public class RabbitMQConsumerService : BackgroundService
                 await MarkAsProcessedAsync(messageId, cancellationToken);
                 await _channel.BasicAckAsync(ea.DeliveryTag, false);
             }
+            // codeql[cs/catch-of-all-exceptions]: per-message handler routes failures
+            // to DLX accounting; the consumer loop must survive poison messages.
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error processing message {MessageId}", messageId);
@@ -273,6 +277,8 @@ public class RabbitMQConsumerService : BackgroundService
             row.MarkAsFailed(error);
             await db.SaveChangesAsync(cancellationToken);
         }
+        // codeql[cs/catch-of-all-exceptions]: inbox bookkeeping is best-effort;
+        // the message stays on the queue for retry regardless.
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to record inbox failure for {MessageId}", messageId);
