@@ -7,7 +7,7 @@ import http from 'k6/http';
  * docs/load-testing.md "Provisioning").
  */
 
-const MERCHANT_BASE_URL = __ENV.MERCHANT_BASE_URL || 'http://localhost/identity';
+const MERCHANT_BASE_URL = __ENV.MERCHANT_BASE_URL || 'http://localhost:8080';
 
 export function login() {
   const res = http.post(

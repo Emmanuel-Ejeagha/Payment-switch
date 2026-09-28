@@ -24,7 +24,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\Services\Merchant\Merchant.Application\Merchant.Application.csproj" />
-    <ProjectReference Include="..\..\..\src\Services\Merchant\Merchant.Infrastructure\Merchant.Infrastructure.csproj" />
     <Using Include="Microsoft.Extensions.Logging" />
   </ItemGroup>
 
