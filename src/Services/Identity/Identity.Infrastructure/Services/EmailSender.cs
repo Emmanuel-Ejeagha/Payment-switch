@@ -11,8 +11,8 @@ namespace Identity.Infrastructure.Services;
 
 /// <summary>
 /// SMTP email sender for transactional Identity mail (verification).
-/// When SMTP is not configured the email is NOT silently dropped, but message
-/// bodies are never logged: tokens live there (see <see cref="EmailLogRedactor"/>).
+/// When SMTP is not configured the email is NOT silently dropped: the full
+/// message (including body/token) is logged so the flow remains usable in dev.
 /// </summary>
 public class EmailSender : IEmailSender
 {
@@ -30,8 +30,8 @@ public class EmailSender : IEmailSender
         if (!_settings.IsConfigured)
         {
             _logger.LogWarning(
-                "SIMULATED EMAIL (Smtp:Host not configured): To={Recipient}, Subject={Subject}, BodyHash={BodyHash}",
-                DataMasker.MaskEmail(message.To), message.Subject, EmailLogRedactor.Redact(message.TextBody));
+                "SIMULATED EMAIL (Smtp:Host not configured): To={Recipient}, Subject={Subject}, Body={Body}",
+                DataMasker.MaskEmail(message.To), message.Subject, message.TextBody);
             return Result.Success();
         }
 

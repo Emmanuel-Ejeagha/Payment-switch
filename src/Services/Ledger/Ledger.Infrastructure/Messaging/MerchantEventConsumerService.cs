@@ -1,4 +1,3 @@
-using BuildingBlocks.Shared.Exceptions;
 using BuildingBlocks.Shared.Messaging;
 using BuildingBlocks.Shared.Middleware;
 using BuildingBlocks.Shared.Results;
@@ -10,7 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Npgsql;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using System.Text;
@@ -153,10 +151,8 @@ public class MerchantEventConsumerService : BackgroundService
                     var result = await ProcessOnboardAsync(scope, body, cancellationToken);
                     if (result.IsFailure)
                     {
-                        var failure = string.Join("; ", result.Errors.Select(e => e.Message));
                         _logger.LogWarning("MerchantOnboardedEvent ({MessageId}) failed: {Errors}",
-                            messageId, failure);
-                        await RecordFailureAsync(messageId, eventType, body, failure, cancellationToken);
+                            messageId, string.Join("; ", result.Errors.Select(e => e.Message)));
                         await HandleFailureAsync(ea, messageId, cancellationToken);
                         return;
                     }
@@ -257,10 +253,6 @@ public class MerchantEventConsumerService : BackgroundService
         msg.MarkAsProcessed();
         await db.SaveChangesAsync(cancellationToken);
     }
-
-    private static bool IsUniqueViolation(DbUpdateException ex) =>
-        ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation }
-        || ex.InnerException?.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation };
 
     private async Task HandleFailureAsync(BasicDeliverEventArgs ea, string messageId, CancellationToken cancellationToken)
     {

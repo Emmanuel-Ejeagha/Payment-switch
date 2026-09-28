@@ -47,7 +47,7 @@ export default function WebhooksPage() {
   const [dataReady, setDataReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
-  const [workingId, setWorkingId] = useState<string | null>(null)
+  const [working, setWorking] = useState(false)
   const [expanded, setExpanded] = useState<string | null>(null)
   const loading = merchantLoading || (merchantId !== null && !dataReady)
 
@@ -74,7 +74,7 @@ export default function WebhooksPage() {
 
   const replay = async (id: string) => {
     if (!merchantId) return
-    setWorkingId(id)
+    setWorking(true)
     setError(null)
     setNotice(null)
     try {
@@ -87,13 +87,13 @@ export default function WebhooksPage() {
       setNotice("Event queued for redelivery.")
       await loadEvents(merchantId)
     } finally {
-      setWorkingId(null)
+      setWorking(false)
     }
   }
 
   const sendTest = async () => {
     if (!merchantId) return
-    setWorkingId("test")
+    setWorking(true)
     setError(null)
     setNotice(null)
     try {
@@ -106,7 +106,7 @@ export default function WebhooksPage() {
       setNotice("Test event sent to your configured endpoint.")
       await loadEvents(merchantId)
     } finally {
-      setWorkingId(null)
+      setWorking(false)
     }
   }
 
@@ -159,7 +159,7 @@ export default function WebhooksPage() {
             variant="primary"
             icon={Send}
             onClick={sendTest}
-            pending={workingId === "test"}
+            pending={working}
             disabled={!merchantId}
           >
             Send test event
@@ -216,7 +216,7 @@ export default function WebhooksPage() {
                 variant="primary"
                 icon={Send}
                 onClick={sendTest}
-                pending={workingId === "test"}
+                pending={working}
                 disabled={!merchantId}
               >
                 Send a test event
@@ -282,8 +282,7 @@ export default function WebhooksPage() {
                           <Button
                             size="sm"
                             icon={RotateCcw}
-                            pending={workingId === ev.id}
-                            disabled={!!workingId}
+                            disabled={working}
                             onClick={() => replay(ev.id)}
                           >
                             Replay

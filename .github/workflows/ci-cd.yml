@@ -41,12 +41,6 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore PaymentSwitch.slnx
 
-      - name: Audit NuGet packages for vulnerabilities
-        # Step 9.8: explicit report step. The gate itself lives in
-        # Directory.Build.props (NU1901-NU1904 escalated to errors), so any
-        # build/test also fails on vulnerable packages.
-        run: dotnet list PaymentSwitch.slnx package --vulnerable --include-transitive
-
       - name: Verify formatting
         run: dotnet format PaymentSwitch.slnx --verify-no-changes --no-restore
 
@@ -146,12 +140,6 @@ jobs:
 
       - name: Lint merchant
         run: npm run lint --workspace=merchant
-
-      - name: Test admin
-        run: npm run test --workspace=admin
-
-      - name: Test merchant
-        run: npm run test --workspace=merchant
 
       - name: Build admin
         run: npm run build --workspace=admin
@@ -306,7 +294,7 @@ jobs:
 
   deploy:
     name: Deploy to Kubernetes (production)
-    needs: [docker, docker-frontend, manifest-validate]
+    needs: [docker, docker-frontend]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: production

@@ -44,7 +44,7 @@ public class E2EFlowTests : IClassFixture<E2EFactory>
         var settlement = _factory.SettlementHost.CreateClient();
 
         var email = $"e2e-{Guid.NewGuid():N}@example.com";
-        const string password = "E2ePass1234!";
+        const string password = "E2ePass123!";
 
         // 1. Register, verify (via the captured plaintext token), login as owner.
         var register = await identity.PostAsJsonAsync("/api/v1/auth/register", new { Email = email, Password = password, FullName = "E2E Owner" });
@@ -117,13 +117,8 @@ public class E2EFlowTests : IClassFixture<E2EFactory>
             return account is { PendingBalance: 10000, ReservedBalance: 10000 };
         }, "ledger reserve of 10000 for the authorized payment");
 
-        // 9. Capture the authorized payment (idempotency key is required; NULL bypasses unique index).
-        var captureRequest = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/payments/{intent.IntentId}/capture")
-        {
-            Content = JsonContent.Create(new { })
-        };
-        captureRequest.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString("N"));
-        var captureResponse = await paymentInternal.SendAsync(captureRequest);
+        // 9. Capture the authorized payment.
+        var captureResponse = await paymentInternal.PostAsJsonAsync($"/api/v1/payments/{intent.IntentId}/capture", new { });
         captureResponse.EnsureSuccessStatusCode();
         var capture = await captureResponse.Content.ReadFromJsonAsync<CapturePaymentResponse>();
         Assert.Equal("Captured", capture!.Status);
@@ -147,7 +142,7 @@ public class E2EFlowTests : IClassFixture<E2EFactory>
         var trigger = await settlement.PostAsJsonAsync("/api/v1/settlement/trigger", new { BatchDate = DateTime.UtcNow.Date });
         trigger.EnsureSuccessStatusCode();
         var triggerResult = await trigger.Content.ReadFromJsonAsync<TriggerSettlementResponse>();
-        var batch = await settlement.GetFromJsonAsync<SettlementBatchDto>($"/api/v1/settlement/{Assert.Single(triggerResult!.BatchIds)}");
+        var batch = await settlement.GetFromJsonAsync<SettlementBatchDto>($"/api/v1/settlement/{triggerResult!.Id}");
         Assert.Equal(9850, batch!.TotalAmount);
     }
 
@@ -242,7 +237,7 @@ public class E2EFlowTests : IClassFixture<E2EFactory>
         var merchantAdmin = _factory.MerchantHost.CreateClient();
 
         var email = $"e2e-idem-{Guid.NewGuid():N}@example.com";
-        const string password = "E2ePass1234!";
+        const string password = "E2ePass123!";
 
         var register = await identity.PostAsJsonAsync("/api/v1/auth/register", new { Email = email, Password = password, FullName = "E2E Idempotency Owner" });
         register.EnsureSuccessStatusCode();

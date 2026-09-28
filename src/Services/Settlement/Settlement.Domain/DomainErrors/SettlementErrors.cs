@@ -18,7 +18,4 @@ public static class SettlementErrors
 
     public static Error LedgerTieOutMismatch =>
         new("Settlement.LedgerTieOutMismatch", "Batch totals do not match the ledger's daily payout figures; settlement was not completed.");
-
-    public static Error EmptyBatch =>
-        new("Settlement.EmptyBatch", "No payouts to settle for the requested date.");
 }

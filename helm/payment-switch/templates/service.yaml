@@ -12,9 +12,7 @@ spec:
   selector:
     app: {{ $svc.name }}
   ports:
-    # Step 9.5: 8080 like the k8s Services (and the compose/Prometheus :8080
-    # convention) — the Ingress backends address this port.
-    - port: 8080
+    - port: 80
       targetPort: {{ $svc.containerPort }}
       protocol: TCP
       name: http

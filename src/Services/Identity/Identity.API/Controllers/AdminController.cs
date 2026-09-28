@@ -1,6 +1,5 @@
 ﻿using Identity.API.Extensions;
 using Identity.Application.Commands.Role;
-using BuildingBlocks.Shared.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -8,7 +7,7 @@ using System.Security.Claims;
 
 namespace Identity.API.Controllers;
 
-[Authorize(Roles = RolePolicies.AdminOnly)]
+[Authorize(Roles = "Admin")]
 [Produces("application/json")]
 [EnableRateLimiting("Strict")]
 public class AdminController : BaseApiController
@@ -28,9 +27,9 @@ public class AdminController : BaseApiController
         [FromBody] AssignRoleCommand command,
         [FromServices] AssignRoleHandler handler)
     {
-        if (!Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var adminUserId))
-            return Unauthorized();
-        command = new AssignRoleCommand(adminUserId, command.TargetUserId, command.Role);
+        var adminUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (adminUserId is null) return Unauthorized();
+        command = new AssignRoleCommand(Guid.Parse(adminUserId), command.TargetUserId, command.Role);
         var result = await handler.Handle(command);
         return result.ToActionResult();
     }

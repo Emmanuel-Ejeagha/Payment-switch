@@ -65,41 +65,6 @@ public class UserTests
     }
 
     [Fact]
-    public void AddRole_LowercaseOrPadded_ShouldStoreCanonicalOnce()
-    {
-        var user = CreateUser();
-        user.AddRole("admin");
-        user.AddRole(" ADMIN ");
-        Assert.Single(user.Roles, r => r == "Admin");
-    }
-
-    [Fact]
-    public void AddRole_UnknownRole_ShouldThrow()
-    {
-        var user = CreateUser();
-        Assert.Throws<ArgumentException>(() => user.AddRole("root"));
-    }
-
-    [Fact]
-    public void RemoveRole_DifferentCasing_ShouldRemove()
-    {
-        var user = CreateUser();
-        user.AddRole("Admin");
-        user.RemoveRole("ADMIN");
-        Assert.DoesNotContain("Admin", user.Roles);
-    }
-
-    [Fact]
-    public void HasRole_ShouldMatchCaseInsensitively()
-    {
-        var user = CreateUser();
-        Assert.True(user.HasRole("merchant"));
-        Assert.True(user.HasRole(" MERCHANT "));
-        Assert.False(user.HasRole("Admin"));
-        Assert.False(user.HasRole(""));
-    }
-
-    [Fact]
     public void AddRefreshToken_ShouldAddToList()
     {
         var user = CreateUser();

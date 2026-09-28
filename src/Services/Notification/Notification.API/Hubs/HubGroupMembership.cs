@@ -1,4 +1,3 @@
-using BuildingBlocks.Shared.Auth;
 using Microsoft.AspNetCore.SignalR;
 using Notification.API.Services;
 using System.Security.Claims;
@@ -27,7 +26,7 @@ public static class HubGroupMembership
             return groups;
         }
 
-        if (RoleNames.IsInRole(user, RoleNames.Admin))
+        if (user.IsInRole("Admin"))
         {
             groups.Add("admin");
         }

@@ -11,10 +11,7 @@ public class SettlementBatchConfiguration : IEntityTypeConfiguration<SettlementB
     {
         builder.HasKey(b => b.Id);
         builder.Property(b => b.BatchDate).IsRequired();
-        // One batch per currency per day: a bare TotalAmount is only
-        // meaningful within a single currency.
-        builder.Property(b => b.Currency).HasMaxLength(3);
-        builder.HasIndex(b => new { b.BatchDate, b.Currency }).IsUnique();
+        builder.HasIndex(b => b.BatchDate).IsUnique();
         builder.Property(b => b.Status)
             .HasConversion(s => s.Value, s => SettlementStatus.FromString(s))
             .IsRequired();
