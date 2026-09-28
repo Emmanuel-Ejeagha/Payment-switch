@@ -7,17 +7,18 @@ The system simulates the core backend of payment processors like Stripe, Flutter
 
 ## Live Deployment
 
-The entire stack is deployed on **AWS EC2** (t3.small) using Docker Compose.  
-You can explore the live APIs here:
+The entire stack is deployed on **AWS EC2** (t3.small) using Docker Compose.
+You can explore the live system here:
 
-| Service        | Swagger UI                                         |
-|----------------|----------------------------------------------------|
-| Identity       | http://16.171.58.173/identity/swagger              |
-| Merchant       | http://16.171.58.173/merchant/swagger              |
-| Payment        | http://16.171.58.173/payment/swagger               |
-| Ledger         | http://16.171.58.173/ledger/swagger                |
-| Notification   | http://16.171.58.173/notification/swagger          |
-| Settlement     | http://16.171.58.173/settlement/swagger            |
+| Surface | URL |
+|---|---|
+| Merchant portal | http://16.171.58.173/ |
+| Admin portal (login) | http://16.171.58.173/admin/login |
+| API health (example) | http://16.171.58.173/identity/health/live |
+
+Swagger UI is **disabled in production** (and denied at the edge by design),
+so there are no public `/swagger` links — see `docs/prod-exposure.md`.
+API docs for integrators live in `docs/api-reference.md` and `docs/webhooks.md`.
 
 *(The instance stops automatically when credits run out, but you can always restart it.)*
 
@@ -29,11 +30,11 @@ The system follows **Domain‑Driven Design (DDD)**, **CQRS**, and **Event‑Dri
 ```
 ┌─────────────┐
 │ Clients │
-│ SPA / MAPI │
+│ Merchant / Admin portals (Next.js), public API, checkout │
 └──────┬──────┘
 │ HTTPS
 ┌──────▼──────┐
-│ Nginx │ (Reverse Proxy, TLS, Routing)
+│ Nginx │ (Reverse Proxy, TLS, Routing, per-service prefixes)
 └──────┬──────┘
 ┌─────────────────────┼─────────────────────┐
 │ │ │
@@ -46,7 +47,8 @@ The system follows **Domain‑Driven Design (DDD)**, **CQRS**, and **Event‑Dri
 │ │
 ┌──────▼──────┐ ┌────────▼────────┐
 │ RabbitMQ │ │ PostgreSQL │
-│ (Broker) │ │ (per service) │
+│ (Outbox → exchange → inbox, │ │ (per service) │
+│  retry/DLX → DLQ) │ │ │
 └──────┬──────┘ └────────┬────────┘
 │ │
 ┌──────────────┼────────────────────┼──────────────┐
@@ -54,7 +56,8 @@ The system follows **Domain‑Driven Design (DDD)**, **CQRS**, and **Event‑Dri
 ┌──────▼──────┐ ┌─────▼──────┐ ┌────────▼────────┐ ┌──▼──────────┐
 │ Ledger │ │ Notification│ │ Settlement │ │ Redis │
 │ Service │ │ Service │ │ Service │ │ (Cache/ │
-│ (Double-entry) │ │ (Retry) │ │ (Hangfire) │ │ Idempotency)│
+│ (Double-entry) │ │ (Retry + │ │ (Hangfire, │ │ Idempotency)│
+│ │ │ SignalR) │ │ reconcil.) │ │ │
 └─────────────┘ └────────────┘ └─────────────────┘ └─────────────┘
 
 ```
@@ -66,14 +69,14 @@ The system follows **Domain‑Driven Design (DDD)**, **CQRS**, and **Event‑Dri
 | Category               | Technologies                                                                 |
 |------------------------|------------------------------------------------------------------------------|
 | **Backend**            | .NET 10, ASP.NET Core, PostgreSQL 16, Redis 7, RabbitMQ 3, Hangfire          |
-| **Testing**            | xUnit, Moq, EF Core InMemory                                                 |
+| **Testing**            | xUnit + Moq, Testcontainers (real Postgres/RabbitMQ), k6 (load/soak), Playwright (E2E), Vitest (frontend) |
 | **Communication**      | REST (OpenAPI), RabbitMQ (AMQP), gRPC (internal sync calls)                 |
 | **Authentication**     | JWT, API Keys, service-to-service tokens (gRPC)                             |
 | **Validation**         | FluentValidation                                                             |
 | **Observability**      | Serilog (structured logging), OpenTelemetry, Jaeger (tracing), Prometheus (metrics), Grafana (dashboards) |
-| **Containerization**   | Docker, Docker Compose (local dev)                                           |
+| **Containerization**   | Docker, Docker Compose (live production runtime on EC2; dev via override-free base file) |
 | **Orchestration**      | Kubernetes (Deployments, Services, Ingress, ConfigMaps, Secrets)             |
-| **CI/CD**              | GitHub Actions (build, test, Docker build & push, deploy to Kubernetes)      |
+| **CI/CD**              | GitHub Actions (build, format gate, unit + Testcontainers integration tests, frontend typecheck/lint/build, Trivy/CodeQL/Gitleaks scans, Helm lint + kubeconform manifest validation, Docker build & push, gated deploy, nightly E2E + k6) |
 | **Scheduling**         | Hangfire (nightly settlement batch)                                          |
 
 ---
@@ -82,12 +85,12 @@ The system follows **Domain‑Driven Design (DDD)**, **CQRS**, and **Event‑Dri
 
 | Service        | Database           | Responsibilities                                                                                     |
 |----------------|--------------------|------------------------------------------------------------------------------------------------------|
-| **Identity**   | `IdentityDb`       | User registration, login, JWT issuance, role‑based access control                |
-| **Merchant**   | `MerchantDb`       | Merchant onboarding, activation/suspension, webhook & payment method configuration, API key management |
-| **Payment**    | `PaymentDb`        | Payment intent creation, authorization, capture, void, refund, idempotency, routing (simulated)      |
-| **Ledger**     | `LedgerDb`         | Double‑entry ledger, merchant balances (available/pending/reserved), immutable journal entries       |
-| **Notification**| `NotificationDb`  | Email / SMS / Webhook dispatch with retry & exponential backoff, driven by payment events            |
-| **Settlement** | `SettlementDb`     | End‑of‑day settlement batch calculation, merchant payouts, scheduled via Hangfire                    |
+| **Identity**   | `IdentityDb`       | Registration + email verification, login + JWT/refresh rotation, password reset/change, account lockout, RBAC (Admin/Merchant/Support) |
+| **Merchant**   | `MerchantDb`       | Merchant onboarding with approval lifecycle, settlement/bank info, webhook config + encrypted signing secrets, API key management |
+| **Payment**    | `PaymentDb`        | Payment intent lifecycle (authorize/capture/void/refund, partial ops), guarded state machine, idempotency keys, public secret-key API, card-token vault, payment links + hosted checkout, subscriptions/invoices, signed outbound webhooks |
+| **Ledger**     | `LedgerDb`         | Double‑entry ledger, merchant balances (available/pending/reserved), immutable journal entries, crash-safe idempotent posting, reconciliation reports |
+| **Notification**| `NotificationDb`  | Email / SMS / Webhook dispatch with retry & exponential backoff, DLQ recording, templates, preferences, SignalR realtime fan-out |
+| **Settlement** | `SettlementDb`     | Nightly + on-demand settlement batches with ledger tie-out, idempotent per-date batches, payout rows, scheduled via Hangfire |
 
 All services follow **Clean Architecture** with distinct **Domain**, **Application**, **Infrastructure**, and **API** layers.
 
@@ -117,6 +120,14 @@ All services follow **Clean Architecture** with distinct **Domain**, **Applicati
 - [kubectl](https://kubernetes.io/docs/tasks/tools/)
 - [Git](https://git-scm.com/)
 
+### Prerequisites
+
+- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Engine + Compose v2)
+- [Node.js 22+](https://nodejs.org/) (for the Next.js portals)
+- [Git](https://git-scm.com/)
+- Optional for cluster work: [kubectl](https://kubernetes.io/docs/tasks/tools/), [Helm](https://helm.sh/)
+
 ### Local Development (Docker Compose)
 
 1. **Clone the repository**
@@ -126,24 +137,61 @@ All services follow **Clean Architecture** with distinct **Domain**, **Applicati
    cd PaymentSwitch
    ```
 
-2. **Start infrastructure services**
+2. **Create your `.env`** (copy `.env.example`; every secret is required —
+   compose fails fast on missing values)
+
+3. **Start the whole stack**
 
    ```bash
-   docker-compose up -d
+   docker compose up -d --build
+   docker compose ps          # wait until all services report healthy
    ```
 
-3. **Run each microservice** (each in its own terminal)
+   For production TLS termination, overlay the TLS config (see `docs/tls.md`):
 
    ```bash
-   dotnet run --project src/Services/Identity/Identity.API
-   dotnet run --project src/Services/Merchant/Merchant.API
-   dotnet run --project src/Services/Payment/Payment.API
-   dotnet run --project src/Services/Ledger/Ledger.API
-   dotnet run --project src/Services/Notification/Notification.API
-   dotnet run --project src/Services/Settlement/Settlement.API
+   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
    ```
 
-   Access APIs at `http://localhost:5xxx/swagger` (ports are configured in launchSettings.json).
+4. **Verify**
+
+   ```bash
+   curl -fsS http://localhost/identity/health/live     # via nginx
+   bash infra/smoke/compose-smoke.sh                   # per-API health + metrics matrix
+   ```
+
+Services and ports (host → container):
+
+| Service | URL / port |
+|---|---|
+| Nginx (only public ingress) | `http://localhost` (`:80`, `:443` in prod overlay) |
+| Merchant portal | `http://localhost/` |
+| Admin portal | `http://localhost/admin/login` |
+| APIs (loopback only) | `127.0.0.1:5146` (identity), `:5237` (merchant), `:5118` (payment), `:5320` (ledger), `:5281` (notification), `:5392` (settlement) → container `:8080` |
+| RabbitMQ mgmt / metrics | `127.0.0.1:15672` / `:15692` (loopback only) |
+| Postgres | `127.0.0.1:5432` (loopback only) |
+
+Swagger UI is served in Development only (`/swagger` on each API's direct port);
+it is disabled in Production and denied at the edge — see `docs/prod-exposure.md`.
+
+### Running tests
+
+```bash
+# Unit tests (one project at a time)
+dotnet test tests/Unit/Payment.Application.Tests/Payment.Application.Tests.csproj -c Release
+
+# Integration tests (need Docker Desktop running; run projects one at a time)
+dotnet test tests/Integration/Ledger.API.IntegrationTests/Ledger.API.IntegrationTests.csproj -c Release
+
+# Cross-service E2E
+dotnet test tests/Integration/E2E.IntegrationTests/E2E.IntegrationTests.csproj -c Release
+
+# Frontend (per app in apps/merchant, apps/admin)
+npm run typecheck && npm run lint && npm run test && npm run build
+
+# Load (k6 must be installed; staging only)
+k6 run tests/load/create-intent-capture.js
+```
 
 ### Kubernetes Deployment
 
@@ -156,12 +204,33 @@ kubectl apply -f k8s/namespace.yaml
 kubectl apply -f k8s/configmap.yaml
 DB_PASSWORD=$(openssl rand -base64 24)
 JWT_SECRET=$(openssl rand -base64 32)
+SERVICE_TOKEN_SECRET=$(openssl rand -base64 32)
+RABBITMQ_PASS=$(openssl rand -base64 24)
+SEED_ADMIN_PASSWORD=$(openssl rand -base64 18)
+WEBHOOK_KEY=$(openssl rand -base64 32)
+GRAFANA_PASSWORD=$(openssl rand -base64 18)
+SMTP_PASS='<smtp-password>'
 kubectl create secret generic payment-switch-secret \
   --namespace payment-switch \
-  --from-literal=Jwt__Secret="$JWT_SECRET" \
   --from-literal=Postgres__Password="$DB_PASSWORD" \
+  --from-literal=Jwt__Secret="$JWT_SECRET" \
+  --from-literal=ServiceToken__Secret="$SERVICE_TOKEN_SECRET" \
+  --from-literal=RabbitMQ__UserName="paymentswitch" \
+  --from-literal=RabbitMQ__Password="$RABBITMQ_PASS" \
+  --from-literal=Seed__AdminPassword="$SEED_ADMIN_PASSWORD" \
+  --from-literal=WebhookSecretEncryption__Key="$WEBHOOK_KEY" \
+  --from-literal=GrafanaAdminUser="admin" \
+  --from-literal=GrafanaAdminPassword="$GRAFANA_PASSWORD" \
+  --from-literal=Smtp__Password="$SMTP_PASS" \
   --from-literal=IdentityDb__ConnectionString="Host=postgres;Database=IdentityDb;Username=paymentswitch;Password=$DB_PASSWORD" \
-  # ... add all connection strings (see docs/deployment.md)
+  --from-literal=MerchantDb__ConnectionString="Host=postgres;Database=MerchantDb;Username=paymentswitch;Password=$DB_PASSWORD" \
+  --from-literal=PaymentDb__ConnectionString="Host=postgres;Database=PaymentDb;Username=paymentswitch;Password=$DB_PASSWORD" \
+  --from-literal=LedgerDb__ConnectionString="Host=postgres;Database=LedgerDb;Username=paymentswitch;Password=$DB_PASSWORD" \
+  --from-literal=NotificationDb__ConnectionString="Host=postgres;Database=NotificationDb;Username=paymentswitch;Password=$DB_PASSWORD" \
+  --from-literal=SettlementDb__ConnectionString="Host=postgres;Database=SettlementDb;Username=paymentswitch;Password=$DB_PASSWORD"
+```
+
+Every key above is required at pod start (`Jwt__PreviousSecret` excepted — rotation windows only). The full key set also lives in `k8s/secret.example.yaml`.
 ```
 
 **Deploy all services**
@@ -170,46 +239,48 @@ kubectl create secret generic payment-switch-secret \
 kubectl apply -f k8s/
 ```
 
-**Access via Ingress**
+**Access via Ingress** (paths mirror the nginx compose routes; Swagger is
+dev-only, so these are health and app routes)
 
-- Identity: http://localhost/identity/swagger
-- Merchant: http://localhost/merchant/swagger
-- Payment: http://localhost/payment/swagger
-- Ledger: http://localhost/ledger/swagger
-- Notification: http://localhost/notification/swagger
-- Settlement: http://localhost/settlement/swagger
+- Merchant portal: http://localhost/ (admin portal: http://localhost/admin/login)
+- Identity health: http://localhost/identity/health/live
+- Merchant health: http://localhost/merchant/health/ready
 
 ### Observability
 
-| Tool       | Access URL / Port          | Purpose                             |
-|------------|----------------------------|-------------------------------------|
-| Jaeger     | http://localhost:16686     | Distributed traces across services  |
-| Prometheus | http://localhost:9090      | Metrics scraping                    |
-| Grafana    | http://localhost:3000      | Dashboards (admin / `GRAFANA_ADMIN_PASSWORD`) |
+| Tool       | Access | Purpose                             |
+|------------|-----------------------------------|-------------------------------------|
+| Jaeger     | cluster-internal `:16686` (use `kubectl port-forward`) | Distributed traces across services  |
+| Prometheus | cluster-internal `:9090` (use `kubectl port-forward`) | Metrics scraping |
+| Grafana    | cluster-internal `:3000` (use `kubectl port-forward`) | Dashboards (see secrets for admin password) |
 
 *(Grafana datasource + dashboards are provisioned from `infra/grafana/provisioning`; alert rules live in `infra/prometheus/alerts.yml`.)*
 
 CI/CD Pipeline
-The project uses GitHub Actions:
+The project uses GitHub Actions (`.github/workflows/`):
 
-Triggers: push to main and pull requests.
+Triggers: push to main and pull requests (plus nightly E2E and load schedules).
 
-Build & Test: Restores, builds, and runs all unit tests.
+- Build & Test: restore, `dotnet format` gate, Release build, NuGet vulnerability audit, unit tests with coverage.
+- Integration Tests: Testcontainers suites (real Postgres + RabbitMQ), run sequentially per service.
+- Frontend Build & Lint: typecheck, lint, unit/component tests, and production builds for both portals.
+- Manifest Validation: `helm lint`, `helm template`, and kubeconform schema validation of `k8s/` and the rendered chart.
+- Docker Build & Push: builds all six API images plus both frontend images with immutable `:<sha>` (and `:latest`) tags, Trivy-scanned, pushed to GHCR (only on push to main).
+- Security Scan: CodeQL (C# + JS) and Gitleaks secret scanning on push, PR, and weekly schedule.
+- Deploy to Kubernetes: gated on the `production` environment; pins immutable image SHAs via `kubectl set image`, verifies rollouts, auto-reverts on failure.
+- E2E Nightly: full cross-service flow (register → authorize → capture → ledger → notification → settlement) plus k6 load/soak thresholds.
 
-Docker Build & Push: Builds all six Docker images and pushes them to GitHub Container Registry (only on push to main).
-
-Deploy to Kubernetes: Updates the Kubernetes deployments with the new image tags and verifies rollouts.
-
-Required GitHub Secrets
+Required GitHub Secrets / Variables
 Secret Name	Description
 KUBE_CONFIG	Base64‑encoded kubeconfig for the target cluster
 GITHUB_TOKEN	Automatically provided by GitHub Actions
+FRONTEND_API_URL (variable)	Public API origin baked into the frontend images at build time
 Project Structure
 ```
 PaymentSwitch/
 ├── src/
 │   ├── BuildingBlocks/
-│   │   └── BuildingBlocks.Shared/         # Shared kernel (Result, AggregateRoot, etc.)
+│   │   └── BuildingBlocks.Shared/         # Shared kernel (Result, auth, rate limiting, OTel, etc.)
 │   ├── Protos/                            # gRPC contracts
 │   └── Services/
 │       ├── Identity/                      # Identity microservice
@@ -219,30 +290,52 @@ PaymentSwitch/
 │       ├── Notification/                  # Notification microservice
 │       └── Settlement/                    # Settlement microservice
 ├── apps/
-│   ├── merchant/                          # Merchant portal (Next.js SPA)
-│   └── admin/                             # Admin portal (Next.js SPA)
+│   ├── merchant/                          # Merchant portal (Next.js, served at /)
+│   └── admin/                             # Admin portal (Next.js, served at /admin via basePath)
 ├── packages/
 │   ├── shared/                            # Shared TypeScript types & utils
 │   └── ui/                                # Shared React components
 ├── tests/
-│   ├── Unit/                              # Unit tests per service
-│   └── Integration/                       # Integration tests per service
-├── k8s/                                   # Kubernetes manifests
-├── helm/                                  # Helm chart
-├── infra/                                 # Nginx, Prometheus, Postgres configs
-├── .github/workflows/                     # CI/CD pipeline
-├── docs/                                  # Detailed documentation
+│   ├── Unit/                              # Unit tests per service (+ API/middleware suites)
+│   ├── Integration/                       # Testcontainers suites per service + cross-service E2E
+│   ├── load/                              # k6 load/soak scripts (create-intent → capture)
+│   └── Performance/                       # k6 nightly smoke
+├── e2e/                                   # Playwright end-to-end tests
+├── k8s/                                   # Kubernetes manifests (Deployments, Services, Ingress, PDBs, NetworkPolicies)
+├── helm/
+│   └── payment-switch/                    # Helm chart mirroring k8s/
+├── infra/
+│   ├── nginx/{http,tls}/                  # Edge configs (dev HTTP, prod TLS termination)
+│   ├── prometheus/                        # Scrape config + alert rules
+│   ├── grafana/provisioning/              # Datasources + dashboards
+│   ├── alertmanager/                      # Alert routing
+│   ├── postgres/                          # Multi-database init scripts
+│   ├── backup/                            # Nightly pg-backup job + restore drill
+│   └── smoke/                             # Compose smoke test (health + metrics matrix)
+├── docker-compose.yml                     # Live runtime (all services, health-gated startup)
+├── docker-compose.prod.yml                # Prod overlay (TLS :443)
+├── Directory.Build.props                  # Solution-wide build policy (incl. NuGet audit gate)
+├── .github/workflows/                     # ci-cd, e2e-nightly, k6-nightly, security pipelines
+├── docs/                                  # runbook, deployment, tls, secrets, webhooks, api-reference, ...
 └── PaymentSwitch.slnx
 ```
-Future Enhancements
-- Real‑time webhooks with SignalR *(implemented — notification hub + portal UI)*
+Further documentation: `docs/runbook.md` (operations), `docs/deployment.md` (k8s/Helm/CI-CD),
+`docs/tls.md`, `docs/secrets.md`, `docs/api-reference.md`, `docs/webhooks.md`,
+`docs/prod-exposure.md`, `docs/roles.md`, `docs/branch-protection.md`,
+`docs/load-testing.md`, `docs/frontend-tests.md`, `docs/messaging-registry.md`,
+`docs/api-versioning.md`, `docs/RETENTION.md`.
+Delivered recently (previously listed here as future work)
+- Real‑time webhooks with SignalR *(notification hub + both portals live)*
+- Merchant Portal *(Next.js, live)* and Admin Portal *(Next.js, live, role-gated)*
+- Helm charts for Kubernetes deployment *(chart mirrors k8s/, lint/template/kubeconform-gated in CI)*
+- Public Payments API with secret‑key auth (Stripe/Paystack‑style, idempotency keys enforced)
+- Card tokenization vault, hosted Checkout page, payment links
+- Subscriptions, plans, invoices & recurring billing worker
+- Multi‑currency balances with exponent-aware money handling *(FX conversion pending)*
+- Production TLS termination at nginx/Ingress plus default-deny NetworkPolicies
+
+Still ahead
 - Full OAuth2 / OpenID Connect flows
-- Multi‑currency support with FX conversion *(multi‑currency balances implemented; FX pending)*
-- Merchant Portal *(implemented — Next.js)*
-- Admin Portal *(implemented — Next.js)*
-- Helm charts for Kubernetes deployment *(scaffolded)*
-- Public Payments API with secret‑key auth (Stripe/Paystack‑style)
-- Card tokenization, 3DS, and a hosted Checkout page
-- Subscriptions & recurring billing
+- FX conversion for multi‑currency settlement
 - Disputes / chargebacks
-- Production‑ready TLS & network policies
+- Admin-portal support for the read-only Support role (API already grants it)

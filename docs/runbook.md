@@ -47,15 +47,11 @@ the stack consistent. For zero-downtime deployment of a single service,
 ### Verifying a deploy
 
 ```bash
-curl -fsS http://localhost/identity/health/live
-curl -fsS http://localhost/merchant/health/ready
+curl -fsS http://localhost/identity/api/v1/health/live
+curl -fsS http://localhost/merchant/api/v1/health/ready
 curl -I http://localhost/            # merchant portal
 curl -I http://localhost/admin/login # admin portal
 ```
-
-Health lives at `/health/live|ready` on each API (no `/api/v1` prefix);
-nginx strips the `/<service>/` prefix when proxying (Step 8.1). For metrics
-and the full per-API matrix, run `bash infra/smoke/compose-smoke.sh`.
 
 ## 2. TLS (production)
 
@@ -64,14 +60,13 @@ TLS terminates at nginx (see `docs/tls.md`):
 1. Obtain certs with certbot: `sudo certbot certonly --standalone -d <domain>`.
 2. Copy `fullchain.pem` + `privkey.pem` into `infra/nginx/tls/certs/`
    (gitignored).
-3. Bring up the production overlay (adds `:443` + the TLS server blocks;
-   plain `docker compose up` stays HTTP-only on `:80`):
-   `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d`.
+3. Switch nginx to TLS mode in `docker-compose.yml` (mount
+   `./infra/nginx/tls:/etc/nginx/tls:ro`) and `docker compose up -d nginx`.
 4. Confirm the redirect + HSTS:
-    ```bash
-    curl -I http://<domain>/identity/health/live   # 301 -> https
-    curl -I https://<domain>/                        # 200
-    ```
+   ```bash
+   curl -I http://<domain>/identity/api/v1/health   # 301 -> https
+   curl -I https://<domain>/                        # 200
+   ```
 
 ### Renewal
 
@@ -84,45 +79,28 @@ Test renewal with `sudo certbot renew --dry-run`.
 All state lives in the named volumes (`postgres_data`, `rabbitmq_data`,
 `prometheus_data`, `grafana_data`; `redis_data` is cache).
 
-### Postgres (critical) — automated job + drill
-
-The `backup` compose service runs `infra/backup/pg-backup.sh` on a daily
-loop: per-database custom-format dumps for all six DBs plus a globals dump,
-a `SHA256SUMS` manifest, `latest-<db>` symlinks, and 14-daily pruning — all
-in the `pgbackups` volume. No schedule to configure; it starts with the
-stack (gated on postgres healthy).
+### Postgres (critical)
 
 ```bash
-# Inspect recent artifacts:
-docker compose exec backup ls -l /backups | tail
+# Full logical dump of every paymentswitch database, hourly/daily:
+docker compose exec -T postgres pg_dump -U paymentswitch -F c -f - -C IdentityDb \
+  | gzip > /var/backups/paymentswitch/identitydb-$(date +%F_%H%M).dump.gz
+# ... repeat for MerchantDb, PaymentDb, LedgerDb, NotificationDb, SettlementDb
 ```
 
-A volume alone is not a backup. Sync off-host nightly from the host cron:
+`pg_dumpall` is a simpler one-shot for the whole instance (superuser):
 
 ```bash
-# Host crontab: copy the volume contents to object storage daily.
-docker run --rm -v paymentswitch_pgbackups:/data -v /var/backups:/backup \
-  alpine sh -c 'tar czf /backup/pgbackups-$(date +%F).tgz -C /data .'
-# + upload /var/backups/pgbackups-*.tgz to S3 (14 daily + 12 monthly).
+docker compose exec -T postgres pg_dumpall -U paymentswitch \
+  | gzip > /var/backups/paymentswitch/pg-dumpall-$(date +%F_%H%M).sql.gz
 ```
 
-### Restore drill (Step 10.1 — run quarterly)
-
-`infra/backup/restore-drill.sh` proves restorability against a scratch
-container (never the live volume): checksums the manifest, restores every
-`latest-*.dump.gz`, and asserts each database opens with countable core
-tables. Exit 0 = pass.
+Retention: keep 14 daily + 12 monthly copies off-host (S3/object storage).
+Restore:
 
 ```bash
-# Copy one backup set locally, then:
-bash infra/backup/restore-drill.sh /var/backups/latest-copy
-# Manual single-DB restore (same mechanism the drill uses):
-gunzip -c IdentityDb-<ts>.dump.gz | docker compose exec -T postgres \
-  pg_restore -U paymentswitch -d IdentityDb --no-owner
+gunzip -c backup.sql.gz | docker compose exec -T postgres psql -U paymentswitch -d postgres
 ```
-
-Record each drill (date + result + operator) in the ops log. A drill that
-is overdue is an incident: fix backup/restore before it becomes an emergency.
 
 ### RabbitMQ / Prometheus / Grafana
 
@@ -138,13 +116,9 @@ docker run --rm -v paymentswitch_prometheus_data:/data -v /var/backups:/backup \
 
 - **Health endpoints:** each API exposes `/health/live` and `/health/ready`
   (nginx proxies them; used by the Docker healthchecks).
-- **Metrics:** Prometheus scrapes `/metrics` from each API (port 8080,
-  `metrics_path` pinned in `infra/prometheus/prometheus.yml`) and RabbitMQ
-  (`:15692`, via the `rabbitmq_prometheus` plugin enabled in compose/k8s).
-  Verify with `bash infra/smoke/compose-smoke.sh` (per-API health through
-  nginx + per-API exposition on loopback). Grafana dashboards are provisioned
-  from `infra/grafana`. Alert rules live in `infra/prometheus/alerts.yml`
-  (fired via Alertmanager).
+- **Metrics:** Prometheus scrapes `/metrics` from each API (port 8080) and
+  RabbitMQ; Grafana dashboards are provisioned from `infra/grafana`.
+  Alert rules live in `infra/prometheus/alerts.yml` (fired via Alertmanager).
 - **Traces:** OpenTelemetry OTLP -> Jaeger (`http://jaeger:4317`).
 - **Logs:** `docker compose logs -f <service>` (structured JSON via Serilog).
   For a tail of everything: `docker compose logs -f --tail=200`.
@@ -186,15 +160,6 @@ The inbox/outbox are resilient by design (idempotent processing, DLX/DLQ). If
 a consumer is down, restart it; messages accumulate in the queue and drain on
 recovery.
 
-### Settlement nightly job misbehaving
-
-The 01:00 batch is a Hangfire recurring job (`nightly-settlement`); check
-`docker compose logs settlement-api` for the trigger output and tie-out
-result. The HTML dashboard (`/hangfire`) is intentionally unreachable from
-the outside — see "Hangfire in production" in `docs/prod-exposure.md` for why
-and how to inspect it safely. To rerun a date manually, `POST
-/api/v1/settlement/trigger` as Admin (duplicate-safe: one batch per date).
-
 ### Disk filling up
 
 ```bash
@@ -221,8 +186,7 @@ automatically — see `docs/deployment.md`.)
 ## 6. k8s / Helm — implemented, not live
 
 The `k8s/` and `helm/` artefacts are validated by CI (`helm lint`, `helm
-template`, kubeconform on both the manifests and the render) but the
-production runtime is compose. Before relying
+template`, YAML parse) but the production runtime is compose. Before relying
 on k8s in production:
 
 - Apply against a staging cluster and validate rollouts/HPA/NetworkPolicies.

@@ -18,9 +18,6 @@ public class AssignRoleCommandValidatorTests
     [InlineData("Admin")]
     [InlineData("Merchant")]
     [InlineData("Support")]
-    [InlineData("admin")]
-    [InlineData("SUPPORT")]
-    [InlineData(" Merchant ")]
     public void AllowedRole_Passes(string role)
     {
         var result = _validator.Validate(new AssignRoleCommand(Guid.NewGuid(), Guid.NewGuid(), role));

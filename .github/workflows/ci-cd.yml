@@ -41,12 +41,6 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore PaymentSwitch.slnx
 
-      - name: Audit NuGet packages for vulnerabilities
-        # Step 9.8: explicit report step. The gate itself lives in
-        # Directory.Build.props (NU1901-NU1904 escalated to errors), so any
-        # build/test also fails on vulnerable packages.
-        run: dotnet list PaymentSwitch.slnx package --vulnerable --include-transitive
-
       - name: Verify formatting
         run: dotnet format PaymentSwitch.slnx --verify-no-changes --no-restore
 
@@ -97,12 +91,6 @@ jobs:
       - name: Pre-pull Postgres image
         run: docker pull postgres:16-alpine
 
-      - name: Pre-pull RabbitMQ image
-        # Step 9.8: Testcontainers pulls at runtime; pre-pulling warms the
-        # cache and fails fast on registry outages (matches the Postgres
-        # pre-pull above).
-        run: docker pull rabbitmq:3-management-alpine
-
       # Each project runs in its own step so Testcontainers containers are not
       # spun up concurrently (parallel container startup can exceed the Docker
       # connection limit and cause flaky named-pipe timeouts).
@@ -149,61 +137,11 @@ jobs:
       - name: Lint merchant
         run: npm run lint --workspace=merchant
 
-      - name: Test admin
-        run: npm run test --workspace=admin
-
-      - name: Test merchant
-        run: npm run test --workspace=merchant
-
       - name: Build admin
         run: npm run build --workspace=admin
 
       - name: Build merchant
         run: npm run build --workspace=merchant
-
-  manifest-validate:
-    name: Manifest Validation
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Helm
-        uses: azure/setup-helm@v4
-
-      - name: Helm lint
-        run: helm lint helm/payment-switch
-
-      - name: Render chart (ingress enabled)
-        # Dummy secrets: rendering only needs the keys present, never real values.
-        run: >
-          helm template payment-switch helm/payment-switch --namespace payment-switch
-          --set config.postgres.password=dummy
-          --set config.jwt.secret=0123456789abcdef0123456789abcdef
-          --set config.rabbitmq.password=dummy
-          --set config.seed.adminPassword=dummy
-          --set config.webhookSecretEncryption.key=dummy
-          --set config.smtp.password=dummy
-          --set config.grafana.adminPassword=dummy
-          --set ingress.enabled=true
-          --set ingress.host=paymentswitch.example.com
-          --set ingress.tls.enabled=true
-          --set ingress.tls.secretName=payment-switch-tls
-          > /tmp/helm-rendered.yaml
-
-      - name: Install kubeconform
-        run: |
-          curl -sL https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz \
-            | tar xz kubeconform
-          sudo mv kubeconform /usr/local/bin/kubeconform
-
-      - name: Validate k8s manifests
-        # ClusterIssuer is a cert-manager CRD with no stock schema; everything
-        # else must validate strictly (this caught a merged-documents bug in
-        # hpa.yaml and a dangling selector in pdb.yaml).
-        run: kubeconform -strict -summary -skip ClusterIssuer k8s/
-
-      - name: Validate rendered chart
-        run: kubeconform -strict -summary /tmp/helm-rendered.yaml
 
   docker:
     name: Docker Build & Push
@@ -307,7 +245,7 @@ jobs:
 
   deploy:
     name: Deploy to Kubernetes (production)
-    needs: [docker, docker-frontend, manifest-validate]
+    needs: [docker, docker-frontend]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: production

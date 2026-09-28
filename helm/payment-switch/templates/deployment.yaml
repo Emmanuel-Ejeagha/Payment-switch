@@ -196,7 +196,6 @@ spec:
               drop:
                 - ALL
             readOnlyRootFilesystem: true
-          # Step 9.5: probe timings match the k8s manifests exactly.
           startupProbe:
             httpGet:
               path: {{ $svc.probes.livenessPath }}
@@ -208,18 +207,14 @@ spec:
             httpGet:
               path: {{ $svc.probes.livenessPath }}
               port: {{ $svc.containerPort }}
-            initialDelaySeconds: 10
-            periodSeconds: 15
-            timeoutSeconds: 5
-            failureThreshold: 3
+            initialDelaySeconds: 15
+            periodSeconds: 10
           readinessProbe:
             httpGet:
               path: {{ $svc.probes.readinessPath }}
               port: {{ $svc.containerPort }}
-            initialDelaySeconds: 15
-            periodSeconds: 20
-            timeoutSeconds: 5
-            failureThreshold: 3
+            initialDelaySeconds: 10
+            periodSeconds: 5
 ---
 {{- end }}
 {{- end }}

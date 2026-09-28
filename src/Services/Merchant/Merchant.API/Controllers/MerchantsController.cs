@@ -16,7 +16,6 @@ using Merchant.Application.Features.Commands.UpdateSettlementInfo;
 using Merchant.Application.Features.Queries.GetMerchantByEmail;
 using Merchant.Application.Features.Queries.GetMerchantById;
 using Merchant.Application.Features.Queries.ListMerchants;
-using BuildingBlocks.Shared.Auth;
 using BuildingBlocks.Shared.Paging;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -91,7 +90,7 @@ public class MerchantsController : BaseApiController
     /// <param name="handler">Handler injected via DI.</param>
     /// <returns>200 if activated, 400 if transition invalid, 404 if not found.</returns>
     [HttpPost("{id:guid}/activate")]
-    [Authorize(Roles = RolePolicies.AdminOnly)]
+    [Authorize(Roles = "Admin")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
@@ -110,7 +109,7 @@ public class MerchantsController : BaseApiController
     /// <param name="handler">Handler injected via DI.</param>
     /// <returns>200 if approved, 400 if transition invalid, 404 if not found.</returns>
     [HttpPost("{id:guid}/approve")]
-    [Authorize(Roles = RolePolicies.AdminOnly)]
+    [Authorize(Roles = "Admin")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
@@ -130,7 +129,7 @@ public class MerchantsController : BaseApiController
     /// <param name="handler">Handler injected via DI.</param>
     /// <returns>200 if rejected, 400 if transition invalid, 404 if not found.</returns>
     [HttpPost("{id:guid}/reject")]
-    [Authorize(Roles = RolePolicies.AdminOnly)]
+    [Authorize(Roles = "Admin")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
@@ -150,7 +149,7 @@ public class MerchantsController : BaseApiController
     /// <param name="handler">Handler injected via DI.</param>
     /// <returns>200 if suspended, 400 if transition invalid, 404 if not found.</returns>
     [HttpPost("{id:guid}/suspend")]
-    [Authorize(Roles = RolePolicies.AdminOnly)]
+    [Authorize(Roles = "Admin")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
@@ -169,7 +168,7 @@ public class MerchantsController : BaseApiController
     /// <param name="handler">Handler injected via DI.</param>
     /// <returns>200 if reactivated, 400 if transition invalid, 404 if not found.</returns>
     [HttpPost("{id:guid}/reactivate")]
-    [Authorize(Roles = RolePolicies.AdminOnly)]
+    [Authorize(Roles = "Admin")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
@@ -274,23 +273,22 @@ public class MerchantsController : BaseApiController
     }
 
     /// <summary>
-    /// List merchants with paging (Admin + Support read).
+    /// List merchants with paging (admin only).
     /// </summary>
     /// <param name="handler">Handler injected via DI.</param>
     /// <param name="skip">Number of records to skip (default 0).</param>
     /// <param name="take">Number of records to take (default 20).</param>
     /// <returns>A list of merchant DTOs.</returns>
     [HttpGet]
-    [Authorize(Roles = RolePolicies.ReadOnly)]
+    [Authorize(Roles = "Admin")]
     [ProducesResponseType(typeof(List<MerchantDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> List(
         [FromServices] ListMerchantsHandler handler,
         [FromQuery] int skip = PageBounds.DefaultSkip,
-        [FromQuery] int take = PageBounds.DefaultTake,
-        [FromQuery] string? search = null)
+        [FromQuery] int take = PageBounds.DefaultTake)
     {
         var (normalizedSkip, normalizedTake) = PageBounds.Normalize(skip, take);
-        var result = await handler.Handle(new ListMerchantsQuery(normalizedSkip, normalizedTake, search));
+        var result = await handler.Handle(new ListMerchantsQuery(normalizedSkip, normalizedTake));
         if (result.IsFailure) return result.ToActionResult();
 
         Response.Headers["X-Total-Count"] = result.Value!.TotalCount.ToString(CultureInfo.InvariantCulture);

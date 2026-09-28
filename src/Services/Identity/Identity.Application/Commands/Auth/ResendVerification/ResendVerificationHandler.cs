@@ -48,12 +48,7 @@ public class ResendVerificationHandler
 
         var user = await _userRepository.GetByEmailAsync(command.Email, cancellationToken);
         if (user == null)
-        {
-            // Respond identically for unknown addresses so the endpoint cannot be
-            // used to enumerate which emails have accounts.
-            _logger.LogWarning("Verification resend requested for unknown {Identifier}", DataMasker.MaskEmail(command.Email));
-            return Result.Success();
-        }
+            return IdentityErrors.UserNotFoundByEmail(command.Email);
 
         if (user.EmailConfirmed)
             return IdentityErrors.EmailAlreadyVerified;

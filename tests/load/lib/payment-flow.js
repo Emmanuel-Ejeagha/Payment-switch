@@ -11,7 +11,7 @@ import http from 'k6/http';
  *   mock gateway docs).
  */
 
-const PAYMENT_BASE_URL = __ENV.PAYMENT_BASE_URL || 'http://localhost/payment';
+const PAYMENT_BASE_URL = __ENV.PAYMENT_BASE_URL || 'http://localhost:8080';
 const API_KEY = __ENV.API_KEY || '';
 const AMOUNT = Number(__ENV.PAYMENT_AMOUNT || 10000);
 const CURRENCY = __ENV.PAYMENT_CURRENCY || 'USD';

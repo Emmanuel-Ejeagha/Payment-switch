@@ -1,5 +1,4 @@
 ﻿using BuildingBlocks.Shared.Aggregate;
-using BuildingBlocks.Shared.Auth;
 using Identity.Domain.DomainEvents;
 using Identity.Domain.ValueObjects;
 
@@ -19,7 +18,6 @@ public class User : AggregateRoot
     public DateTime? PasswordResetTokenExpiresAt { get; private set; }
     public int AccessFailedCount { get; private set; }
     public DateTime? LockoutEnd { get; private set; }
-    public uint RowVersion { get; private set; }
     private readonly List<string> _roles = new();
     private readonly List<TokenValue> _refreshTokens = new();
     public IReadOnlyList<string> Roles => _roles.AsReadOnly();
@@ -33,7 +31,7 @@ public class User : AggregateRoot
         PasswordHash = passwordHash ?? throw new ArgumentNullException(nameof(passwordHash));
         FullName = fullName ?? throw new ArgumentNullException(nameof(fullName));
         IsActive = true;
-        _roles = new List<string> { RoleNames.Merchant }; // default role
+        _roles = new List<string> { "Merchant" }; // default role
         AddDomainEvent(new UserRegisteredDomainEvent(Id, email.Value, fullName.Value));
     }
 
@@ -130,16 +128,7 @@ public class User : AggregateRoot
     }
 
     public void Activate() => IsActive = true;
-
-    /// <summary>
-    /// Deactivates the account and revokes every refresh token, so a
-    /// suspended user cannot keep minting access tokens (see Step 2.1).
-    /// </summary>
-    public void Deactivate()
-    {
-        IsActive = false;
-        RevokeAllRefreshTokens();
-    }
+    public void Deactivate() => IsActive = false;
 
     /// <summary>Consecutive failed sign-in attempts tolerated before the account is locked.</summary>
     public const int MaxAccessFailedAttempts = 5;
@@ -175,32 +164,16 @@ public class User : AggregateRoot
         LockoutEnd = null;
     }
 
-    /// <summary>
-    /// Adds a role, normalizing to canonical casing (Step 7.5: roles are
-    /// case-insensitive — "admin" and " Admin " both store "Admin", never a
-    /// duplicate). Throws on unknown roles; validate user input with the
-    /// command validator first.
-    /// </summary>
     public void AddRole(string role)
     {
-        var canonical = RoleNames.Normalize(role)
-            ?? throw new ArgumentException($"Unknown role '{role}'.", nameof(role));
-        if (!HasRole(canonical))
-            _roles.Add(canonical);
+        if (!_roles.Contains(role))
+            _roles.Add(role);
     }
 
     public void RemoveRole(string role)
     {
-        var canonical = RoleNames.Normalize(role);
-        if (canonical is null)
-            return;
-        _roles.RemoveAll(r => string.Equals(r, canonical, StringComparison.OrdinalIgnoreCase));
+        _roles.Remove(role);
     }
-
-    /// <summary>Case-insensitive role membership check.</summary>
-    public bool HasRole(string role) =>
-        !string.IsNullOrWhiteSpace(role) &&
-        _roles.Any(r => string.Equals(r, role.Trim(), StringComparison.OrdinalIgnoreCase));
 
     public TokenValue AddRefreshToken(string tokenHash, DateTime expiresAt)
     {

@@ -18,19 +18,23 @@ public class OutboxInterceptor : SaveChangesInterceptor
         "PaymentProcessingDomainEvent",
         "PaymentCapturedDomainEvent",
         "PaymentRefundedDomainEvent",
-        "PaymentVoidedDomainEvent",
-        "PaymentFailedDomainEvent",
-        "PaymentExpiredDomainEvent"
+        "PaymentVoidedDomainEvent"
     };
 
     /// <summary>
     /// Event types with a real RabbitMQ consumer. Everything else is only ever
     /// delivered in-process (webhooks) or carries no cross-service value, so it
     /// is not written to the outbox — publishing it would drop it into a void.
-    /// See docs/messaging-registry.md and the shared <see cref="PaymentEventChannels"/>.
+    /// See docs/messaging-registry.md.
     /// </summary>
-    internal static readonly HashSet<string> PublishedEventTypes =
-        new(PaymentEventChannels.PublishedPaymentEvents);
+    private static readonly HashSet<string> PublishedEventTypes = new()
+    {
+        "PaymentIntentCreatedDomainEvent",
+        "PaymentAuthorizedDomainEvent",
+        "PaymentCapturedDomainEvent",
+        "PaymentRefundedDomainEvent",
+        "PaymentVoidedDomainEvent"
+    };
 
     private readonly ICorrelationIdProvider _correlationIdProvider;
 
@@ -73,19 +77,10 @@ public class OutboxInterceptor : SaveChangesInterceptor
                 if (PublishedEventTypes.Contains(eventType))
                 {
                     var payload = JsonSerializer.Serialize(domainEvent, domainEvent.GetType());
-                    // Downstream journal postings are keyed by correlation: sibling
-                    // events flushed in one SaveChanges (e.g. authorize+capture on
-                    // auto-capture) must not share a correlation, or the second
-                    // posting violates the unique journal index and DLQs with
-                    // funds stuck reserved. Scope each row to its event; the
-                    // stored value keeps redeliveries stable.
-                    var rowCorrelationId = correlationId is null || entry.Entity is not PaymentIntent scopedIntent
-                        ? correlationId
-                        : $"{correlationId}:{scopedIntent.Id}:{eventType}";
                     var outboxMessage = new OutboxMessage(
                         eventType,
                         payload,
-                        rowCorrelationId,
+                        correlationId,
                         traceParent);
                     dbContext.Set<OutboxMessage>().Add(outboxMessage);
                 }

@@ -13,8 +13,6 @@ export const NOTIFICATION_EVENT_TYPES = [
   "PaymentRefundedDomainEvent",
   "PaymentIntentCreatedDomainEvent",
   "PaymentVoidedDomainEvent",
-  "PaymentFailedDomainEvent",
-  "PaymentExpiredDomainEvent",
 ] as const
 
 type Channel = (typeof NOTIFICATION_CHANNELS)[number]
