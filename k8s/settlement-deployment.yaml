@@ -27,7 +27,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: settlement-api
-          image: paymentswitch/settlement-api:latest
+          image: paymentswitch-settlement:latest
           env:
             - name: ConnectionStrings__SettlementDb
               valueFrom:
@@ -39,11 +39,6 @@ spec:
                 secretKeyRef:
                   name: payment-switch-secret
                   key: Jwt__Secret
-            - name: ServiceToken__Secret
-              valueFrom:
-                secretKeyRef:
-                  name: payment-switch-secret
-                  key: ServiceToken__Secret
             - name: Jwt__PreviousSecret
               valueFrom:
                 secretKeyRef:

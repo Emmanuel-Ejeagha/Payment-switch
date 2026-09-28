@@ -33,8 +33,6 @@ services:
     enabled: true
     name: payment
     replicaCount: 1
-    # Journal/payment rows are financial records: 7 years (Step 9.5).
-    retentionBusinessDays: 2557
     image:
       repository: paymentswitch/payment-api
       tag: latest
@@ -83,8 +81,6 @@ services:
     enabled: true
     name: ledger
     replicaCount: 1
-    # Journal entries are financial records: 7 years (Step 9.5).
-    retentionBusinessDays: 2557
     image:
       repository: paymentswitch/ledger-api
       tag: latest
@@ -109,8 +105,6 @@ services:
     enabled: true
     name: notification
     replicaCount: 1
-    # Delivered notifications: 90 days (Step 9.5).
-    retentionBusinessDays: 90
     image:
       repository: paymentswitch/notification-api
       tag: latest
@@ -165,10 +159,6 @@ config:
     # Set alongside config.jwt.secret on the first rotation step; remove once
     # the window closes (see infra/secrets/rotate-jwt.sh).
     previousSecret: ""
-  serviceToken:
-    # REQUIRED: dedicated inter-service secret, must differ from config.jwt.secret.
-    # Provide via --set config.serviceToken.secret="..." or a secrets values file.
-    secret: ""
   rabbitmq:
     hostName: "rabbitmq"
     # REQUIRED: provide a strong username/password via --set or a secrets values file
@@ -202,13 +192,6 @@ config:
     fromName: "PaymentSwitch"
   sms:
     enabled: false
-  retention:
-    # Shared archival-sweep tuning (Step 9.5); per-service business-record
-    # retention differs, so services.payment/ledger/notification carry
-    # retentionBusinessDays below. Only those three run retention workers.
-    cleanupIntervalMinutes: 60
-    batchSize: 100
-    messageRetentionDays: 7
   grafana:
     adminUser: "admin"
     adminPassword: ""
