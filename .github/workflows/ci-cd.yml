@@ -72,6 +72,15 @@ jobs:
     name: Integration Tests
     if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    # One suite per runner (matrix): six sequential suites on a single 2-core
+    # runner starve cold Testcontainers boots (RabbitMQ attach takes 30-60s+)
+    # and cause broker-readiness flakes. fail-fast false so one red suite does
+    # not hide the others' results. The job name stays un-suffixed so the
+    # branch-protection required check keeps matching.
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [Identity, Merchant, Payment, Ledger, Notification, Settlement]
     steps:
       - uses: actions/checkout@v4
 
@@ -97,27 +106,16 @@ jobs:
       - name: Pre-pull Postgres image
         run: docker pull postgres:16-alpine
 
-      - name: Pre-pull RabbitMQ image
+      - name: Pre-pull RabbitMQ images
         # Step 9.8: Testcontainers pulls at runtime; pre-pulling warms the
-        # cache and fails fast on registry outages (matches the Postgres
-        # pre-pull above).
-        run: docker pull rabbitmq:3-management-alpine
+        # cache and fails fast on registry outages (3.13-alpine is what the
+        # Ledger suites actually boot).
+        run: |
+          docker pull rabbitmq:3-management-alpine
+          docker pull rabbitmq:3.13-alpine
 
-      # Each project runs in its own step so Testcontainers containers are not
-      # spun up concurrently (parallel container startup can exceed the Docker
-      # connection limit and cause flaky named-pipe timeouts).
-      - name: Integration tests - Identity
-        run: dotnet test tests/Integration/Identity.API.IntegrationTests --configuration Release --no-build
-      - name: Integration tests - Merchant
-        run: dotnet test tests/Integration/Merchant.API.IntegrationTests --configuration Release --no-build
-      - name: Integration tests - Payment
-        run: dotnet test tests/Integration/Payment.API.IntegrationTests --configuration Release --no-build
-      - name: Integration tests - Ledger
-        run: dotnet test tests/Integration/Ledger.API.IntegrationTests --configuration Release --no-build
-      - name: Integration tests - Notification
-        run: dotnet test tests/Integration/Notification.API.IntegrationTests --configuration Release --no-build
-      - name: Integration tests - Settlement
-        run: dotnet test tests/Integration/Settlement.API.IntegrationTests --configuration Release --no-build
+      - name: Integration tests - ${{ matrix.suite }}
+        run: dotnet test tests/Integration/${{ matrix.suite }}.API.IntegrationTests --configuration Release --no-build
 
   frontend:
     name: Frontend Build & Lint
