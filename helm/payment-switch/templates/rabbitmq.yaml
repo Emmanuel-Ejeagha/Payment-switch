@@ -17,10 +17,6 @@ spec:
       containers:
         - name: rabbitmq
           image: {{ .Values.infrastructure.rabbitmq.image }}
-          # Step 8.1: serve the prometheus scrape target (prometheusPort).
-          # Args override CMD only, so the image entrypoint (and
-          # RABBITMQ_DEFAULT_* handling) still runs via the inner re-entry.
-          args: ["sh", "-c", "rabbitmq-plugins enable --offline rabbitmq_prometheus && exec docker-entrypoint.sh rabbitmq-server"]
           ports:
             - containerPort: {{ .Values.infrastructure.rabbitmq.port }}
             - containerPort: {{ .Values.infrastructure.rabbitmq.managementPort }}

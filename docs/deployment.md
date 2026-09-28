@@ -35,23 +35,11 @@ Create the secret with all connection strings and the JWT secret.
 ```bash
 DB_PASSWORD=$(openssl rand -base64 24)
 JWT_SECRET=$(openssl rand -base64 32)
-RABBITMQ_PASS=$(openssl rand -base64 24)
-SEED_ADMIN_PASSWORD=$(openssl rand -base64 18)
-WEBHOOK_KEY=$(openssl rand -base64 32)
-GRAFANA_PASSWORD=$(openssl rand -base64 18)
-SMTP_PASS='<smtp-password>'
 
 kubectl create secret generic payment-switch-secret \
   --namespace payment-switch \
   --from-literal=Postgres__Password="$DB_PASSWORD" \
   --from-literal=Jwt__Secret="$JWT_SECRET" \
-  --from-literal=RabbitMQ__UserName="paymentswitch" \
-  --from-literal=RabbitMQ__Password="$RABBITMQ_PASS" \
-  --from-literal=Seed__AdminPassword="$SEED_ADMIN_PASSWORD" \
-  --from-literal=WebhookSecretEncryption__Key="$WEBHOOK_KEY" \
-  --from-literal=GrafanaAdminUser="admin" \
-  --from-literal=GrafanaAdminPassword="$GRAFANA_PASSWORD" \
-  --from-literal=Smtp__Password="$SMTP_PASS" \
   --from-literal=IdentityDb__ConnectionString="Host=postgres;Database=IdentityDb;Username=paymentswitch;Password=$DB_PASSWORD" \
   --from-literal=MerchantDb__ConnectionString="Host=postgres;Database=MerchantDb;Username=paymentswitch;Password=$DB_PASSWORD" \
   --from-literal=PaymentDb__ConnectionString="Host=postgres;Database=PaymentDb;Username=paymentswitch;Password=$DB_PASSWORD" \
@@ -59,11 +47,6 @@ kubectl create secret generic payment-switch-secret \
   --from-literal=NotificationDb__ConnectionString="Host=postgres;Database=NotificationDb;Username=paymentswitch;Password=$DB_PASSWORD" \
   --from-literal=SettlementDb__ConnectionString="Host=postgres;Database=SettlementDb;Username=paymentswitch;Password=$DB_PASSWORD"
 ```
-
-Every key above is required at pod start (missing `secretKeyRef` entries
-fail fast), except `Jwt__PreviousSecret`, which is only set during a
-rotation dual-write window (see `docs/secrets.md`). Cross-check against
-`k8s/secret.example.yaml`, which lists the full key set.
 
 ## Step 3 – Deploy Infrastructure & Services
 
@@ -112,29 +95,6 @@ The pipeline gates deploys per environment:
 - **Pushes to `main`** build and push images (immutable `:<sha>` plus `:latest`), scan them with
   Trivy (HIGH/CRITICAL fail the build), then deploy to the `production` environment, which is
   subject to **environment protection rules** (reviewers/approvals) in the repository settings.
-
-### Image naming convention (Step 9.1)
-
-One convention everywhere: `<registry>/<namespace>/<name>:<tag>` with
-`<name>` in `{identity,merchant,payment,ledger,notification,settlement}-api`
-and `{merchant,admin}-web`.
-
-- **k8s manifests** pin the default `paymentswitch/<name>:latest` (same
-  string the Helm chart renders with defaults). Deployment and container
-  names equal `<name>`, so `kubectl set image deployment/<name>
-  <name>=<image>` always addresses the right container.
-- **Helm chart** defaults to `repository: paymentswitch/<name>`, `tag:
-  latest`; override with `--set global.imageRegistry=<registry>/<namespace>`
-  plus `--set services.<svc>.image.tag=<sha>` (or
-  `...image.repository=` for a different namespace).
-- **CI** builds `ghcr.io/<owner>/<repo>/<name>:<sha>` (+ `:latest`) and
-  deploys with `kubectl set image ...:<sha>` (immutable; `:latest` is
-  dev-convenience only).
-
-Two supported deploy paths: the pipeline's `kubectl set image` (live path,
-with automatic previous-image rollback), or `helm upgrade --install
---set global.imageRegistry=... --set <svc>.image.tag=<sha>` for
-Helm-managed clusters. Never deploy `:latest` to production.
 
 ### Rollback
 

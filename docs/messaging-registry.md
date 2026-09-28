@@ -42,10 +42,9 @@ cross-service value).
 | `PaymentRequiresActionDomainEvent` | removed | — | Webhook-only; no cross-service consumer |
 | `PaymentProcessingDomainEvent` | removed | — | Webhook-only; no cross-service consumer |
 | `PaymentCapturedDomainEvent` | consumed | Ledger, Notification | Ledger captures; webhook |
-| `PaymentVoidedDomainEvent` | consumed | Ledger, Notification | Ledger releases the reservation; merchant notified; webhook |
-| `PaymentFailedDomainEvent` | consumed | Notification | Merchant notified a payment failed; webhook |
+| `PaymentVoidedDomainEvent` | consumed | Notification | Merchant notified a payment was voided; webhook |
 | `PaymentRefundedDomainEvent` | consumed | Ledger, Notification | Ledger refunds; webhook |
-| `PaymentExpiredDomainEvent` | consumed | Notification | Merchant notified a payment expired; webhook |
+| `PaymentExpiredDomainEvent` | removed | — | No consumer, no webhook |
 | `SubscriptionCreatedDomainEvent` | removed | — | No consumer |
 | `SubscriptionRenewedDomainEvent` | removed | — | No consumer |
 | `SubscriptionPastDueDomainEvent` | removed | — | No consumer |
@@ -100,9 +99,9 @@ cross-service value).
 
 | Queue | Source exchange | Routing keys | Consumer |
 |---|---|---|---|
-| `ledger.payment.events` | `payment.events` | `PaymentAuthorizedDomainEvent`, `PaymentCapturedDomainEvent`, `PaymentRefundedDomainEvent`, `PaymentVoidedDomainEvent` | Ledger `RabbitMQConsumerService` |
+| `ledger.payment.events` | `payment.events` | `PaymentAuthorizedDomainEvent`, `PaymentCapturedDomainEvent`, `PaymentRefundedDomainEvent` | Ledger `RabbitMQConsumerService` |
 | `ledger.merchant.events` | `merchant.events` | `MerchantOnboardedEvent` | Ledger `MerchantEventConsumerService` |
-| `notification.events` | `payment.events` | `PaymentAuthorizedDomainEvent`, `PaymentCapturedDomainEvent`, `PaymentRefundedDomainEvent`, `PaymentIntentCreatedDomainEvent`, `PaymentVoidedDomainEvent`, `PaymentFailedDomainEvent`, `PaymentExpiredDomainEvent` | Notification `RabbitMQConsumerService` |
+| `notification.events` | `payment.events` | `PaymentAuthorizedDomainEvent`, `PaymentCapturedDomainEvent`, `PaymentRefundedDomainEvent`, `PaymentIntentCreatedDomainEvent`, `PaymentVoidedDomainEvent` | Notification `RabbitMQConsumerService` |
 
 ## Implementation touchpoints
 

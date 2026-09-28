@@ -46,19 +46,18 @@ All endpoints return JSON. Authentication uses JWT Bearer tokens obtained from t
 
 ### Public Payments API (secret-key authentication)
 
-Authenticate with `Authorization: Bearer sk_live_...` or `sk_test_...`. The merchant is resolved from the key — never pass `merchantId`. Keys are validated against the Merchant service and cached for 2 minutes (`ApiKeyAuth:CacheTtlSeconds`); revocation purges the cache immediately (best-effort notify, TTL backstop). Past 20 failed attempts per minute per IP the API returns `429` instead of `401` (Step 7.4).
+Authenticate with `Authorization: Bearer sk_live_...` or `sk_test_...`. The merchant is resolved from the key — never pass `merchantId`. Keys are validated against the Merchant service and cached for 5 minutes.
 
 | Method | Endpoint                  | Auth          | Description                              |
 |--------|---------------------------|---------------|------------------------------------------|
 | POST   | `/v1/payments/intents`    | Secret key    | Create a payment intent                  |
 | GET    | `/v1/payments/{id}`       | Secret key    | Get payment intent details (own merchant only) |
 
-`POST /v1/payments/intents` request body (`amount` is always an integer in
-minor units — 10000 for a hundred dollars; never a float):
+`POST /v1/payments/intents` request body:
 
 ```json
 {
-  "amount": 10000,
+  "amount": 100.00,
   "currency": "USD",
   "paymentMethod": "Card",
   "cardLastFour": "4242",
