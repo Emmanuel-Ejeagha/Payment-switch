@@ -73,16 +73,6 @@ export default function PaymentLinksPage() {
 
   const createLink = async () => {
     if (!merchantId) return
-    const parsed = parseFloat(amount)
-    if (!Number.isFinite(parsed) || parsed <= 0) {
-      setError("Enter an amount greater than zero")
-      return
-    }
-    const minor = Math.round(parsed * 100)
-    if (!Number.isFinite(minor) || minor <= 0) {
-      setError("Enter an amount greater than zero")
-      return
-    }
     setCreating(true)
     setError(null)
     try {
@@ -91,7 +81,7 @@ export default function PaymentLinksPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           merchantId,
-          amount: minor,
+          amount: Math.round(parseFloat(amount) * 100),
           currency,
           description,
         }),

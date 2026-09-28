@@ -8,20 +8,17 @@ public class RevokeMerchantApiKeyHandler
     private readonly IUnitOfWork _unitOfWork;
     private readonly IValidator<RevokeMerchantApiKeyCommand> _validator;
     private readonly ILogger<RevokeMerchantApiKeyHandler> _logger;
-    private readonly IApiKeyRevocationNotifier _revocationNotifier;
 
     public RevokeMerchantApiKeyHandler(
         IMerchantRepository repository,
         IUnitOfWork unitOfWork,
         IValidator<RevokeMerchantApiKeyCommand> validator,
-        ILogger<RevokeMerchantApiKeyHandler> logger,
-        IApiKeyRevocationNotifier revocationNotifier)
+        ILogger<RevokeMerchantApiKeyHandler> logger)
     {
         _repository = repository;
         _unitOfWork = unitOfWork;
         _validator = validator;
         _logger = logger;
-        _revocationNotifier = revocationNotifier;
     }
 
     public async Task<Result> Handle(RevokeMerchantApiKeyCommand command, CancellationToken cancellationToken = default)
@@ -50,11 +47,6 @@ public class RevokeMerchantApiKeyHandler
 
         await _repository.UpdateAsync(merchant, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
-
-        // Best-effort: purge Payment's cached resolution so the revoked key
-        // stops working immediately (Step 7.4). Never fails the command; the
-        // short cache TTL backstops a missed notify.
-        await _revocationNotifier.NotifyRevokedAsync(command.MerchantId, cancellationToken);
         return Result.Success();
     }
 }

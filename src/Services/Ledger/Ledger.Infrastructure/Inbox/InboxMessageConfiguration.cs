@@ -15,7 +15,5 @@ public class InboxMessageConfiguration : IEntityTypeConfiguration<InboxMessage>
         builder.Property(m => m.OccurredOn).IsRequired();
         builder.Property(m => m.State).IsRequired();
         builder.Property(m => m.ProcessedAt);
-        builder.Property(m => m.Attempts).IsRequired();
-        builder.Property(m => m.LastError).HasMaxLength(2000);
     }
 }

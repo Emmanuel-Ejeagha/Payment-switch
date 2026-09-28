@@ -32,23 +32,19 @@ export default function LoginPage() {
 
   const onSubmit = async (data: LoginForm) => {
     setError(null)
-    try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      })
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    })
 
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({} as Record<string, string>))
-        setError(body.message ?? body.detail ?? "Login failed")
-        return
-      }
-
-      router.push("/dashboard")
-    } catch {
-      setError("Network error — please check your connection and try again")
+    if (!res.ok) {
+      const body = await res.json()
+      setError(body.message ?? body.detail ?? "Login failed")
+      return
     }
+
+    router.push("/dashboard")
   }
 
   return (

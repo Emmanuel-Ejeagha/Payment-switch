@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server"
-import { ACCESS_TOKEN_MAX_AGE, REFRESH_TOKEN_MAX_AGE } from "@/lib/auth"
 
 export async function POST(request: Request) {
   const body = await request.json()
@@ -28,20 +27,20 @@ export async function POST(request: Request) {
   }
 
   const isSecure = process.env.NODE_ENV === "production"
-  const response = NextResponse.json({ ok: true })
+  const response = NextResponse.json(data)
   response.cookies.set("access_token", data.accessToken as string, {
     httpOnly: true,
     secure: isSecure,
     sameSite: "lax",
     path: "/",
-    maxAge: ACCESS_TOKEN_MAX_AGE,
+    maxAge: 60 * 60,
   })
   response.cookies.set("refresh_token", data.refreshToken as string, {
     httpOnly: true,
     secure: isSecure,
     sameSite: "lax",
     path: "/",
-    maxAge: REFRESH_TOKEN_MAX_AGE,
+    maxAge: 60 * 60 * 24 * 7,
   })
 
   return response

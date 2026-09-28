@@ -1,5 +1,4 @@
-﻿using BuildingBlocks.Shared.Auth;
-using BuildingBlocks.Shared.Results;
+﻿using BuildingBlocks.Shared.Results;
 using FluentValidation;
 using Identity.Application.Interfaces;
 using Identity.Domain.DomainErrors;
@@ -36,16 +35,14 @@ public class AssignRoleHandler
         if (adminUser == null)
             return IdentityErrors.UserNotFound(command.AdminUserId);
 
-        if (!adminUser.HasRole(RoleNames.Admin))
+        if (!adminUser.Roles.Contains("Admin"))
             return new Error("Identity.NotAuthorized", "Only admins can assign roles.");
 
         var targetUser = await _userRepository.GetByIdAsync(command.TargetUserId, cancellationToken);
         if (targetUser == null)
             return IdentityErrors.UserNotFound(command.TargetUserId);
 
-        // Validator guarantees a known role; normalize defensively so storage
-        // is always canonical ("admin" → "Admin", never a near-duplicate).
-        targetUser.AddRole(RoleNames.Normalize(command.Role)!);
+        targetUser.AddRole(command.Role);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         return Result.Success();
     }

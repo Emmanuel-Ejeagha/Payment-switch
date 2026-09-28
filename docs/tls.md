@@ -9,10 +9,10 @@ provisioning, the Compose dev/prod switch, and frontend base URLs.
 The nginx container loads its server blocks from `/etc/nginx/tls/*.conf`. Two
 mode folders are committed:
 
-| Mode | How | Behaviour |
+| Mode | Mount (`nginx.volumes`) | Behaviour |
 |---|---|---|
-| Dev (default, `docker compose up -d`) | `./infra/nginx/http:/etc/nginx/tls:ro`, port `:80` only | Plain HTTP on `:80` |
-| Prod (`docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d`) | `./infra/nginx/tls:/etc/nginx/tls:ro`, ports `:80` + `:443` | HTTP→HTTPS redirect on `:80`, HTTPS on `:443` |
+| Dev (default) | `./infra/nginx/http:/etc/nginx/tls:ro` | Plain HTTP on `:80` |
+| Prod | `./infra/nginx/tls:/etc/nginx/tls:ro` | HTTP→HTTPS redirect on `:80`, HTTPS on `:443` |
 
 ### Provisioning (Let's Encrypt / certbot)
 
@@ -33,23 +33,25 @@ mode folders are committed:
      infra/nginx/tls/certs/privkey.pem
    ```
 
-4. Bring up the production overlay (Step 9.6) instead of editing the base file:
+4. Switch nginx to TLS mode in `docker-compose.yml` and restart:
 
-   ```bash
-   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+   ```yaml
+   volumes:
+     - ./infra/nginx/tls:/etc/nginx/tls:ro
    ```
 
-   The overlay publishes `:443` and mounts `./infra/nginx/tls`; the base
-   file stays HTTP-only on `:80`.
+   ```bash
+   docker compose up -d nginx
+   ```
 
 5. Verify:
 
-    ```bash
-    curl -I https://paymentswitch.example.com/merchant/health/live
-    curl -I http://paymentswitch.example.com/merchant/health/live   # expect 301
-    curl -I https://paymentswitch.example.com/                         # merchant portal
-    curl -I https://paymentswitch.example.com/admin/login              # admin portal
-    ```
+   ```bash
+   curl -I https://paymentswitch.example.com/merchant/api/v1/health
+   curl -I http://paymentswitch.example.com/merchant/api/v1/health   # expect 301
+   curl -I https://paymentswitch.example.com/                         # merchant portal
+   curl -I https://paymentswitch.example.com/admin/login              # admin portal
+   ```
 
 The TLS server sets HSTS (`max-age=31536000; includeSubDomains`), forwards
 `X-Forwarded-Proto: https`, and sets nosniff/SAMEORIGIN/referrer headers.
@@ -96,50 +98,3 @@ in `next.config.js`; nginx and the Ingress route `/admin` to `admin-web` and
 paths reach the app unchanged).
 
 See `apps/<app>/.env.production.example`.
-
-## gRPC service-to-service (Step 7.3)
-
-Three internal gRPC channels cross service boundaries:
-
-| Caller | Callee | Address key | Sensitive payload |
-|---|---|---|---|
-| payment-api | merchant-api (`GetMerchantConfig`, `ResolveApiKey`) | `Grpc:Merchant:Address` | webhook secrets (current + previous), API-key material |
-| notification-api | merchant-api (`GetMerchantContact`) | `Grpc:Merchant:Address` | merchant contact email |
-| settlement-api | ledger-api (`GetDailyPayoutData`, `GetBalances`) | `Grpc:Ledger:Address` | payout aggregates, balances |
-
-Servers listen on `:5001` (HTTP/2 cleartext) alongside `:8080`. Port `5001`
-is **never published** (no compose `ports`, no k8s Service port, no Ingress
-route) and every gRPC method is gated by the `ServiceOnly` policy
-(short-lived service JWT with `client_type=service`, 10-min expiry). That is
-the documented in-network exception to end-to-end TLS.
-
-### Production posture
-
-- Default (fail-closed): `RequireGrpcTls` throws at startup in Production
-  unless the address uses `https://`. Set e.g.
-  `Grpc__Merchant__Address=https://merchant-api:5001` (compose env) or
-  `Grpc.Merchant.Address` (appsettings) and mount a server cert via Kestrel
-  (`ASPNETCORE_Kestrel__Certificates__Default__Path/KeyPath`) — clients
-  automatically use TLS credentials for `https://` addresses (insecure call
-  credentials are only applied to `http://`).
-- Acknowledged exception: where mTLS is not yet provisioned, set
-  `Grpc__Merchant__AllowInsecure=true` (or `Grpc__Ledger__AllowInsecure=true`).
-  This is only valid while ALL of the following hold: the channel stays on the
-  isolated compose/k8s network, port 5001 remains unpublished, the
-  `ServiceOnly` gate stays enforced, and service-token secrets come from the
-  managed store (see `docs/secrets.md`). The exception is logged as a
-  deployment decision, not silent — startup still fails without the explicit
-  flag.
-- Encrypted payloads: merchant webhook secrets are AES-GCM encrypted at rest
-  (TASK-006) and decrypted only inside the Merchant value-conversion and the
-  Payment signing path; they traverse gRPC only inside the isolated network
-  with `ServiceOnly` auth. API-key resolution sends the presented key over the
-  same channel for BCrypt verification server-side (the stored hash never
-  leaves Merchant).
-
-### mTLS roadmap
-
-Terminate per-service TLS with a shared internal CA (or a service mesh with
-automatic mTLS, e.g. Linkerd/Istio) and require client certificates on `:5001`.
-Until then, the controls above + NetworkPolicy restriction of `:5001` to the
-three caller pods are the compensating controls.

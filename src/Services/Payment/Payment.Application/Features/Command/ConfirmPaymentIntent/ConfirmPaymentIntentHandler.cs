@@ -68,7 +68,7 @@ public class ConfirmPaymentIntentHandler
 
         // No CVC here: the code was collected on the original authorization and is not
         // retained, so a challenge confirm is always cardholder-not-present to us.
-        var gatewayResult = await _gateway.ConfirmChallengeAsync(intent.MerchantId, intent.Amount, intent.CardDetails, intent.GatewayReference!.Value, idempotencyKey: command.IdempotencyKey, providerName: intent.ProviderName, cancellationToken: cancellationToken);
+        var gatewayResult = await _gateway.ConfirmChallengeAsync(intent.MerchantId, intent.Amount, intent.CardDetails, intent.GatewayReference!.Value, cancellationToken: cancellationToken);
         if (!gatewayResult.IsSuccess)
             return new Error("Payment.ChallengeConfirmationFailed", gatewayResult.Errors.First().Message);
 
@@ -80,10 +80,10 @@ public class ConfirmPaymentIntentHandler
         try
         {
             intent.MarkProcessing();
-            intent.ConfirmAction(authCode, gatewayRef, command.IdempotencyKey, gwResponse.ProviderName);
+            intent.ConfirmAction(authCode, gatewayRef, command.IdempotencyKey);
 
             if (configResult.Value!.AutoCapture)
-                intent.Capture(idempotencyKey: DeriveCaptureKey(command.IdempotencyKey));
+                intent.Capture();
         }
         catch (InvalidOperationException)
         {
@@ -109,13 +109,5 @@ public class ConfirmPaymentIntentHandler
     {
         string? clientSecret = intent.Transactions.LastOrDefault(t => t.Type == TransactionType.Capture)?.Id.ToString();
         return new ConfirmPaymentIntentResponse(intent.Id, intent.Status.Value, clientSecret);
-    }
-
-    internal static string DeriveCaptureKey(string baseKey)
-    {
-        const string suffix = "-capture";
-        if (baseKey.Length + suffix.Length <= Payment.Domain.ValueObjects.IdempotencyKey.MaxLength)
-            return baseKey + suffix;
-        return baseKey.Substring(0, Payment.Domain.ValueObjects.IdempotencyKey.MaxLength - suffix.Length) + suffix;
     }
 }

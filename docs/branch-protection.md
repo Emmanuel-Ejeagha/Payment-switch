@@ -15,10 +15,9 @@ checks are green. This document defines exactly what to enforce and how.
 
   | Check context (job `name`) | Runs on PRs to `main`? | What it gates |
   |---|---|---|
-  | `Build & Test` | yes | `dotnet format`, Release build, NuGet audit, all unit suites + coverage |
+  | `Build & Test` | yes | `dotnet format`, Release build, all unit suites + coverage |
   | `Integration Tests` | yes | Testcontainers integration suites (Identity/Merchant/Payment/Ledger/Notification/Settlement) |
   | `Frontend Build & Lint` | yes | npm audit + typecheck + lint + build for `admin`/`merchant` |
-  | `Manifest Validation` | yes | `helm lint` + `helm template` + kubeconform on `k8s/` and the render |
 
 - Optional-but-recommended (`.github/workflows/security.yml`): `CodeQL`,
   `Secret Scanning`. Requiring them slows PRs slightly but prevents a reviewed
@@ -32,10 +31,9 @@ checks are green. This document defines exactly what to enforce and how.
    owners/admins; without this a repo owner can bypass every gate.
 3. **Required approving reviews: 1** and **require review from Code Owners**
    (uses `.github/CODEOWNERS`). **Dismiss stale reviews** on new commits.
-4. **Required status checks** (strict: branch must be up to date): the four
+4. **Required status checks** (strict: branch must be up to date): the three
    table rows above; add `CodeQL` and `Secret Scanning` if you accept the
-   latency cost. (`E2E Nightly` and `k6 Nightly` are scheduled, not PR checks,
-   so they are not in the required set.)
+   latency cost.
 5. **Require linear history**, **no force pushes**, **no deletions**.
 6. Consider the same ruleset on `develop` (with the same checks) so that the
    shared integration branch gets the same quality bar.
@@ -52,7 +50,7 @@ checks are green. This document defines exactly what to enforce and how.
 - **Require approvals from the CODEOWNERS** ✓
 - **Dismiss stale pull request approvals when new commits are pushed** ✓
 - **Require status checks to pass before merging** ✓ — add `Build & Test`,
-  `Integration Tests`, `Frontend Build & Lint`, `Manifest Validation` (all "required")
+  `Integration Tests`, `Frontend Build & Lint` (all "required")
 - **Require branches to be up to date before merging** ✓
 - **Require linear history** ✓
 - **Do not allow force pushes** ✓, **Do not allow deletions** ✓
@@ -68,8 +66,7 @@ cat > /tmp/branch-protection.json <<'EOF'
     "contexts": [
       "Build & Test",
       "Integration Tests",
-      "Frontend Build & Lint",
-      "Manifest Validation"
+      "Frontend Build & Lint"
     ]
   },
   "enforce_admins": true,

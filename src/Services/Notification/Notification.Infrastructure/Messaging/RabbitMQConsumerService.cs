@@ -116,8 +116,11 @@ public class RabbitMQConsumerService : BackgroundService
         await _channel.QueueBindAsync(_dlq, _dlxExchange, "#", null, cancellationToken: cancellationToken);
 
         await _channel.QueueDeclareAsync(_queueName, durable: true, exclusive: false, autoDelete: false, cancellationToken: cancellationToken);
-        foreach (var routingKey in PaymentEventChannels.NotificationBoundPaymentEvents)
-            await _channel.QueueBindAsync(_queueName, _sourceExchange, routingKey, null, cancellationToken: cancellationToken);
+        await _channel.QueueBindAsync(_queueName, _sourceExchange, "PaymentAuthorizedDomainEvent", null, cancellationToken: cancellationToken);
+        await _channel.QueueBindAsync(_queueName, _sourceExchange, "PaymentCapturedDomainEvent", null, cancellationToken: cancellationToken);
+        await _channel.QueueBindAsync(_queueName, _sourceExchange, "PaymentRefundedDomainEvent", null, cancellationToken: cancellationToken);
+        await _channel.QueueBindAsync(_queueName, _sourceExchange, "PaymentIntentCreatedDomainEvent", null, cancellationToken: cancellationToken);
+        await _channel.QueueBindAsync(_queueName, _sourceExchange, "PaymentVoidedDomainEvent", null, cancellationToken: cancellationToken);
 
         var consumer = new AsyncEventingBasicConsumer(_channel);
         consumer.ReceivedAsync += async (sender, ea) =>
@@ -196,20 +199,6 @@ public class RabbitMQConsumerService : BackgroundService
                         merchantId = voidedEvent.MerchantId;
                         command = await ResolveCommandAsync(merchantContacts, eventType, voidedEvent.MerchantId,
                             recipient => PaymentEventMapper.MapVoided(voidedEvent, recipient, body), cancellationToken);
-                        break;
-
-                    case "PaymentFailedDomainEvent":
-                        var failedEvent = JsonSerializer.Deserialize<PaymentFailedEvent>(body)!;
-                        merchantId = failedEvent.MerchantId;
-                        command = await ResolveCommandAsync(merchantContacts, eventType, failedEvent.MerchantId,
-                            recipient => PaymentEventMapper.MapFailed(failedEvent, recipient, body), cancellationToken);
-                        break;
-
-                    case "PaymentExpiredDomainEvent":
-                        var expiredEvent = JsonSerializer.Deserialize<PaymentExpiredEvent>(body)!;
-                        merchantId = expiredEvent.MerchantId;
-                        command = await ResolveCommandAsync(merchantContacts, eventType, expiredEvent.MerchantId,
-                            recipient => PaymentEventMapper.MapExpired(expiredEvent, recipient, body), cancellationToken);
                         break;
                 }
 

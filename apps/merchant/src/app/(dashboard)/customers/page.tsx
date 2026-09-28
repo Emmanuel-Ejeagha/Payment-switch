@@ -91,22 +91,16 @@ export default function CustomersPage() {
     setDescription("")
   }
 
-  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
   const save = async () => {
-    if (!merchantId || !email.trim()) return
-    if (!emailValid) {
-      setError("Enter a valid email address")
-      return
-    }
+    if (!merchantId || !email) return
     setWorking(true)
     setError(null)
     try {
-      const trimmedEmail = email.trim()
       if (editingId) {
         const res = await fetch(`/api/proxy/payment/api/v1/customers/${editingId}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ merchantId, email: trimmedEmail, name: name || null, phone: phone || null, description: description || null }),
+          body: JSON.stringify({ merchantId, email, name: name || null, phone: phone || null, description: description || null }),
         })
         if (!res.ok) {
           const body = await res.json().catch(() => ({}))
@@ -117,7 +111,7 @@ export default function CustomersPage() {
         const res = await fetch("/api/proxy/payment/api/v1/customers", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ merchantId, email: trimmedEmail, name: name || null, phone: phone || null, description: description || null }),
+          body: JSON.stringify({ merchantId, email, name: name || null, phone: phone || null, description: description || null }),
         })
         if (!res.ok) {
           const body = await res.json().catch(() => ({}))
@@ -301,21 +295,20 @@ export default function CustomersPage() {
           footer={
             <>
               <Button onClick={closeForm}>Cancel</Button>
-              <Button variant="primary" onClick={save} pending={working} disabled={!email.trim() || !emailValid}>
+              <Button variant="primary" onClick={save} pending={working} disabled={!email}>
                 {working ? "Saving…" : editingId ? "Save changes" : "Create customer"}
               </Button>
             </>
           }
         >
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Email" htmlFor="customer-email" required className="sm:col-span-2" error={!emailValid && email ? "Enter a valid email address" : undefined}>
+            <Field label="Email" htmlFor="customer-email" required className="sm:col-span-2">
               <Input
                 id="customer-email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="customer@example.com"
-                aria-invalid={!!email && !emailValid}
               />
             </Field>
             <Field label="Name" htmlFor="customer-name">

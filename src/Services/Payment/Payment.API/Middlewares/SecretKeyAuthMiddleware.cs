@@ -1,6 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Caching.Memory;
 using Payment.Application.DTOs;
 using Payment.Application.Interfaces;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Payment.API.Middlewares;
 
@@ -12,19 +15,13 @@ public class SecretKeyAuthMiddleware
 
     private readonly RequestDelegate _next;
     private readonly ILogger<SecretKeyAuthMiddleware> _logger;
-    private readonly ApiKeyResolutionCache _cache;
-    private readonly ApiKeyFailureThrottle _throttle;
+    private readonly IMemoryCache _cache;
 
-    public SecretKeyAuthMiddleware(
-        RequestDelegate next,
-        ILogger<SecretKeyAuthMiddleware> logger,
-        ApiKeyResolutionCache cache,
-        ApiKeyFailureThrottle throttle)
+    public SecretKeyAuthMiddleware(RequestDelegate next, ILogger<SecretKeyAuthMiddleware> logger, IMemoryCache cache)
     {
         _next = next;
         _logger = logger;
         _cache = cache;
-        _throttle = throttle;
     }
 
     public async Task InvokeAsync(HttpContext context, IMerchantService merchantService)
@@ -36,40 +33,28 @@ public class SecretKeyAuthMiddleware
             return;
         }
 
-        // Per-IP partition (API-key callers are unauthenticated at this point;
-        // ForwardedHeaders already restored the real client IP).
-        var partitionKey = $"ip:{context.Connection.RemoteIpAddress?.ToString() ?? "unknown"}";
-        if (_throttle.IsThrottled(partitionKey))
-        {
-            await WriteTooManyRequests(context);
-            return;
-        }
-
         var apiKey = ExtractApiKey(context.Request);
         if (string.IsNullOrEmpty(apiKey) || !TryParseKey(apiKey, out var keyPrefix))
         {
-            _throttle.RecordFailure(partitionKey);
             await WriteUnauthorized(context, "Missing or malformed API key. Expected 'Authorization: Bearer sk_live_...'.");
             return;
         }
 
-        var cacheKey = ApiKeyResolutionCache.BuildCacheKey(keyPrefix, apiKey);
-        if (!_cache.TryGet(cacheKey, out MerchantKeyResolution? resolution))
+        var cacheKey = $"apikey:{keyPrefix}:{HashKey(apiKey)}";
+        if (!_cache.TryGetValue(cacheKey, out MerchantKeyResolution? resolution))
         {
             var result = await merchantService.ResolveApiKeyAsync(keyPrefix, apiKey, context.RequestAborted);
             if (!result.IsSuccess)
             {
-                _throttle.RecordFailure(partitionKey);
                 await WriteUnauthorized(context, "Invalid API key.");
                 return;
             }
             resolution = result.Value;
-            _cache.Set(cacheKey, resolution!);
+            _cache.Set(cacheKey, resolution, TimeSpan.FromMinutes(5));
         }
 
         if (resolution is null)
         {
-            _throttle.RecordFailure(partitionKey);
             await WriteUnauthorized(context, "Invalid API key.");
             return;
         }
@@ -114,6 +99,9 @@ public class SecretKeyAuthMiddleware
         return false;
     }
 
+    private static string HashKey(string key) =>
+        Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(key)));
+
     private static Task WriteUnauthorized(HttpContext context, string detail)
     {
         context.Response.StatusCode = StatusCodes.Status401Unauthorized;
@@ -136,19 +124,6 @@ public class SecretKeyAuthMiddleware
             Status = StatusCodes.Status403Forbidden,
             Title = "Forbidden",
             Detail = detail
-        };
-        return context.Response.WriteAsJsonAsync(problem);
-    }
-
-    private static Task WriteTooManyRequests(HttpContext context)
-    {
-        context.Response.StatusCode = StatusCodes.Status429TooManyRequests;
-        context.Response.ContentType = "application/problem+json";
-        var problem = new ProblemDetails
-        {
-            Status = StatusCodes.Status429TooManyRequests,
-            Title = "Too Many Requests",
-            Detail = "Too many failed API-key attempts. Retry after the window resets."
         };
         return context.Response.WriteAsJsonAsync(problem);
     }

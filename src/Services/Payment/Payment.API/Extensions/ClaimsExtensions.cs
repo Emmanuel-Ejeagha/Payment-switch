@@ -1,4 +1,3 @@
-using BuildingBlocks.Shared.Auth;
 using Payment.Application.Auth;
 using System.Security.Claims;
 
@@ -11,7 +10,7 @@ public static class ClaimsExtensions
         var userIdClaim = user.FindFirstValue(ClaimTypes.NameIdentifier);
         Guid? userId = Guid.TryParse(userIdClaim, out var id) ? id : null;
         var email = user.FindFirstValue(ClaimTypes.Email);
-        var isAdmin = RoleNames.IsInRole(user, RoleNames.Admin);
+        var isAdmin = user.IsInRole("Admin");
 
         return new CallerContext(userId, email, isAdmin);
     }

@@ -58,20 +58,6 @@ export default function MerchantDetailPage() {
   }
 
   const handleSaveConfig = async () => {
-    const trimmedUrl = webhookUrl.trim()
-    if (trimmedUrl) {
-      try {
-        const u = new URL(trimmedUrl)
-        if (u.protocol !== "http:" && u.protocol !== "https:") throw new Error()
-      } catch {
-        setSaveMessage("Webhook URL must be a valid http(s) URL")
-        return
-      }
-    }
-    if (enabledMethods.length === 0) {
-      setSaveMessage("Select at least one payment method")
-      return
-    }
     setSaving(true)
     setSaveMessage(null)
     try {
@@ -79,7 +65,8 @@ export default function MerchantDetailPage() {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          webhookUrl: trimmedUrl || null,
+          merchantId: id,
+          webhookUrl: webhookUrl || null,
           paymentMethods: enabledMethods,
           autoCapture,
         }),
