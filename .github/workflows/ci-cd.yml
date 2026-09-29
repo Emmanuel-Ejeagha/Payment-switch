@@ -169,7 +169,18 @@ jobs:
         uses: azure/setup-helm@v4
 
       - name: Helm lint
-        run: helm lint helm/payment-switch
+        # Lint renders the chart, so the required-secret guards need the same
+        # dummy values as the render step (never real secrets).
+        run: >
+          helm lint helm/payment-switch
+          --set config.postgres.password=dummy
+          --set config.jwt.secret=0123456789abcdef0123456789abcdef
+          --set config.serviceToken.secret=dummy-service-token-secret-0123456789abcdef
+          --set config.rabbitmq.password=dummy
+          --set config.seed.adminPassword=dummy
+          --set config.webhookSecretEncryption.key=dummy
+          --set config.smtp.password=dummy
+          --set config.grafana.adminPassword=dummy
 
       - name: Render chart (ingress enabled)
         # Dummy secrets: rendering only needs the keys present, never real values.

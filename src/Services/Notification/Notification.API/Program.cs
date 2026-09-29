@@ -152,6 +152,11 @@ app.MapControllers();
 app.MapHub<PaymentNotificationHub>("/hubs/payment-notifications");
 app.MapPrometheusScrapingEndpoint();
 app.MapPaymentSwitchHealthEndpoints();
-app.UseStaticFiles();
+// test-signalr.html is a developer-only manual probe; never serve wwwroot
+// in production.
+if (app.Environment.IsDevelopment())
+{
+    app.UseStaticFiles();
+}
 
 app.Run();
