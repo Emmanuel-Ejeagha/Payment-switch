@@ -1,0 +1,155 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  namespace: payment-switch
+data:
+  prometheus.yml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus:9090
+        isDefault: true
+        editable: true
+        jsonData:
+          timeInterval: 15s
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards
+  namespace: payment-switch
+data:
+  dashboard.yml: |
+    apiVersion: 1
+    providers:
+      - name: PaymentSwitch
+        orgId: 1
+        folder: PaymentSwitch
+        type: file
+        disableDeletion: false
+        updateIntervalSeconds: 30
+        allowUiUpdates: true
+        options:
+          path: /var/lib/grafana/dashboards
+  paymentswitch-overview.json: |
+    {
+      "annotations": { "list": [ { "builtIn": 1, "datasource": { "type": "grafana", "uid": "-- Grafana --" }, "enable": true, "hide": true, "iconColor": "rgba(0, 211, 255, 1)", "name": "Annotations & Alerts", "type": "dashboard" } ] },
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 1,
+      "timezone": "utc",
+      "links": [],
+      "panels": [
+        {
+          "id": 1,
+          "title": "Requests per second by service",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [ { "refId": "A", "expr": "sum by (job) (rate(http_server_request_duration_seconds_count[5m]))", "legendFormat": "{{job}}" } ],
+          "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2, "showPoints": "never" } }, "overrides": [] }
+        },
+        {
+          "id": 2,
+          "title": "5xx error rate by service",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [ { "refId": "A", "expr": "sum by (job) (rate(http_server_request_duration_seconds_count{http_response_status_code=~\"5..\"}[5m]))", "legendFormat": "{{job}}" } ],
+          "fieldConfig": { "defaults": { "unit": "reqps", "color": { "mode": "fixed", "fixedColor": "red" }, "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2, "showPoints": "never" } }, "overrides": [] }
+        },
+        {
+          "id": 3,
+          "title": "Outbox backlog (messages awaiting publication)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [ { "refId": "A", "expr": "outbox_backlog", "legendFormat": "{{job}}" } ],
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2, "showPoints": "never" } }, "overrides": [] }
+        },
+        {
+          "id": 4,
+          "title": "Outbox publish rate",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 8 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [ { "refId": "A", "expr": "sum by (job) (rate(outbox_published_total[5m]))", "legendFormat": "{{job}}" } ],
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2, "showPoints": "never" } }, "overrides": [] }
+        },
+        {
+          "id": 5,
+          "title": "Dead letters (rate)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 8 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [ { "refId": "A", "expr": "sum by (job) (rate({__name__=~\"ledger_dead_letters_total|notification_dead_letters_total\"}[5m]))", "legendFormat": "{{job}}" } ],
+          "fieldConfig": { "defaults": { "unit": "ops", "color": { "mode": "fixed", "fixedColor": "red" }, "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2, "showPoints": "never" } }, "overrides": [] }
+        },
+        {
+          "id": 6,
+          "title": "Service up",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 24, "x": 0, "y": 16 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [ { "refId": "A", "expr": "up", "legendFormat": "{{job}}" } ],
+          "fieldConfig": { "defaults": { "unit": "short", "mappings": [ { "type": "value", "options": { "1": { "text": "UP", "color": "green" }, "0": { "text": "DOWN", "color": "red" } } } ], "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "green", "value": 1 } ] } }, "overrides": [] }
+        }
+      ],
+      "refresh": "1m",
+      "schemaVersion": 39,
+      "tags": ["paymentswitch"],
+      "templating": { "list": [] },
+      "time": { "from": "now-6h", "to": "now" },
+      "title": "Payment Switch Overview",
+      "uid": "paymentswitch-overview",
+      "version": 1
+    }
+  rabbitmq-queues.json: |
+    {
+      "annotations": { "list": [ { "builtIn": 1, "datasource": { "type": "grafana", "uid": "-- Grafana --" }, "enable": true, "hide": true, "iconColor": "rgba(0, 211, 255, 1)", "name": "Annotations & Alerts", "type": "dashboard" } ] },
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 1,
+      "timezone": "utc",
+      "links": [],
+      "panels": [
+        {
+          "id": 1,
+          "title": "Total queued messages",
+          "type": "timeseries",
+          "gridPos": { "h": 9, "w": 12, "x": 0, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [ { "refId": "A", "expr": "rabbitmq_queue_messages", "legendFormat": "queued" } ],
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2, "showPoints": "never" } }, "overrides": [] }
+        },
+        {
+          "id": 2,
+          "title": "Unacked messages",
+          "type": "timeseries",
+          "gridPos": { "h": 9, "w": 12, "x": 12, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [ { "refId": "A", "expr": "rabbitmq_queue_messages_unacked", "legendFormat": "unacked" } ],
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2, "showPoints": "never" } }, "overrides": [] }
+        },
+        {
+          "id": 3,
+          "title": "Dead-lettered messages (per service counter)",
+          "type": "timeseries",
+          "gridPos": { "h": 9, "w": 24, "x": 0, "y": 9 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [ { "refId": "A", "expr": "sum by (job) (rate({__name__=~\"ledger_dead_letters_total|notification_dead_letters_total\"}[5m]))", "legendFormat": "{{job}}" } ],
+          "fieldConfig": { "defaults": { "unit": "ops", "color": { "mode": "fixed", "fixedColor": "red" }, "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2, "showPoints": "never" } }, "overrides": [] }
+        }
+      ],
+      "refresh": "1m",
+      "schemaVersion": 39,
+      "tags": ["paymentswitch", "rabbitmq"],
+      "templating": { "list": [] },
+      "time": { "from": "now-6h", "to": "now" },
+      "title": "RabbitMQ Queues",
+      "uid": "paymentswitch-rabbitmq",
+      "version": 1
+    }

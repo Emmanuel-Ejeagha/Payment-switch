@@ -12,4 +12,7 @@ public static class LedgerErrors
 
     public static Error AmountMustBePositive =>
         new("Ledger.AmountMustBePositive", "Amount must be greater than zero.");
+
+    public static Error ConcurrencyConflict =>
+        new("Ledger.ConcurrencyConflict", "The ledger account was modified concurrently. Please retry.");
 }

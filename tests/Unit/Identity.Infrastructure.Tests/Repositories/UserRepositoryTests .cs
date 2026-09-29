@@ -42,5 +42,39 @@ public class UserRepositoryTests : IDisposable
         Assert.True(await _repository.ExistsByEmailAsync("exist@example.com"));
     }
 
+    [Fact]
+    public async Task ExistsByEmailAsync_ShouldReturnTrueForMixedCaseVariant()
+    {
+        var user = new User(Guid.NewGuid(), new Email("exist@example.com"), new PasswordHash("hash"), new FullName("Exist"));
+        await _repository.AddAsync(user);
+        await _context.SaveChangesAsync();
+
+        Assert.True(await _repository.ExistsByEmailAsync("EXIST@Example.COM"));
+        Assert.True(await _repository.ExistsByEmailAsync("  exist@example.com  "));
+    }
+
+    [Fact]
+    public async Task ExistsByEmailAsync_ShouldReturnFalseForDifferentEmail()
+    {
+        var user = new User(Guid.NewGuid(), new Email("exist@example.com"), new PasswordHash("hash"), new FullName("Exist"));
+        await _repository.AddAsync(user);
+        await _context.SaveChangesAsync();
+
+        Assert.False(await _repository.ExistsByEmailAsync("other@example.com"));
+    }
+
+    [Fact]
+    public async Task GetByEmailAsync_ShouldReturnUserForMixedCaseVariant()
+    {
+        var user = new User(Guid.NewGuid(), new Email("exist@example.com"), new PasswordHash("hash"), new FullName("Exist"));
+        await _repository.AddAsync(user);
+        await _context.SaveChangesAsync();
+
+        var found = await _repository.GetByEmailAsync("EXIST@Example.COM");
+
+        Assert.NotNull(found);
+        Assert.Equal(user.Id, found.Id);
+    }
+
     public void Dispose() => _context.Dispose();
 }

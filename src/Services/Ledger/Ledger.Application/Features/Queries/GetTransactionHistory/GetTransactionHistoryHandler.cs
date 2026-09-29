@@ -1,7 +1,6 @@
 ﻿using BuildingBlocks.Shared.Results;
 using Ledger.Application.DTOs;
 using Ledger.Application.Interfaces;
-using Ledger.Domain.DomainErrors;
 using Microsoft.Extensions.Logging;
 
 namespace Ledger.Application.Features.Queries.GetTransactionHistory;
@@ -20,11 +19,10 @@ public class GetTransactionHistoryHandler
     public async Task<Result<List<TransactionDto>>> Handle(GetTransactionHistoryQuery query, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Handling {CommandName} for Merchant {MerchantId}", nameof(GetTransactionHistoryQuery), query.MerchantId);
-        var account = await _repository.GetByMerchantIdAsync(query.MerchantId, cancellationToken);
-        if (account is null)
-            return LedgerErrors.AccountNotFound(query.MerchantId);
+        var accounts = await _repository.ListByMerchantIdAsync(query.MerchantId, cancellationToken);
 
-        var transactions = account.Journal
+        var transactions = accounts
+            .SelectMany(a => a.Journal)
             .OrderByDescending(j => j.Timestamp)
             .Skip(query.Skip)
             .Take(query.Take)

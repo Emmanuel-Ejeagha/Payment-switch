@@ -30,7 +30,7 @@ public class PaymentIntentRepositoryTests : IDisposable
 
         var retrieved = await _repository.GetByIdAsync(intent.Id);
         Assert.NotNull(retrieved);
-        Assert.Equal(100m, retrieved.Amount.Amount);
+        Assert.Equal(100L, retrieved.Amount.Amount);
     }
 
     [Fact]

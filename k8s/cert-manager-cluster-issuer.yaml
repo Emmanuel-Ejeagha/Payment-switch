@@ -1,0 +1,17 @@
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    # REPLACE with the ops email before applying. The domain in
+    # k8s/ingress.yaml must resolve to the cluster ingress controller for the
+    # HTTP-01 challenge to succeed.
+    email: ops@example.com
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: letsencrypt-prod-account-key
+    solvers:
+      - http01:
+          ingress:
+            class: nginx

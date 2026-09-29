@@ -22,47 +22,50 @@ namespace Identity.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("Identity.Domain.Entities.ApiKey", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Environment")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("KeyHash")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("RevokedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("ApiKeys");
-                });
-
             modelBuilder.Entity("Identity.Domain.Entities.User", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<int>("AccessFailedCount")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("EmailConfirmed")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("EmailVerificationTokenExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EmailVerificationTokenHash")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime?>("EmailVerifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LockoutEnd")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("PasswordResetTokenExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PasswordResetTokenHash")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
 
                     b.Property<string>("Roles")
                         .IsRequired()
                         .HasColumnType("jsonb");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
 
                     b.HasKey("Id");
 
@@ -75,10 +78,20 @@ namespace Identity.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("CorrelationId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
                     b.Property<string>("EventType")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime?>("LeaseExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("LeaseToken")
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("OccurredOn")
                         .HasColumnType("timestamp with time zone");
@@ -90,18 +103,15 @@ namespace Identity.Infrastructure.Migrations
                     b.Property<bool>("Processed")
                         .HasColumnType("boolean");
 
+                    b.Property<string>("TraceParent")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.HasKey("Id");
 
-                    b.ToTable("OutboxMessages");
-                });
+                    b.HasIndex("Processed", "LeaseExpiresAt");
 
-            modelBuilder.Entity("Identity.Domain.Entities.ApiKey", b =>
-                {
-                    b.HasOne("Identity.Domain.Entities.User", null)
-                        .WithMany("ApiKeys")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                    b.ToTable("OutboxMessages");
                 });
 
             modelBuilder.Entity("Identity.Domain.Entities.User", b =>
@@ -179,16 +189,26 @@ namespace Identity.Infrastructure.Migrations
                             b1.Property<bool>("IsRevoked")
                                 .HasColumnType("boolean");
 
+                            b1.Property<uint>("RowVersion")
+                                .IsConcurrencyToken()
+                                .ValueGeneratedOnAddOrUpdate()
+                                .HasColumnType("xid")
+                                .HasColumnName("xmin");
+
                             b1.Property<Guid>("UserId")
                                 .HasColumnType("uuid");
 
                             b1.Property<string>("Value")
                                 .IsRequired()
-                                .HasColumnType("text");
+                                .HasMaxLength(128)
+                                .HasColumnType("character varying(128)");
 
                             b1.HasKey("Id");
 
                             b1.HasIndex("UserId");
+
+                            b1.HasIndex("Value")
+                                .IsUnique();
 
                             b1.ToTable("RefreshTokens", (string)null);
 
@@ -206,11 +226,6 @@ namespace Identity.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("RefreshTokens");
-                });
-
-            modelBuilder.Entity("Identity.Domain.Entities.User", b =>
-                {
-                    b.Navigation("ApiKeys");
                 });
 #pragma warning restore 612, 618
         }

@@ -37,14 +37,27 @@ namespace Settlement.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("Currency")
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<decimal>("TotalAmount")
-                        .HasColumnType("numeric");
+                    b.Property<long>("TotalAmount")
+                        .HasColumnType("bigint");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("BatchDate", "Currency")
+                        .IsUnique();
 
                     b.ToTable("SettlementBatches");
                 });
@@ -55,10 +68,20 @@ namespace Settlement.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("CorrelationId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
                     b.Property<string>("EventType")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime?>("LeaseExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("LeaseToken")
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("OccurredOn")
                         .HasColumnType("timestamp with time zone");
@@ -70,7 +93,13 @@ namespace Settlement.Infrastructure.Migrations
                     b.Property<bool>("Processed")
                         .HasColumnType("boolean");
 
+                    b.Property<string>("TraceParent")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("Processed", "LeaseExpiresAt");
 
                     b.ToTable("OutboxMessages");
                 });
@@ -108,8 +137,8 @@ namespace Settlement.Infrastructure.Migrations
                                     b2.Property<Guid>("PayoutId")
                                         .HasColumnType("uuid");
 
-                                    b2.Property<decimal>("Amount")
-                                        .HasColumnType("numeric")
+                                    b2.Property<long>("Amount")
+                                        .HasColumnType("bigint")
                                         .HasColumnName("FeesAmount");
 
                                     b2.Property<string>("Currency")
@@ -131,8 +160,8 @@ namespace Settlement.Infrastructure.Migrations
                                     b2.Property<Guid>("PayoutId")
                                         .HasColumnType("uuid");
 
-                                    b2.Property<decimal>("Amount")
-                                        .HasColumnType("numeric")
+                                    b2.Property<long>("Amount")
+                                        .HasColumnType("bigint")
                                         .HasColumnName("GrossAmount");
 
                                     b2.Property<string>("Currency")
@@ -154,8 +183,8 @@ namespace Settlement.Infrastructure.Migrations
                                     b2.Property<Guid>("PayoutId")
                                         .HasColumnType("uuid");
 
-                                    b2.Property<decimal>("Amount")
-                                        .HasColumnType("numeric")
+                                    b2.Property<long>("Amount")
+                                        .HasColumnType("bigint")
                                         .HasColumnName("NetAmount");
 
                                     b2.Property<string>("Currency")

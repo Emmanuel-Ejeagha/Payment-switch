@@ -1,4 +1,5 @@
-﻿using Merchant.Application.Features.Commands.UpdateMerchantConfig;
+﻿using Merchant.Application.Auth;
+using Merchant.Application.Features.Commands.UpdateMerchantConfig;
 
 
 namespace Merchant.Application.Tests.Handlers;
@@ -7,21 +8,20 @@ public class UpdateMerchantConfigurationHandlerTests
 {
     private readonly Mock<IMerchantRepository> _repoMock = new();
     private readonly Mock<IUnitOfWork> _uowMock = new();
-    private readonly Mock<IDomainEventDispatcher> _dispatcherMock = new();
     private readonly Mock<IValidator<UpdateMerchantConfigurationCommand>> _validatorMock = new();
     private readonly Mock<ILogger<UpdateMerchantConfigurationHandler>> _loggerMock = new();
     private readonly UpdateMerchantConfigurationHandler _handler;
 
     public UpdateMerchantConfigurationHandlerTests()
     {
-        _handler = new UpdateMerchantConfigurationHandler(_repoMock.Object, _uowMock.Object, _dispatcherMock.Object, _validatorMock.Object, _loggerMock.Object);
+        _handler = new UpdateMerchantConfigurationHandler(_repoMock.Object, _uowMock.Object, _validatorMock.Object, _loggerMock.Object);
     }
 
     [Fact]
     public async Task Handle_ActiveMerchant_ShouldUpdate()
     {
         var merchant = CreateActiveMerchant();
-        var command = new UpdateMerchantConfigurationCommand(merchant.Id, "https://hook.com", new List<string> { "card" });
+        var command = new UpdateMerchantConfigurationCommand(merchant.Id, "https://hook.com", new List<string> { "card" }, false, OwnerCaller(merchant));
         SetupValidatorSuccess(command);
         _repoMock.Setup(r => r.GetByIdAsync(merchant.Id, It.IsAny<CancellationToken>())).ReturnsAsync(merchant);
         _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
@@ -31,6 +31,7 @@ public class UpdateMerchantConfigurationHandlerTests
         Assert.True(result.IsSuccess);
         Assert.Equal("https://hook.com", merchant.WebhookUrl!.Value);
         Assert.Contains("card", merchant.EnabledPaymentMethods);
+        Assert.False(merchant.AutoCapture);
     }
 
     [Fact]
@@ -38,19 +39,51 @@ public class UpdateMerchantConfigurationHandlerTests
     {
         var merchant = CreateActiveMerchant();
         merchant.Suspend();
-        var command = new UpdateMerchantConfigurationCommand(merchant.Id, null, null);
+        var command = new UpdateMerchantConfigurationCommand(merchant.Id, null, null, null, OwnerCaller(merchant));
         SetupValidatorSuccess(command);
         _repoMock.Setup(r => r.GetByIdAsync(merchant.Id, It.IsAny<CancellationToken>())).ReturnsAsync(merchant);
 
         var result = await _handler.Handle(command);
 
         Assert.True(result.IsFailure);
-        Assert.Equal("Merchant.ConfigurationUpdateFailed", result.Errors[0].Code);
+        Assert.Equal("Merchant.NotActive", result.Errors[0].Code);
     }
+
+    [Fact]
+    public async Task Handle_UnverifiedOwner_ShouldFail()
+    {
+        var merchant = CreateActiveMerchant();
+        var command = new UpdateMerchantConfigurationCommand(merchant.Id, null, null, null, new CallerContext(merchant.OwnerId, "t@t.com", false));
+        SetupValidatorSuccess(command);
+        _repoMock.Setup(r => r.GetByIdAsync(merchant.Id, It.IsAny<CancellationToken>())).ReturnsAsync(merchant);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Merchant.EmailNotVerified", result.Errors[0].Code);
+    }
+
+    [Fact]
+    public async Task Handle_NonOwner_ShouldFail()
+    {
+        var merchant = CreateActiveMerchant();
+        var command = new UpdateMerchantConfigurationCommand(merchant.Id, null, null, null, new CallerContext(Guid.NewGuid(), null, false, EmailVerified: true));
+        SetupValidatorSuccess(command);
+        _repoMock.Setup(r => r.GetByIdAsync(merchant.Id, It.IsAny<CancellationToken>())).ReturnsAsync(merchant);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Merchant.Unauthorized", result.Errors[0].Code);
+    }
+
+    private CallerContext OwnerCaller(MerchantEntity merchant) => new(merchant.OwnerId, null, false, EmailVerified: true);
 
     private MerchantEntity CreateActiveMerchant()
     {
-        var m = new MerchantEntity(Guid.NewGuid(), new BusinessName("Test"), new MerchantEmail("t@t.com"));
+        var ownerId = Guid.NewGuid();
+        var m = new MerchantEntity(Guid.NewGuid(), ownerId, new BusinessName("Test"), new MerchantEmail("t@t.com"));
+        m.Approve();
         m.Activate();
         m.ClearDomainEvents();
         return m;

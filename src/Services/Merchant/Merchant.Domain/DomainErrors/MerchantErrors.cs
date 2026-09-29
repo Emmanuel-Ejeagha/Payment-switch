@@ -18,4 +18,13 @@ public static class MerchantErrors
 
     public static Error EmailAlreadyInUse(string email) =>
         new("Merchant.EmailAlreadyInUse", $"Email '{email}' is already used by another merchant.");
+
+    public static Error Unauthorized() =>
+        new("Merchant.Unauthorized", "You do not have permission to access this merchant.");
+
+    public static Error MerchantNotActive() =>
+        new("Merchant.NotActive", "Only active merchants can perform this operation.");
+
+    public static Error EmailNotVerified() =>
+        new("Merchant.EmailNotVerified", "Please verify your email address before performing this operation.");
 }

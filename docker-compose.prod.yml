@@ -1,0 +1,19 @@
+# Production overlay for Docker Compose (Step 9.6).
+#
+# Dev (`docker compose up -d`) serves plain HTTP on :80 only. Production
+# adds TLS termination on :443 via the pre-provisioned certificates
+# (see docs/tls.md):
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# The base file intentionally publishes only port 80: an operator who never
+# opts into this overlay cannot accidentally serve half-configured TLS (or
+# bind a port nothing listens on).
+services:
+  nginx:
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./infra/nginx/tls:/etc/nginx/tls:ro

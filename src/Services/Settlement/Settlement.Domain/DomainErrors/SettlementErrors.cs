@@ -12,4 +12,13 @@ public static class SettlementErrors
 
     public static Error BatchNotFound(Guid batchId) =>
         new("Settlement.BatchNotFound", $"Settlement batch with Id '{batchId}' not found.");
+
+    public static Error ConcurrencyConflict =>
+        new("Settlement.ConcurrencyConflict", "The settlement batch was modified concurrently. Please retry.");
+
+    public static Error LedgerTieOutMismatch =>
+        new("Settlement.LedgerTieOutMismatch", "Batch totals do not match the ledger's daily payout figures; settlement was not completed.");
+
+    public static Error EmptyBatch =>
+        new("Settlement.EmptyBatch", "No payouts to settle for the requested date.");
 }

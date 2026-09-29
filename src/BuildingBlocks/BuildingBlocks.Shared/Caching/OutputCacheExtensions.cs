@@ -12,7 +12,7 @@ public static class OutputCacheExtensions
             options.DefaultExpirationTimeSpan = TimeSpan.FromSeconds(30);
             options.AddBasePolicy(builder => builder.Tag("default"));
             options.AddPolicy("CacheById", builder =>
-                builder.Expire(TimeSpan.FromSeconds(60)).Tag("by-id"));
+                builder.Expire(TimeSpan.FromSeconds(10)).Tag("by-id"));
         });
 
         return services;

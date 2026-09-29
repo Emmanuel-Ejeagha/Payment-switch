@@ -1,8 +1,10 @@
-﻿using BuildingBlocks.Shared.Events;
+﻿using BuildingBlocks.Shared.Exceptions;
 using BuildingBlocks.Shared.Results;
 using FluentValidation;
 using Microsoft.Extensions.Logging;
+using Settlement.Application.DTOs;
 using Settlement.Application.Interfaces;
+using Settlement.Domain.DomainErrors;
 using Settlement.Domain.Entities;
 using Settlement.Domain.ValueObjects;
 
@@ -13,7 +15,6 @@ public class TriggerSettlementHandler
     private readonly ISettlementBatchRepository _repository;
     private readonly ILedgerService _ledgerService;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IDomainEventDispatcher _dispatcher;
     private readonly IValidator<TriggerSettlementCommand> _validator;
     private readonly ILogger<TriggerSettlementHandler> _logger;
 
@@ -21,19 +22,17 @@ public class TriggerSettlementHandler
         ISettlementBatchRepository repository,
         ILedgerService ledgerService,
         IUnitOfWork unitOfWork,
-        IDomainEventDispatcher dispatcher,
         IValidator<TriggerSettlementCommand> validator,
         ILogger<TriggerSettlementHandler> logger)
     {
         _repository = repository;
         _ledgerService = ledgerService;
         _unitOfWork = unitOfWork;
-        _dispatcher = dispatcher;
         _validator = validator;
         _logger = logger;
     }
 
-    public async Task<Result<Guid>> Handle(TriggerSettlementCommand command, CancellationToken cancellationToken = default)
+    public async Task<Result<TriggerSettlementResponse>> Handle(TriggerSettlementCommand command, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Handling {CommandName}", nameof(TriggerSettlementCommand));
 
@@ -41,17 +40,52 @@ public class TriggerSettlementHandler
         if (!validation.IsValid)
             return validation.Errors.Select(e => new Error(e.PropertyName, e.ErrorMessage)).ToList();
 
-        var existing = await _repository.GetByBatchDateAsync(command.BatchDate, cancellationToken);
+        var batchDate = command.BatchDate.Kind == DateTimeKind.Unspecified
+            ? DateTime.SpecifyKind(command.BatchDate, DateTimeKind.Utc)
+            : command.BatchDate;
+
+        var ledgerResult = await _ledgerService.GetDailyPayoutDataAsync(batchDate, cancellationToken);
+        if (!ledgerResult.IsSuccess)
+            return Result<TriggerSettlementResponse>.Failure(ledgerResult.Errors);
+
+        // Reject empty days explicitly: an empty ledger snapshot must not
+        // complete a batch (which would fall back to USD) — the caller gets
+        // an actionable EmptyBatch error instead of a silent zero-batch success.
+        if (ledgerResult.Value is null || ledgerResult.Value.Count == 0)
+            return Result<TriggerSettlementResponse>.Failure(SettlementErrors.EmptyBatch);
+
+        // One batch per currency: a bare TotalAmount is only meaningful within
+        // a single currency, so each currency group settles independently.
+        // (Existing batches are detected per currency inside the loop, so a
+        // re-trigger converges without duplicating.)
+        // Single-snapshot tie-out: the batch is built and validated against the
+        // same ledger snapshot so there is no TOCTOU window between two reads.
+        var batchIds = new List<Guid>();
+        foreach (var group in ledgerResult.Value.GroupBy(d => d.Currency, StringComparer.OrdinalIgnoreCase))
+        {
+            var batchId = await TriggerCurrencyBatchAsync(batchDate, group.Key, group.ToList(), cancellationToken);
+            if (!batchId.IsSuccess)
+                return Result<TriggerSettlementResponse>.Failure(batchId.Errors);
+            batchIds.Add(batchId.Value);
+        }
+
+        return new TriggerSettlementResponse(batchIds);
+    }
+
+    private async Task<Result<Guid>> TriggerCurrencyBatchAsync(
+        DateTime batchDate,
+        string currency,
+        List<MerchantPayoutData> payoutDataList,
+        CancellationToken cancellationToken)
+    {
+        var existing = await _repository.GetByBatchDateAndCurrencyAsync(batchDate, currency, cancellationToken);
         if (existing is not null)
             return existing.Id;
 
-        var ledgerResult = await _ledgerService.GetDailyPayoutDataAsync(command.BatchDate, cancellationToken);
-        if (!ledgerResult.IsSuccess)
-            return Result<Guid>.Failure(ledgerResult.Errors);
+        if (payoutDataList.Count == 0)
+            return Result<Guid>.Failure(SettlementErrors.EmptyBatch);
 
-        var payoutDataList = ledgerResult.Value!;
-
-        var batch = new SettlementBatch(Guid.NewGuid(), command.BatchDate);
+        var batch = new SettlementBatch(Guid.NewGuid(), batchDate);
 
         foreach (var data in payoutDataList)
         {
@@ -60,11 +94,40 @@ public class TriggerSettlementHandler
             batch.AddPayout(data.MerchantId, gross, fees);
         }
 
+        // Single-snapshot tie-out: validate the batch against the same ledger
+        // snapshot it was built from, so there is no TOCTOU between two reads.
+        var ledgerGross = payoutDataList.Sum(d => d.GrossVolume);
+        var ledgerFees = payoutDataList.Sum(d => d.Fees);
+        var batchGross = batch.Payouts.Sum(p => p.GrossVolume.Amount);
+        var batchFees = batch.Payouts.Sum(p => p.Fees.Amount);
+
+        if (ledgerGross != batchGross || ledgerFees != batchFees)
+            return Result<Guid>.Failure(SettlementErrors.LedgerTieOutMismatch);
+
         batch.Complete();
 
+        await _unitOfWork.BeginTransactionAsync(cancellationToken);
         await _repository.AddAsync(batch, cancellationToken);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
-        await _dispatcher.DispatchAsync(batch.DomainEvents, cancellationToken);
+        try
+        {
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            await _unitOfWork.CommitAsync(cancellationToken);
+        }
+        catch (ConcurrencyConflictException)
+        {
+            await _unitOfWork.RollbackAsync(cancellationToken);
+            return SettlementErrors.ConcurrencyConflict;
+        }
+        catch (UniqueConstraintViolationException)
+        {
+            // A concurrent trigger already created this currency's batch
+            // (unique BatchDate+Currency index). Surface the existing batch.
+            await _unitOfWork.RollbackAsync(cancellationToken);
+            var existingBatch = await _repository.GetByBatchDateAndCurrencyAsync(batchDate, currency, cancellationToken);
+            if (existingBatch is not null)
+                return existingBatch.Id;
+            return new Error("Settlement.BatchCreateFailed", "Could not create settlement batch.");
+        }
 
         return batch.Id;
     }

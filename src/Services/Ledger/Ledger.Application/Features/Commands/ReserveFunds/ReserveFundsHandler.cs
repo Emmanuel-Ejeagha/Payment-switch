@@ -1,8 +1,9 @@
-﻿using BuildingBlocks.Shared.Events;
+﻿using BuildingBlocks.Shared.Exceptions;
 using BuildingBlocks.Shared.Results;
 using FluentValidation;
 using Ledger.Application.Interfaces;
 using Ledger.Domain.DomainErrors;
+using Ledger.Domain.Entities;
 using Ledger.Domain.ValueObjects;
 using Microsoft.Extensions.Logging;
 
@@ -12,20 +13,17 @@ public class ReserveFundsHandler
 {
     private readonly ILedgerAccountRepository _repository;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IDomainEventDispatcher _dispatcher;
     private readonly IValidator<ReserveFundsCommand> _validator;
     private readonly ILogger<ReserveFundsHandler> _logger;
 
     public ReserveFundsHandler(
         ILedgerAccountRepository repository,
         IUnitOfWork unitOfWork,
-        IDomainEventDispatcher dispatcher,
         IValidator<ReserveFundsCommand> validator,
         ILogger<ReserveFundsHandler> logger)
     {
         _repository = repository;
         _unitOfWork = unitOfWork;
-        _dispatcher = dispatcher;
         _validator = validator;
         _logger = logger;
     }
@@ -37,23 +35,71 @@ public class ReserveFundsHandler
         if (!validation.IsValid)
             return validation.Errors.Select(e => new Error(e.PropertyName, e.ErrorMessage)).ToList();
 
-        var account = await _repository.GetByMerchantIdAsync(command.MerchantId, cancellationToken);
+        var account = await _repository.GetByMerchantIdAndCurrencyAsync(command.MerchantId, command.Currency, cancellationToken);
         if (account is null)
-            return LedgerErrors.AccountNotFound(command.MerchantId);
+        {
+            _logger.LogInformation("No ledger account found for merchant {MerchantId}/{Currency}; auto-creating", command.MerchantId, command.Currency);
+            account = new LedgerAccount(Guid.NewGuid(), command.MerchantId, command.Currency);
+            await _repository.AddAsync(account, cancellationToken);
+        }
 
+        await _unitOfWork.BeginTransactionAsync(cancellationToken);
         try
         {
             var amount = new Money(command.Amount, command.Currency);
             var correlationId = new CorrelationId(command.CorrelationId);
-            account.ReserveFunds(amount, correlationId);
+            account.ReserveFunds(amount, correlationId, command.EventOccurredOn);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            await _unitOfWork.CommitAsync(cancellationToken);
+        }
+        catch (UniqueConstraintViolationException)
+        {
+            // A concurrent first payment won the account-insert race (unique
+            // MerchantId+Currency). Roll back, drop the tracked insert, and
+            // post against the winner's account instead of failing.
+            await _unitOfWork.RollbackAsync(cancellationToken);
+            _unitOfWork.ClearTrackedEntities();
+            return await ReserveOnExistingAccountAsync(command, cancellationToken);
         }
         catch (InvalidOperationException ex)
         {
+            await _unitOfWork.RollbackAsync(cancellationToken);
             return new Error("Ledger.ReserveFailed", ex.Message);
         }
+        catch (ConcurrencyConflictException)
+        {
+            await _unitOfWork.RollbackAsync(cancellationToken);
+            return LedgerErrors.ConcurrencyConflict;
+        }
 
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
-        await _dispatcher.DispatchAsync(account.DomainEvents, cancellationToken);
+        return Result.Success();
+    }
+
+    private async Task<Result> ReserveOnExistingAccountAsync(ReserveFundsCommand command, CancellationToken cancellationToken)
+    {
+        var account = await _repository.GetByMerchantIdAndCurrencyAsync(command.MerchantId, command.Currency, cancellationToken);
+        if (account is null)
+            return LedgerErrors.AccountNotFound(command.MerchantId);
+
+        await _unitOfWork.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            var amount = new Money(command.Amount, command.Currency);
+            var correlationId = new CorrelationId(command.CorrelationId);
+            account.ReserveFunds(amount, correlationId, command.EventOccurredOn);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            await _unitOfWork.CommitAsync(cancellationToken);
+        }
+        catch (InvalidOperationException ex)
+        {
+            await _unitOfWork.RollbackAsync(cancellationToken);
+            return new Error("Ledger.ReserveFailed", ex.Message);
+        }
+        catch (ConcurrencyConflictException)
+        {
+            await _unitOfWork.RollbackAsync(cancellationToken);
+            return LedgerErrors.ConcurrencyConflict;
+        }
 
         return Result.Success();
     }

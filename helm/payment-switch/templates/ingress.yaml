@@ -5,10 +5,17 @@ metadata:
   name: payment-switch
   namespace: {{ .Values.namespace }}
   annotations:
+    # Step 9.5: strip the /<service> prefix like the k8s manifests and the
+    # compose nginx do — backends serve /health/live and /api/..., not
+    # /<service>/health/live. Without this every API path 404s.
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
     {{- if .Values.ingress.tls.enabled }}
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
     {{- end }}
 spec:
+  ingressClassName: nginx
   {{- if .Values.ingress.tls.enabled }}
   tls:
     - hosts:
@@ -21,13 +28,13 @@ spec:
         paths:
           {{- range $name, $svc := .Values.services }}
           {{- if $svc.enabled }}
-          - path: /{{ $svc.name }}
-            pathType: Prefix
+          - path: /{{ $svc.name }}(/|$)(.*)
+            pathType: ImplementationSpecific
             backend:
               service:
                 name: {{ $svc.name }}
                 port:
-                  number: 80
+                  number: 8080
           {{- end }}
           {{- end }}
 {{- end }}

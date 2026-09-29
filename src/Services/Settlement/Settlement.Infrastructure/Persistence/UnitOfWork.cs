@@ -1,18 +1,67 @@
-﻿using Settlement.Application.Interfaces;
+﻿using BuildingBlocks.Shared.Exceptions;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
+using Npgsql;
+using Settlement.Application.Interfaces;
 
 namespace Settlement.Infrastructure.Persistence;
 
 public class UnitOfWork : IUnitOfWork
 {
     private readonly AppDbContext _context;
+    private IDbContextTransaction? _transaction;
 
     public UnitOfWork(AppDbContext context)
     {
         _context = context;
     }
 
+    public async Task BeginTransactionAsync(CancellationToken cancellationToken = default)
+    {
+        _transaction ??= await _context.Database.BeginTransactionAsync(cancellationToken);
+    }
+
     public async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
-        return await _context.SaveChangesAsync(cancellationToken);
+        try
+        {
+            return await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            throw new ConcurrencyConflictException(
+                $"A concurrency conflict occurred while saving. {ex.Message}");
+        }
+        catch (DbUpdateException ex) when (IsUniqueViolation(ex))
+        {
+            throw new UniqueConstraintViolationException(
+                $"A unique constraint was violated while saving. {ex.Message}");
+        }
+    }
+
+    private static bool IsUniqueViolation(DbUpdateException ex)
+    {
+        return ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation }
+            || ex.InnerException?.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation };
+    }
+
+    public async Task CommitAsync(CancellationToken cancellationToken = default)
+    {
+        if (_transaction is null)
+            return;
+
+        await _transaction.CommitAsync(cancellationToken);
+        await _transaction.DisposeAsync();
+        _transaction = null;
+    }
+
+    public async Task RollbackAsync(CancellationToken cancellationToken = default)
+    {
+        if (_transaction is null)
+            return;
+
+        await _transaction.RollbackAsync(cancellationToken);
+        await _transaction.DisposeAsync();
+        _transaction = null;
     }
 }

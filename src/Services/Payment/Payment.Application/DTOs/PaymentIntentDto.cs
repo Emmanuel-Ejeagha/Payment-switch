@@ -3,8 +3,11 @@
 public record PaymentIntentDto(
     Guid IntentId,
     Guid MerchantId,
-    decimal Amount,
+    long Amount,
     string Currency,
     string Status,
+    string? CardLastFour,
+    string? CardBrand,
+    DateTime CreatedAt,
     List<TransactionDto> Transactions
 );

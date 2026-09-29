@@ -1,0 +1,13 @@
+<!-- Step 9.8: fail the build (local and CI) on vulnerable packages.
+     NuGet Audit reports NU1901-NU1904 warnings at restore; escalating them
+     to errors turns every build and test run into a dependency gate. The
+     tree is currently clean (verified with dotnet list package vulnerable
+     output including transitives), so this changes nothing until a
+     vulnerable package appears. CI additionally runs the audit explicitly
+     for a readable report (see .github/workflows/ci-cd.yml). -->
+<Project>
+  <PropertyGroup>
+    <NuGetAudit Condition="'$(NuGetAudit)' == ''">true</NuGetAudit>
+    <WarningsAsErrors>$(WarningsAsErrors);NU1901;NU1902;NU1903;NU1904</WarningsAsErrors>
+  </PropertyGroup>
+</Project>

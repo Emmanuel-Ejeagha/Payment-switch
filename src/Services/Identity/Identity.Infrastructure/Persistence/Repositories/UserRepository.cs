@@ -1,5 +1,4 @@
-﻿using Identity.Application.DTOs;
-using Identity.Application.Interfaces;
+﻿using Identity.Application.Interfaces;
 using Identity.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -22,52 +21,18 @@ public class UserRepository : IUserRepository
 
     public async Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default)
     {
-        var normalizedEmail = email.ToLowerInvariant();
+        // Stored emails are normalized to lowercase (Email.cs), so the lookup
+        // must normalize the input too or a case-variant query misses its match.
+        var normalizedEmail = (email ?? string.Empty).Trim().ToLowerInvariant();
         return await _context.Users
             .FirstOrDefaultAsync(u => u.Email.Value == normalizedEmail, cancellationToken);
     }
 
-    public async Task<User?> GetByIdWithApiKeysAsync(Guid id, CancellationToken cancellationToken = default)
-    {
-        return await _context.Users
-            .Include(u => u.ApiKeys)
-            .FirstOrDefaultAsync(u => u.Id == id, cancellationToken);
-    }
-
-    public Task AddApiKeyAsync(User user, ApiKey apiKey, CancellationToken cancellationToken = default)
-    {
-        _context.ApiKeys.Add(apiKey);
-        _context.Entry(apiKey).Property("UserId").CurrentValue = user.Id;
-        return Task.CompletedTask;
-    }
-
     public async Task<User?> FindByRefreshTokenAsync(string refreshToken, CancellationToken cancellationToken = default)
     {
-        var users = await _context.Users.ToListAsync(cancellationToken);
-        return users.FirstOrDefault(u => u.RefreshTokens.Any(t => t.Value == refreshToken));
-    }
-
-    public async Task<List<ApiKeyDto>> GetApiKeysByUserIdAsync(Guid userId, CancellationToken cancellationToken = default)
-    {
-        return await _context.ApiKeys
-            .Where(k => EF.Property<Guid>(k, "UserId") == userId)
-            .Select(k => new ApiKeyDto(k.Id, k.Environment, k.CreatedAt, k.RevokedAt))
-            .ToListAsync(cancellationToken);
-    }
-
-    public async Task<bool> RevokeApiKeyAsync(Guid userId, Guid keyId, CancellationToken cancellationToken = default)
-    {
-        var apiKey = await _context.ApiKeys
-        .FirstOrDefaultAsync(k => k.Id == keyId && EF.Property<Guid>(k, "UserId") == userId, cancellationToken);
-
-        if (apiKey is null)
-            return false;
-
-        apiKey.Revoke();
-
-        _context.Entry(apiKey).State = EntityState.Modified;
-
-        return true;
+        return await _context.Users
+            .Where(u => u.RefreshTokens.Any(t => t.Value == refreshToken))
+            .FirstOrDefaultAsync(cancellationToken);
     }
 
     public async Task AddAsync(User user, CancellationToken cancellationToken = default)
@@ -75,14 +40,22 @@ public class UserRepository : IUserRepository
         await _context.Users.AddAsync(user, cancellationToken);
     }
 
-    public async Task UpdateAsync(User user, CancellationToken cancellationToken = default)
-    {
-        _context.Users.Update(user);
-        await Task.CompletedTask;
-    }
-
     public async Task<bool> ExistsByEmailAsync(string email, CancellationToken cancellationToken = default)
     {
-        return await _context.Users.AnyAsync(u => u.Email.Value == email, cancellationToken);
+        // Stored emails are normalized to lowercase (Email.cs), so compare against
+        // the normalized input or a case-variant duplicate slips past this check
+        // and surfaces as a unique-index 500 instead of a graceful 409.
+        var normalizedEmail = (email ?? string.Empty).Trim().ToLowerInvariant();
+        return await _context.Users.AnyAsync(u => u.Email.Value == normalizedEmail, cancellationToken);
+    }
+
+    public Task<int> PruneRefreshTokensAsync(CancellationToken cancellationToken = default)
+    {
+        // Physically delete tokens that are revoked or already expired so the
+        // RefreshTokens table cannot grow without bound. Best-effort cleanup —
+        // executed on its own command, independent of the current unit of work.
+        return _context.Database.ExecuteSqlRawAsync(
+            "DELETE FROM \"RefreshTokens\" WHERE \"IsRevoked\" = true OR \"ExpiresAt\" < NOW()",
+            Array.Empty<object>(), cancellationToken);
     }
 }
