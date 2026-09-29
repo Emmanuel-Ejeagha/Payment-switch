@@ -1,4 +1,5 @@
 ﻿using BuildingBlocks.Shared.Messaging;
+using BuildingBlocks.Shared.Exceptions;
 using BuildingBlocks.Shared.Middleware;
 using BuildingBlocks.Shared.Results;
 using Ledger.Application.Features.Commands.CaptureFunds;

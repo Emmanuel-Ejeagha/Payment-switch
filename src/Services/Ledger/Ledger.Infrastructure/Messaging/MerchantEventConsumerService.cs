@@ -1,3 +1,4 @@
+using BuildingBlocks.Shared.Exceptions;
 using BuildingBlocks.Shared.Messaging;
 using BuildingBlocks.Shared.Middleware;
 using BuildingBlocks.Shared.Results;
@@ -9,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Npgsql;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using System.Text;
@@ -348,5 +350,11 @@ public class MerchantEventConsumerService : BackgroundService
     public override void Dispose()
     {
         base.Dispose();
+    }
+
+    private static bool IsUniqueViolation(DbUpdateException ex)
+    {
+        return ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation }
+            || ex.InnerException?.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation };
     }
 }
