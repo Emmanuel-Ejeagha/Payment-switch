@@ -7,20 +7,19 @@ public class ActivateMerchantHandlerTests
 {
     private readonly Mock<IMerchantRepository> _repoMock = new();
     private readonly Mock<IUnitOfWork> _uowMock = new();
-    private readonly Mock<IDomainEventDispatcher> _dispatcherMock = new();
     private readonly Mock<IValidator<ActivateMerchantCommand>> _validatorMock = new();
     private readonly Mock<ILogger<ActivateMerchantHandler>> _loggerMock = new();
     private readonly ActivateMerchantHandler _handler;
 
     public ActivateMerchantHandlerTests()
     {
-        _handler = new ActivateMerchantHandler(_repoMock.Object, _uowMock.Object, _dispatcherMock.Object, _validatorMock.Object, _loggerMock.Object);
+        _handler = new ActivateMerchantHandler(_repoMock.Object, _uowMock.Object, _validatorMock.Object, _loggerMock.Object);
     }
 
     [Fact]
-    public async Task Handle_PendingMerchant_ShouldActivate()
+    public async Task Handle_ApprovedMerchant_ShouldActivate()
     {
-        var merchant = CreatePendingMerchant();
+        var merchant = CreateApprovedMerchant();
         var command = new ActivateMerchantCommand(merchant.Id);
         SetupValidatorSuccess(command);
         _repoMock.Setup(r => r.GetByIdAsync(merchant.Id, It.IsAny<CancellationToken>())).ReturnsAsync(merchant);
@@ -33,9 +32,23 @@ public class ActivateMerchantHandlerTests
     }
 
     [Fact]
-    public async Task Handle_AlreadyActive_ShouldFail()
+    public async Task Handle_PendingMerchant_ShouldFail()
     {
         var merchant = CreatePendingMerchant();
+        var command = new ActivateMerchantCommand(merchant.Id);
+        SetupValidatorSuccess(command);
+        _repoMock.Setup(r => r.GetByIdAsync(merchant.Id, It.IsAny<CancellationToken>())).ReturnsAsync(merchant);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Merchant.InvalidStatusTransition", result.Errors[0].Code);
+    }
+
+    [Fact]
+    public async Task Handle_AlreadyActive_ShouldFail()
+    {
+        var merchant = CreateApprovedMerchant();
         merchant.Activate();
         var command = new ActivateMerchantCommand(merchant.Id);
         SetupValidatorSuccess(command);
@@ -62,6 +75,13 @@ public class ActivateMerchantHandlerTests
 
     private MerchantEntity CreatePendingMerchant() =>
         new(Guid.NewGuid(), new BusinessName("Test"), new MerchantEmail("test@test.com"));
+
+    private MerchantEntity CreateApprovedMerchant()
+    {
+        var merchant = CreatePendingMerchant();
+        merchant.Approve();
+        return merchant;
+    }
 
     private void SetupValidatorSuccess(ActivateMerchantCommand command) =>
         _validatorMock.Setup(v => v.ValidateAsync(command, It.IsAny<CancellationToken>())).ReturnsAsync(new ValidationResult());

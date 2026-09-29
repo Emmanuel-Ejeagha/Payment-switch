@@ -11,8 +11,8 @@ public class MockLedgerService : ILedgerService
     {
         var data = new List<MerchantPayoutData>
         {
-            new(Guid.Parse("11111111-1111-1111-1111-111111111111"), 5000m, 100m, "USD"),
-            new(Guid.Parse("22222222-2222-2222-2222-222222222222"), 3000m, 60m, "USD")
+            new(Guid.Parse("11111111-1111-1111-1111-111111111111"), 500000L, 10000L, "USD"),
+            new(Guid.Parse("22222222-2222-2222-2222-222222222222"), 300000L, 6000L, "USD")
         };
 
         return Task.FromResult(Result<List<MerchantPayoutData>>.Success(data));

@@ -2,6 +2,7 @@
 using Payment.Application.DTOs;
 using Payment.Application.Interfaces;
 using Payment.Domain.Entities;
+using Payment.Domain.ValueObjects;
 
 namespace Payment.Infrastructure.Persistence.Repositories;
 
@@ -24,7 +25,8 @@ public class PaymentIntentRepository : IPaymentIntentRepository
     public async Task<PaymentIntent?> GetByIdempotencyKeyAsync(Guid merchantId, string idempotencyKey, CancellationToken cancellationToken = default)
     {
         return await _context.PaymentIntents
-            .FirstOrDefaultAsync(p => p.MerchantId == merchantId && p.IdempotencyKey.Value == idempotencyKey, cancellationToken);
+            .Include(p => p.Transactions)
+            .FirstOrDefaultAsync(p => p.MerchantId == merchantId && p.IdempotencyKey == new IdempotencyKey(idempotencyKey), cancellationToken);
     }
 
     public async Task AddAsync(PaymentIntent intent, CancellationToken cancellationToken = default)
@@ -32,32 +34,56 @@ public class PaymentIntentRepository : IPaymentIntentRepository
         await _context.PaymentIntents.AddAsync(intent, cancellationToken);
     }
 
-    public Task UpdateAsync(PaymentIntent intent, CancellationToken cancellationToken = default)
-    {
-        _context.PaymentIntents.Update(intent);
-        return Task.CompletedTask;
-    }
-
     public async Task<List<PaymentIntentDto>> ListByMerchantAsync(Guid merchantId, int skip, int take, CancellationToken cancellationToken = default)
     {
-        return await _context.PaymentIntents
+        var intents = await _context.PaymentIntents
             .Where(p => p.MerchantId == merchantId)
             .OrderByDescending(p => p.CreatedAt)
             .Skip(skip).Take(take)
-            .Select(p => new PaymentIntentDto(
-                p.Id,
-                p.MerchantId,
-                p.Amount.Amount,
-                p.Amount.Currency,
-                p.Status.Value,
-                p.Transactions.Select(t => new TransactionDto(
-                    t.Id,
-                    t.Type.ToString(),
-                    t.Amount.Amount,
-                    t.Amount.Currency,
-                    t.Timestamp
-                )).ToList()
-            ))
+            .Include(p => p.Transactions)
+            .ToListAsync(cancellationToken);
+
+        return intents.Select(p => new PaymentIntentDto(
+            p.Id,
+            p.MerchantId,
+            p.Amount.Amount,
+            p.Amount.Currency,
+            p.Status.Value,
+            p.CardDetails != null ? p.CardDetails.LastFour : null,
+            p.CardDetails != null ? p.CardDetails.Brand : null,
+            p.CreatedAt,
+            p.Transactions.Select(t => new TransactionDto(
+                t.Id,
+                t.Type.ToString(),
+                t.Amount.Amount,
+                t.Amount.Currency,
+                t.Timestamp
+            )).ToList()
+        )).ToList();
+    }
+
+    public async Task<int> CountByMerchantAsync(Guid merchantId, CancellationToken cancellationToken = default)
+    {
+        return await _context.PaymentIntents
+            .CountAsync(p => p.MerchantId == merchantId, cancellationToken);
+    }
+
+    /// <summary>
+    /// Returns a bounded batch of in-flight intents (Pending / RequiresAction /
+    /// Processing) untouched since <paramref name="olderThanUtc"/>. Ordering by
+    /// last activity keeps the oldest, most-buried intents first (TASK-018).
+    /// </summary>
+    public async Task<List<PaymentIntent>> GetExpirableBatchAsync(
+        DateTime olderThanUtc, int batchSize, CancellationToken cancellationToken = default)
+    {
+        return await _context.PaymentIntents
+            .AsNoTracking()
+            .Where(p => (p.Status == PaymentStatus.Pending
+                         || p.Status == PaymentStatus.RequiresAction
+                         || p.Status == PaymentStatus.Processing)
+                        && (p.UpdatedAt ?? p.CreatedAt) <= olderThanUtc)
+            .OrderBy(p => p.UpdatedAt ?? p.CreatedAt)
+            .Take(batchSize)
             .ToListAsync(cancellationToken);
     }
 }

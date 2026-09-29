@@ -27,6 +27,9 @@ public class NotificationConfiguration : IEntityTypeConfiguration<NotificationEn
         builder.Property(n => n.NextRetryAt);
         builder.Property(n => n.CreatedAt).IsRequired();
         builder.Property(n => n.ProcessedAt);
+        builder.Property(n => n.LeaseToken);
+        builder.Property(n => n.LeaseExpiresAt);
+        builder.HasIndex(n => new { n.Status, n.NextRetryAt });
         builder.Ignore(n => n.DomainEvents);
     }
 }

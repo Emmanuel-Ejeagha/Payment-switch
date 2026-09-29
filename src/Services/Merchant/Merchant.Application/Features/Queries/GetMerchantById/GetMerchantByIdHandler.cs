@@ -21,13 +21,27 @@ public class GetMerchantByIdHandler
         if (merchant == null)
             return MerchantErrors.MerchantNotFound(query.MerchantId);
 
+        if (!query.Caller.CanAccess(merchant.OwnerId))
+            return MerchantErrors.Unauthorized();
+
         return new MerchantDto(
             merchant.Id,
             merchant.BusinessName.Value,
             merchant.Email.Value,
             merchant.Status.Value,
             merchant.WebhookUrl?.Value,
-            merchant.EnabledPaymentMethods.ToList()
+            merchant.EnabledPaymentMethods.ToList(),
+            merchant.CreatedAt,
+            merchant.AutoCapture,
+            merchant.RejectionReason,
+            merchant.SettlementInfo?.BankAccountName,
+            merchant.SettlementInfo?.BankAccountNumber,
+            merchant.SettlementInfo?.BankName,
+            merchant.SettlementInfo?.SettlementCurrency,
+            merchant.SettlementInfo?.SettlementSchedule,
+            merchant.ContactDetails?.Phone,
+            merchant.ContactDetails?.Address,
+            merchant.ContactDetails?.ContactPerson
         );
     }
 }

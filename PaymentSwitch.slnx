@@ -48,6 +48,7 @@
     <Project Path="tests/Integration/Ledger.API.IntegrationTests/Ledger.API.IntegrationTests.csproj" />
     <Project Path="tests/Integration/Notification.API.IntegrationTests/Notification.API.IntegrationTests.csproj" />
     <Project Path="tests/Integration/Settlement.API.IntegrationTests/Settlement.API.IntegrationTests.csproj" />
+    <Project Path="tests/Integration/E2E.IntegrationTests/E2E.IntegrationTests.csproj" />
   </Folder>
   <Folder Name="/tests/Unit/">
     <Project Path="tests/Unit/BuildingBlocks.Shared.Tests/BuildingBlocks.Shared.Tests.csproj" />
@@ -59,10 +60,12 @@
     <Project Path="tests/Unit/Merchant.Application.Tests/Merchant.Application.Tests.csproj" />
     <Project Path="tests/Unit/Merchant.Domain.Tests/Merchant.Domain.Tests.csproj" />
     <Project Path="tests/Unit/Notification.Application.Tests/Notification.Application.Tests.csproj" />
+    <Project Path="tests/Unit/Notification.API.Tests/Notification.API.Tests.csproj" />
     <Project Path="tests/Unit/Notification.Domain.Tests/Notification.Domain.Tests.csproj" />
     <Project Path="tests/Unit/Payment.Application.Tests/Payment.Application.Tests.csproj" />
     <Project Path="tests/Unit/Payment.Domain.Tests/Payment.Domain.Tests.csproj" />
     <Project Path="tests/Unit/Payment.Infrastructure.Tests/Payment.Infrastructure.Tests.csproj" />
+    <Project Path="tests/Unit/Settlement.API.Tests/Settlement.API.Tests.csproj" />
     <Project Path="tests/Unit/Settlement.Application.Tests/Settlement.Application.Tests.csproj" />
     <Project Path="tests/Unit/Settlement.Domain.Tests/Settlement.Domain.Tests.csproj" />
   </Folder>

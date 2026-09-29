@@ -15,11 +15,12 @@ public class PaymentIntent : AggregateRoot
     public CardDetails? CardDetails { get; private set; }
     public AuthorizationCode? AuthorizationCode { get; private set; }
     public GatewayReference? GatewayReference { get; private set; }
+    public string? ProviderName { get; private set; }
     public IReadOnlyList<Transaction> Transactions => _transactions.AsReadOnly();
-    private readonly List<Transaction> _transactions = new();
+    private List<Transaction> _transactions = new();
     public DateTime CreatedAt { get; private set; }
     public DateTime? UpdatedAt { get; private set; }
-
+    public uint RowVersion { get; private set; }
     private PaymentIntent() : base() { }
 
     public PaymentIntent(
@@ -41,28 +42,70 @@ public class PaymentIntent : AggregateRoot
         AddDomainEvent(new PaymentIntentCreatedDomainEvent(Id, MerchantId, Amount, IdempotencyKey.Value));
     }
 
-    public void Authorize(AuthorizationCode authorizationCode, GatewayReference gatewayReference)
+    public void Authorize(AuthorizationCode authorizationCode, GatewayReference gatewayReference, string? idempotencyKey = null, string? providerName = null)
     {
         if (Status != PaymentStatus.Pending)
             throw new InvalidOperationException($"Cannot authorize payment in '{Status}' status.");
 
         AuthorizationCode = authorizationCode;
         GatewayReference = gatewayReference;
+        ProviderName = providerName;
         Status = PaymentStatus.Authorized;
         UpdatedAt = DateTime.UtcNow;
 
-        var transaction = new Transaction(TransactionType.Authorization, Amount, gatewayReference);
+        var transaction = new Transaction(TransactionType.Authorization, new Money(Amount.Amount, Amount.Currency), new GatewayReference(gatewayReference.Value), idempotencyKey);
         _transactions.Add(transaction);
 
-        AddDomainEvent(new PaymentAuthorizedDomainEvent(Id, authorizationCode.Value, Amount, gatewayReference.Value));
+        AddDomainEvent(new PaymentAuthorizedDomainEvent(Id, MerchantId, authorizationCode.Value, Amount, gatewayReference.Value));
     }
 
-    public void Capture(Money? amount = null)
+    public void RequireAction(GatewayReference gatewayReference, string? providerName = null)
+    {
+        if (Status != PaymentStatus.Pending)
+            throw new InvalidOperationException($"Cannot require action for payment in '{Status}' status.");
+
+        GatewayReference = gatewayReference;
+        ProviderName = providerName;
+        Status = PaymentStatus.RequiresAction;
+        UpdatedAt = DateTime.UtcNow;
+
+        AddDomainEvent(new PaymentRequiresActionDomainEvent(Id, MerchantId, Amount, gatewayReference.Value));
+    }
+
+    public void MarkProcessing(string status = "Processing")
+    {
+        if (Status != PaymentStatus.RequiresAction)
+            throw new InvalidOperationException($"Cannot mark '{status}' payment as processing from '{Status}' status.");
+
+        Status = PaymentStatus.Processing;
+        UpdatedAt = DateTime.UtcNow;
+
+        AddDomainEvent(new PaymentProcessingDomainEvent(Id, MerchantId, status));
+    }
+
+    public void ConfirmAction(AuthorizationCode authorizationCode, GatewayReference gatewayReference, string? idempotencyKey = null, string? providerName = null)
+    {
+        if (Status != PaymentStatus.RequiresAction && Status != PaymentStatus.Processing)
+            throw new InvalidOperationException($"Cannot confirm payment in '{Status}' status.");
+
+        AuthorizationCode = authorizationCode;
+        GatewayReference = gatewayReference;
+        ProviderName = providerName;
+        Status = PaymentStatus.Authorized;
+        UpdatedAt = DateTime.UtcNow;
+
+        var transaction = new Transaction(TransactionType.Authorization, new Money(Amount.Amount, Amount.Currency), new GatewayReference(gatewayReference.Value), idempotencyKey);
+        _transactions.Add(transaction);
+
+        AddDomainEvent(new PaymentAuthorizedDomainEvent(Id, MerchantId, authorizationCode.Value, Amount, gatewayReference.Value));
+    }
+
+    public void Capture(Money? amount = null, string? idempotencyKey = null)
     {
         if (Status != PaymentStatus.Authorized && Status != PaymentStatus.PartiallyCaptured)
             throw new InvalidOperationException($"Cannot capture payment in '{Status}' status.");
 
-        var captureAmount = amount ?? Amount; 
+        var captureAmount = amount ?? GetCapturableAmount();
 
         var capturedSoFar = _transactions
             .Where(t => t.Type == TransactionType.Capture)
@@ -75,7 +118,7 @@ public class PaymentIntent : AggregateRoot
         if (captureAmount.Currency != Amount.Currency)
             throw new InvalidOperationException("Capture currency must match the original payment currency.");
 
-        var transaction = new Transaction(TransactionType.Capture, captureAmount);
+        var transaction = new Transaction(TransactionType.Capture, captureAmount, idempotencyKey: idempotencyKey);
         _transactions.Add(transaction);
 
         var newCapturedTotal = capturedSoFar + captureAmount.Amount;
@@ -85,29 +128,36 @@ public class PaymentIntent : AggregateRoot
             Status = PaymentStatus.PartiallyCaptured;
 
         UpdatedAt = DateTime.UtcNow;
-        AddDomainEvent(new PaymentCapturedDomainEvent(Id, transaction.Id, captureAmount));
+        AddDomainEvent(new PaymentCapturedDomainEvent(Id, MerchantId, transaction.Id, captureAmount));
     }
 
-    public void Void()
+    public void Void(string? idempotencyKey = null)
     {
-        if (Status != PaymentStatus.Authorized)
+        if (Status != PaymentStatus.Authorized && Status != PaymentStatus.PartiallyCaptured)
             throw new InvalidOperationException($"Cannot void payment in '{Status}' status.");
+
+        // From Authorized the whole intent is still held; after a partial
+        // capture only the uncaptured remainder is. Either way the voided
+        // amount is exactly what the ledger must release.
+        var voidAmount = Status == PaymentStatus.Authorized
+            ? Amount
+            : new Money(Amount.Amount - GetTotalCaptured(), Amount.Currency);
 
         Status = PaymentStatus.Voided;
         UpdatedAt = DateTime.UtcNow;
 
-        var transaction = new Transaction(TransactionType.Void, Amount);
+        var transaction = new Transaction(TransactionType.Void, voidAmount, idempotencyKey: idempotencyKey);
         _transactions.Add(transaction);
 
-        AddDomainEvent(new PaymentVoidedDomainEvent(Id));
+        AddDomainEvent(new PaymentVoidedDomainEvent(Id, MerchantId, voidAmount));
     }
 
-    public void Refund(Money? amount = null)
+    public void Refund(Money? amount = null, string? idempotencyKey = null)
     {
         if (Status != PaymentStatus.Captured && Status != PaymentStatus.PartiallyCaptured && Status != PaymentStatus.PartiallyRefunded)
             throw new InvalidOperationException($"Cannot refund payment in '{Status}' status.");
 
-        var refundAmount = amount ?? new Money(GetTotalCaptured() - GetTotalRefunded(), Amount.Currency);
+        var refundAmount = amount ?? GetRefundableAmount();
 
         var totalCaptured = GetTotalCaptured();
         var totalRefunded = GetTotalRefunded();
@@ -119,7 +169,7 @@ public class PaymentIntent : AggregateRoot
         if (refundAmount.Currency != Amount.Currency)
             throw new InvalidOperationException("Refund currency must match the original payment currency.");
 
-        var transaction = new Transaction(TransactionType.Refund, refundAmount);
+        var transaction = new Transaction(TransactionType.Refund, refundAmount, idempotencyKey: idempotencyKey);
         _transactions.Add(transaction);
 
         var newRefundedTotal = totalRefunded + refundAmount.Amount;
@@ -129,21 +179,61 @@ public class PaymentIntent : AggregateRoot
             Status = PaymentStatus.PartiallyRefunded;
 
         UpdatedAt = DateTime.UtcNow;
-        AddDomainEvent(new PaymentRefundedDomainEvent(Id, transaction.Id, refundAmount));
+        AddDomainEvent(new PaymentRefundedDomainEvent(Id, MerchantId, transaction.Id, refundAmount));
     }
 
     public void Fail()
     {
-        if (Status != PaymentStatus.Pending)
+        if (Status != PaymentStatus.Pending
+            && Status != PaymentStatus.RequiresAction
+            && Status != PaymentStatus.Processing)
             throw new InvalidOperationException($"Cannot fail payment in '{Status}' status.");
 
         Status = PaymentStatus.Failed;
         UpdatedAt = DateTime.UtcNow;
+
+        AddDomainEvent(new PaymentFailedDomainEvent(Id, MerchantId, Amount));
     }
 
-    private decimal GetTotalCaptured() =>
+    /// <summary>
+    /// Expires a payment intent that was never finalized. Allowed only from the
+    /// in-flight states (Pending / RequiresAction / Processing) — a merchant may
+    /// not authorize or capture it afterward. Idempotent: expiring an already
+    /// expired intent is a no-op so the worker can run safely alongside replay.
+    /// </summary>
+    /// <remarks>
+    /// Reversal semantics are intentionally NOT a second terminal state: an
+    /// authorized intent is reversed via <c>Void()</c>; a captured intent is
+    /// reversed via <c>Refund()</c>. <c>Expired</c> only terminates intents that
+    /// never left the starting states.
+    /// </remarks>
+    public void Expire()
+    {
+        if (Status == PaymentStatus.Expired)
+            return;
+
+        if (Status != PaymentStatus.Pending
+            && Status != PaymentStatus.RequiresAction
+            && Status != PaymentStatus.Processing)
+            throw new InvalidOperationException($"Cannot expire payment in '{Status}' status.");
+
+        Status = PaymentStatus.Expired;
+        UpdatedAt = DateTime.UtcNow;
+
+        AddDomainEvent(new PaymentExpiredDomainEvent(Id, MerchantId, Amount));
+    }
+
+    private long GetTotalCaptured() =>
         _transactions.Where(t => t.Type == TransactionType.Capture).Sum(t => t.Amount.Amount);
 
-    private decimal GetTotalRefunded() =>
+    private long GetTotalRefunded() =>
         _transactions.Where(t => t.Type == TransactionType.Refund).Sum(t => t.Amount.Amount);
+
+    /// <summary>Authorized-but-uncaptured remainder. Used as the default capture amount.</summary>
+    public Money GetCapturableAmount() =>
+        new(Amount.Amount - GetTotalCaptured(), Amount.Currency);
+
+    /// <summary>Captured-but-unrefunded remainder. Used as the default refund amount.</summary>
+    public Money GetRefundableAmount() =>
+        new(GetTotalCaptured() - GetTotalRefunded(), Amount.Currency);
 }

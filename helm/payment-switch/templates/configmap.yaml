@@ -7,4 +7,16 @@ data:
   Jwt__Issuer: {{ .Values.config.jwt.issuer | quote }}
   Jwt__Audience: {{ .Values.config.jwt.audience | quote }}
   RabbitMQ__HostName: {{ .Values.config.rabbitmq.hostName | quote }}
-  RabbitMQ__UserName: {{ .Values.config.rabbitmq.userName | quote }}
+  EmailVerification__FrontendBaseUrl: {{ .Values.config.emailVerification.frontendBaseUrl | quote }}
+  PasswordReset__FrontendBaseUrl: {{ .Values.config.passwordReset.frontendBaseUrl | quote }}
+  PasswordReset__TokenLifetimeHours: {{ .Values.config.passwordReset.tokenLifetimeHours | quote }}
+  Smtp__Host: {{ .Values.config.smtp.host | quote }}
+  Smtp__Port: {{ .Values.config.smtp.port | quote }}
+  Smtp__Username: {{ .Values.config.smtp.username | quote }}
+  Smtp__FromAddress: {{ .Values.config.smtp.fromAddress | quote }}
+  Smtp__FromName: {{ .Values.config.smtp.fromName | quote }}
+  Sms__Enabled: {{ .Values.config.sms.enabled | quote }}
+  Retention__CleanupIntervalMinutes: {{ .Values.config.retention.cleanupIntervalMinutes | quote }}
+  Retention__BatchSize: {{ .Values.config.retention.batchSize | quote }}
+  Retention__MessageRetentionDays: {{ .Values.config.retention.messageRetentionDays | quote }}
+  NEXT_PUBLIC_API_URL: {{ .Values.config.frontend.apiUrl | quote }}

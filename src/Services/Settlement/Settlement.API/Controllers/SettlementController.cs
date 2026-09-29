@@ -1,4 +1,7 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using System.Globalization;
+using BuildingBlocks.Shared.Auth;
+using BuildingBlocks.Shared.Paging;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Settlement.API.Extensions;
 using Settlement.Application.DTOs;
@@ -8,14 +11,16 @@ using Settlement.Application.Features.Queries.ListSettlementBatches;
 
 namespace Settlement.API.Controllers;
 
-[Authorize(Roles = "Admin")]
+[Authorize]
 public class SettlementController : BaseApiController
 {
     /// <summary>
-    /// Manually trigger a settlement batch for a given date.
+    /// Manually trigger a settlement batch for a given date (Admin only —
+    /// moves money).
     /// </summary>
     [HttpPost("trigger")]
-    [ProducesResponseType(typeof(Guid), StatusCodes.Status200OK)]
+    [Authorize(Roles = RolePolicies.AdminOnly)]
+    [ProducesResponseType(typeof(TriggerSettlementResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Trigger(
         [FromBody] TriggerSettlementCommand command,
@@ -26,9 +31,10 @@ public class SettlementController : BaseApiController
     }
 
     /// <summary>
-    /// Get a settlement batch by ID.
+    /// Get a settlement batch by ID (Admin + Support read).
     /// </summary>
     [HttpGet("{id:guid}")]
+    [Authorize(Roles = RolePolicies.ReadOnly)]
     [ProducesResponseType(typeof(SettlementBatchDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(
@@ -40,18 +46,23 @@ public class SettlementController : BaseApiController
     }
 
     /// <summary>
-    /// List settlement batches with optional date filters.
+    /// List settlement batches with optional date filters (Admin + Support read).
     /// </summary>
     [HttpGet]
+    [Authorize(Roles = RolePolicies.ReadOnly)]
     [ProducesResponseType(typeof(List<SettlementBatchDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> List(
         [FromQuery] DateTime? from,
         [FromQuery] DateTime? to,
         [FromServices] ListSettlementBatchesHandler handler,
-        [FromQuery] int skip = 0,
-        [FromQuery] int take = 10)
+        [FromQuery] int skip = PageBounds.DefaultSkip,
+        [FromQuery] int take = PageBounds.DefaultTake)
     {
-        var result = await handler.Handle(new ListSettlementBatchesQuery(from, to, skip, take));
-        return result.ToActionResult();
+        var (normalizedSkip, normalizedTake) = PageBounds.Normalize(skip, take);
+        var result = await handler.Handle(new ListSettlementBatchesQuery(from, to, normalizedSkip, normalizedTake));
+        if (result.IsFailure) return result.ToActionResult();
+
+        Response.Headers["X-Total-Count"] = result.Value!.TotalCount.ToString(CultureInfo.InvariantCulture);
+        return Ok(result.Value.Items);
     }
 }

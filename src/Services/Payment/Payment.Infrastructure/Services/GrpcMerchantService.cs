@@ -1,4 +1,5 @@
 ﻿using BuildingBlocks.Shared.Results;
+using Payment.Application.DTOs;
 using Payment.Application.Interfaces;
 using PaymentSwitch.Protos.Merchant;
 
@@ -18,5 +19,42 @@ public class GrpcMerchantService : IMerchantService
         var request = new GetMerchantStatusRequest { MerchantId = merchantId.ToString() };
         var response = await _client.GetMerchantStatusAsync(request, cancellationToken: cancellationToken);
         return Result<string>.Success(response.Status);
+    }
+
+    public async Task<Result<MerchantConfig>> GetMerchantConfigAsync(Guid merchantId, CancellationToken cancellationToken = default)
+    {
+        var request = new GetMerchantConfigRequest { MerchantId = merchantId.ToString() };
+        var response = await _client.GetMerchantConfigAsync(request, cancellationToken: cancellationToken);
+        return Result<MerchantConfig>.Success(new MerchantConfig(
+            string.IsNullOrEmpty(response.WebhookUrl) ? null : response.WebhookUrl,
+            response.AutoCapture,
+            string.IsNullOrEmpty(response.WebhookSecret) ? null : response.WebhookSecret,
+            string.IsNullOrEmpty(response.PreviousWebhookSecret) ? null : response.PreviousWebhookSecret,
+            response.WebhookSecretRotatedAt == 0
+                ? null
+                : DateTimeOffset.FromUnixTimeSeconds(response.WebhookSecretRotatedAt).UtcDateTime));
+    }
+
+    public async Task<Result<Guid?>> GetMerchantOwnerAsync(Guid merchantId, CancellationToken cancellationToken = default)
+    {
+        var request = new GetMerchantContactRequest { MerchantId = merchantId.ToString() };
+        var response = await _client.GetMerchantContactAsync(request, cancellationToken: cancellationToken);
+        if (string.IsNullOrEmpty(response.OwnerId))
+            return new Error("Payment.MerchantNotFound", "Merchant not found.");
+
+        return Result<Guid?>.Success(Guid.Parse(response.OwnerId));
+    }
+
+    public async Task<Result<MerchantKeyResolution>> ResolveApiKeyAsync(string keyPrefix, string keyValue, CancellationToken cancellationToken = default)
+    {
+        var request = new ResolveApiKeyRequest { KeyPrefix = keyPrefix, KeyValue = keyValue };
+        var response = await _client.ResolveApiKeyAsync(request, cancellationToken: cancellationToken);
+        if (string.IsNullOrEmpty(response.MerchantId))
+            return new Error("Payment.InvalidApiKey", "Invalid API key.");
+
+        return Result<MerchantKeyResolution>.Success(new MerchantKeyResolution(
+            Guid.Parse(response.MerchantId),
+            response.Status,
+            response.Environment));
     }
 }

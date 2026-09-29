@@ -22,3 +22,27 @@ spec:
 ---
 {{- end }}
 {{- end }}
+{{- range $name, $front := .Values.frontends }}
+{{- if and $front.enabled $front.hpa.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ $front.name }}
+  namespace: {{ $.Values.namespace }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ $front.name }}
+  minReplicas: {{ $front.hpa.minReplicas }}
+  maxReplicas: {{ $front.hpa.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ $front.hpa.targetCPUUtilizationPercentage }}
+---
+{{- end }}
+{{- end }}

@@ -21,6 +21,8 @@ public class ExceptionMiddleware
         {
             await _next(context);
         }
+        // codeql[cs/catch-of-all-exceptions]: ASP.NET exception boundary; any
+        // unhandled exception is logged and mapped to a 500, never leaked.
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unhandled exception occurred.");

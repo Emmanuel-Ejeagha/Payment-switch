@@ -16,10 +16,12 @@ public class MerchantEmail : ValueObject
     {
         if (string.IsNullOrWhiteSpace(value))
             throw new ArgumentException("Email cannot be empty.", nameof(value));
-        if (!EmailRegex.IsMatch(value))
+
+        var normalized = value.Trim();
+        if (!EmailRegex.IsMatch(normalized))
             throw new ArgumentException("Email format is invalid.", nameof(value));
 
-        Value = value.ToLowerInvariant();
+        Value = normalized.ToLowerInvariant();
     }
 
     protected override IEnumerable<object?> GetEqualityComponents()

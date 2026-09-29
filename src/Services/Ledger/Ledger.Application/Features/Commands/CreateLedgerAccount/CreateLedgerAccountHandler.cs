@@ -1,6 +1,8 @@
-﻿using BuildingBlocks.Shared.Results;
+﻿using BuildingBlocks.Shared.Exceptions;
+using BuildingBlocks.Shared.Results;
 using FluentValidation;
 using Ledger.Application.Interfaces;
+using Ledger.Domain.DomainErrors;
 using Ledger.Domain.Entities;
 using Microsoft.Extensions.Logging;
 
@@ -32,13 +34,32 @@ public class CreateLedgerAccountHandler
         if (!validation.IsValid)
             return validation.Errors.Select(e => new Error(e.PropertyName, e.ErrorMessage)).ToList();
 
-        var existing = await _repository.GetByMerchantIdAsync(command.MerchantId, cancellationToken);
+        var existing = await _repository.GetByMerchantIdAndCurrencyAsync(command.MerchantId, command.Currency, cancellationToken);
         if (existing is not null)
-            return Result.Success(); 
+            return Result.Success();
 
         var account = new LedgerAccount(Guid.NewGuid(), command.MerchantId, command.Currency);
+        await _unitOfWork.BeginTransactionAsync(cancellationToken);
         await _repository.AddAsync(account, cancellationToken);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            await _unitOfWork.CommitAsync(cancellationToken);
+        }
+        catch (ConcurrencyConflictException)
+        {
+            await _unitOfWork.RollbackAsync(cancellationToken);
+            return LedgerErrors.ConcurrencyConflict;
+        }
+        catch (UniqueConstraintViolationException)
+        {
+            // A concurrent create won the insert race (unique
+            // MerchantId+Currency). That is the desired end state, so converge
+            // on success instead of failing.
+            await _unitOfWork.RollbackAsync(cancellationToken);
+            _logger.LogInformation("Ledger account for Merchant {MerchantId}/{Currency} already created concurrently", command.MerchantId, command.Currency);
+            return Result.Success();
+        }
 
         return Result.Success();
     }

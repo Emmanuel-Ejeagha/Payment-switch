@@ -1,9 +1,10 @@
-﻿using BuildingBlocks.Shared.Events;
-using FluentValidation;
+﻿using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using Notification.Application.Features.Commands.CreateNotification;
 using Notification.Application.Features.Commands.SendPendingNotification;
+using Notification.Application.Features.Commands.UpdateNotificationPreference;
 using Notification.Application.Features.Queries.GetNotificationById;
+using Notification.Application.Features.Queries.GetNotificationPreferences;
 using Notification.Application.Features.Queries.ListNotifications;
 
 namespace Notification.Application;
@@ -16,8 +17,8 @@ public static class DependencyInjection
         services.AddScoped<SendPendingNotificationHandler>();
         services.AddScoped<GetNotificationByIdHandler>();
         services.AddScoped<ListNotificationsHandler>();
-
-        services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
+        services.AddScoped<UpdateNotificationPreferenceHandler>();
+        services.AddScoped<GetNotificationPreferencesHandler>();
 
         services.AddValidatorsFromAssemblyContaining<CreateNotificationCommandValidator>();
 

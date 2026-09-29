@@ -1,4 +1,7 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using BuildingBlocks.Shared.BackgroundServices;
+using BuildingBlocks.Shared.Messaging;
+using BuildingBlocks.Shared.Observability;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -12,6 +15,7 @@ public class OutboxPublisherService : BackgroundService
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<OutboxPublisherService> _logger;
     private readonly TimeSpan _pollingInterval = TimeSpan.FromSeconds(2);
+    private readonly TimeSpan _leaseDuration = TimeSpan.FromSeconds(30);
 
     public OutboxPublisherService(IServiceScopeFactory scopeFactory, ILogger<OutboxPublisherService> logger)
     {
@@ -21,20 +25,15 @@ public class OutboxPublisherService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        while (!stoppingToken.IsCancellationRequested)
-        {
-            try
-            {
-                await ProcessOutboxMessages(stoppingToken);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error processing outbox messages");
-            }
-
-            await Task.Delay(_pollingInterval, stoppingToken);
-        }
+        await WorkerLoop.RunAsync(
+            ProcessOutboxMessages,
+            _pollingInterval,
+            _logger,
+            stoppingToken,
+            "outbox publisher");
     }
+
+    private const int BatchSize = 10;
 
     private async Task ProcessOutboxMessages(CancellationToken cancellationToken)
     {
@@ -42,25 +41,66 @@ public class OutboxPublisherService : BackgroundService
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var eventBus = scope.ServiceProvider.GetRequiredService<IEventBus>();
 
-        var messages = await db.OutboxMessages
-            .Where(m => !m.Processed)
+        var leaseToken = Guid.NewGuid();
+        var leaseUntil = DateTime.UtcNow.Add(_leaseDuration);
+
+        // Bound the lease claim with ORDER BY … LIMIT so a single poll never
+        // claims the whole backlog and same-timestamp rows have a stable order.
+        var candidateIds = await db.OutboxMessages
+            .Where(m => !m.Processed && (m.LeaseExpiresAt == null || m.LeaseExpiresAt < DateTime.UtcNow))
             .OrderBy(m => m.OccurredOn)
-            .Take(10)
+            .ThenBy(m => m.Id)
+            .Take(BatchSize)
+            .Select(m => m.Id)
             .ToListAsync(cancellationToken);
 
-        foreach (var message in messages)
+        if (candidateIds.Count == 0)
         {
-            try
-            {
-                await eventBus.PublishAsync(message.EventType, message.Payload, cancellationToken);
-                message.MarkAsProcessed();
-                await db.SaveChangesAsync(cancellationToken);
-                _logger.LogInformation("Published outbox message {MessageId} of type {EventType}", message.Id, message.EventType);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to publish outbox message {MessageId}", message.Id);
-            }
+            OutboxMetrics.SetBacklog(await db.OutboxMessages.CountAsync(m => !m.Processed, cancellationToken));
+            return;
         }
+
+        await db.OutboxMessages
+            .Where(m => candidateIds.Contains(m.Id))
+            .ExecuteUpdateAsync(
+                s => s.SetProperty(m => m.LeaseToken, leaseToken)
+                      .SetProperty(m => m.LeaseExpiresAt, leaseUntil),
+                cancellationToken);
+
+        while (true)
+        {
+            var messages = await db.OutboxMessages
+                .Where(m => m.LeaseToken == leaseToken)
+                .OrderBy(m => m.OccurredOn)
+                .ThenBy(m => m.Id)
+                .Take(BatchSize)
+                .ToListAsync(cancellationToken);
+
+            if (messages.Count == 0)
+                break;
+
+            foreach (var message in messages)
+            {
+                try
+                {
+                    using var activity = RabbitMqTracing.StartProducerActivity(
+                        message.EventType, RabbitMqTracing.ParseTraceParent(message.TraceParent));
+                    await eventBus.PublishAsync(message.EventType, message.Payload, message.Id.ToString(), message.CorrelationId, cancellationToken);
+                    message.MarkAsProcessed();
+                    OutboxMetrics.RecordPublished();
+                    _logger.LogInformation("Published outbox message {MessageId} of type {EventType}", message.Id, message.EventType);
+                }
+                catch (Exception ex)
+                {
+                    message.ReleaseLease();
+                    OutboxMetrics.RecordFailed();
+                    _logger.LogError(ex, "Failed to publish outbox message {MessageId}", message.Id);
+                }
+            }
+
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        OutboxMetrics.SetBacklog(await db.OutboxMessages.CountAsync(m => !m.Processed, cancellationToken));
     }
 }

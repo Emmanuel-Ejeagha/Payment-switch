@@ -2,10 +2,14 @@
 
 public record CreatePaymentIntentCommand(
     Guid MerchantId,
-    decimal Amount,
+    long Amount,
     string Currency,
     string PaymentMethod,
     string? CardLastFour,
     string? CardBrand,
-    string IdempotencyKey
+    string IdempotencyKey,
+    string? CardToken = null,
+    // Transient CVC for this authorization only. Forwarded to the gateway and then
+    // dropped — it is never written to the PaymentIntent or any other table.
+    string? SecurityCode = null
 );

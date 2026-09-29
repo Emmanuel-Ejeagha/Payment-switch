@@ -2,5 +2,5 @@
 
 public interface IEventBus
 {
-    Task PublishAsync(string eventType, string payload, CancellationToken cancellationToken = default);
+    Task PublishAsync(string eventType, string payload, string? messageId = null, string? correlationId = null, CancellationToken cancellationToken = default);
 }

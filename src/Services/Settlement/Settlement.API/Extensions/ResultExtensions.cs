@@ -23,6 +23,7 @@ public static class ResultExtensions
         var statusCode = first.Code switch
         {
             "Settlement.BatchNotFound" => 404,
+            "Settlement.ConcurrencyConflict" => 409,
             "Settlement.BatchAlreadyCompleted" => 400,
             "Settlement.DuplicateMerchant" => 409,
             _ => 400

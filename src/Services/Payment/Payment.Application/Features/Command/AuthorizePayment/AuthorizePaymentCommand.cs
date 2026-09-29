@@ -3,5 +3,6 @@
 public record AuthorizePaymentCommand(
     Guid IntentId,
     string? CardLastFour,
-    string? CardBrand
+    string? CardBrand,
+    string? IdempotencyKey = null
 );

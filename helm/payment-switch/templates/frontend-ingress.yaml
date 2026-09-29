@@ -1,0 +1,47 @@
+{{- if and .Values.ingress.enabled (or .Values.frontends.admin.enabled .Values.frontends.merchant.enabled) }}
+# Step 9.5: frontend routes live in their own Ingress without a rewrite
+# annotation (mirrors k8s/frontend-ingress.yaml): merchant-web serves at /
+# and admin-web uses basePath /admin, so paths must reach the backends
+# unchanged. Sharing the API rewrite (/$2) here would mangle both portals.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: payment-switch-frontend
+  namespace: {{ .Values.namespace }}
+  annotations:
+    {{- if .Values.ingress.tls.enabled }}
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    {{- end }}
+spec:
+  ingressClassName: nginx
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.host }}
+      secretName: {{ .Values.ingress.tls.secretName }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+          {{- if .Values.frontends.admin.enabled }}
+          - path: /admin
+            pathType: Prefix
+            backend:
+              service:
+                name: admin-web
+                port:
+                  number: 80
+          {{- end }}
+          {{- if .Values.frontends.merchant.enabled }}
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: merchant-web
+                port:
+                  number: 80
+          {{- end }}
+{{- end }}

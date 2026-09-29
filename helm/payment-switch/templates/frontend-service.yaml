@@ -1,0 +1,21 @@
+{{- range $name, $front := .Values.frontends }}
+{{- if $front.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $front.name }}
+  namespace: {{ $.Values.namespace }}
+  labels:
+    app: {{ $front.name }}
+spec:
+  type: ClusterIP
+  selector:
+    app: {{ $front.name }}
+  ports:
+    - port: 80
+      targetPort: {{ $front.containerPort }}
+      protocol: TCP
+      name: http
+---
+{{- end }}
+{{- end }}

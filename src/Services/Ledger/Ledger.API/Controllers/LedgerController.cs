@@ -1,5 +1,6 @@
 ﻿using Ledger.API.Extensions;
 using Ledger.Application.DTOs;
+using Ledger.Application.Features.Queries.GetAllBalances;
 using Ledger.Application.Features.Queries.GetBalance;
 using Ledger.Application.Features.Queries.GetTransactionHistory;
 using Microsoft.AspNetCore.Authorization;
@@ -21,6 +22,19 @@ public class LedgerController : BaseApiController
         [FromServices] GetBalanceHandler handler)
     {
         var result = await handler.Handle(new GetBalanceQuery(merchantId));
+        return result.ToActionResult();
+    }
+
+    /// <summary>
+    /// Get balances for all currencies for a merchant.
+    /// </summary>
+    [HttpGet("balances")]
+    [ProducesResponseType(typeof(List<BalanceDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAllBalances(
+        [FromQuery] Guid merchantId,
+        [FromServices] GetAllBalancesHandler handler)
+    {
+        var result = await handler.Handle(new GetAllBalancesQuery(merchantId));
         return result.ToActionResult();
     }
 

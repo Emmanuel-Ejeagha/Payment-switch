@@ -13,7 +13,7 @@ public static class Guard
     public static void AgainstNullOrEmpty(string? value, string parameterName)
     {
         AgainstNull(value, parameterName);
-        if (value.Length == 0)
+        if (value!.Length == 0)
         {
             throw new ArgumentException("Value cannot be empty.", parameterName);
         }
