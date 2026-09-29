@@ -13,9 +13,11 @@ concurrency:
 env:
   REGISTRY: ghcr.io
   NAMESPACE: payment-switch
-  # github.repository is "owner/repo" (owner and repo names are already lowercase).
-  # The previous `lower(...)` is not a valid GitHub Actions expression and
-  # produced an empty owner, silently corrupting image paths and deploy refs.
+  # github.repository is "owner/repo" but preserves the account's display
+  # case (Emmanuel-Ejeagha/...), while GHCR paths must be lowercase. There is
+  # no lower() in GitHub Actions expressions, so the docker/docker-frontend/
+  # deploy jobs lowercase it via shell (${GITHUB_REPOSITORY,,}) into
+  # IMAGE_NAMESPACE before tagging, scanning, or deploying.
   IMAGE_NAMESPACE: ${{ github.repository }}
 
 jobs:
@@ -239,6 +241,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Lowercase image namespace for GHCR
+        # GHCR repository paths must be lowercase, but github.repository
+        # preserves the account's display case (Emmanuel-Ejeagha/...).
+        # Overriding IMAGE_NAMESPACE here fixes every tag/image-ref below.
+        run: echo "IMAGE_NAMESPACE=${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
@@ -287,6 +295,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Lowercase image namespace for GHCR
+        # GHCR repository paths must be lowercase, but github.repository
+        # preserves the account's display case (Emmanuel-Ejeagha/...).
+        # Overriding IMAGE_NAMESPACE here fixes every tag/image-ref below.
+        run: echo "IMAGE_NAMESPACE=${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
@@ -323,6 +337,11 @@ jobs:
     environment: production
     steps:
       - uses: actions/checkout@v4
+
+      - name: Lowercase image namespace for GHCR
+        # Must match the tags pushed by the docker jobs (GHCR paths are
+        # lowercase; github.repository preserves display case).
+        run: echo "IMAGE_NAMESPACE=${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
 
       - name: Setup kubectl
         uses: azure/setup-kubectl@v3
