@@ -225,6 +225,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      security-events: write
     strategy:
       matrix:
         # `service` stays lowercase for image tags; `dir` matches the real
@@ -296,6 +297,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      security-events: write
     strategy:
       matrix:
         app:
