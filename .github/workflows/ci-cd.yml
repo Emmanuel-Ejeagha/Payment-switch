@@ -273,6 +273,9 @@ jobs:
         uses: aquasecurity/trivy-action@v0.33.1
         with:
           image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service.name }}-api:${{ github.sha }}
+          # The action's default Trivy version does not exist upstream;
+          # pin a real one (verified via the aquasecurity/trivy releases API).
+          version: v0.74.0
           severity: HIGH,CRITICAL
           format: sarif
           output: trivy-${{ matrix.service.name }}.sarif
@@ -332,6 +335,9 @@ jobs:
         uses: aquasecurity/trivy-action@v0.33.1
         with:
           image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.app.name }}-web:${{ github.sha }}
+          # The action's default Trivy version does not exist upstream;
+          # pin a real one (verified via the aquasecurity/trivy releases API).
+          version: v0.74.0
           severity: HIGH,CRITICAL
           format: sarif
           output: trivy-${{ matrix.app.name }}-web.sarif
