@@ -38,9 +38,9 @@ export const viewport: Viewport = {
   ],
 }
 
-// Applies the stored theme before first paint. Without this the page renders
-// light and then snaps to dark once ThemeProvider's effect runs.
-const themeScript = `(function(){try{var s=localStorage.getItem("theme");var d=s?s==="dark":window.matchMedia("(prefers-color-scheme: dark)").matches;if(d)document.documentElement.classList.add("dark")}catch(e){}})()`
+// Applies the stored theme before first paint. Default is light; the "dark"
+// class is added only when the user explicitly chose dark before.
+const themeScript = `(function(){try{var s=localStorage.getItem("theme");if(s==="dark")document.documentElement.classList.add("dark")}catch(e){}})()`
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
