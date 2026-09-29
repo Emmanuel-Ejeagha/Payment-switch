@@ -78,7 +78,7 @@ public class ImageNamingConsistencyTests
         var workflow = Read(".github/workflows/ci-cd.yml");
 
         // Build pushes matrix-derived <name>:<sha> tags for APIs and webs.
-        Assert.Contains("${{ matrix.service }}-api:${{ github.sha }}", workflow);
+        Assert.Contains("${{ matrix.service.name }}-api:${{ github.sha }}", workflow);
         Assert.Contains("${{ matrix.app.name }}-web:${{ github.sha }}", workflow);
         // Deploy pins deployment + container <name> (must match k8s names above).
         foreach (var name in ApiNames.Concat(WebNames))
