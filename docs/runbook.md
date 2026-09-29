@@ -10,6 +10,11 @@ responses. See `docs/deployment.md` (k8s/CI-CD), `docs/tls.md` (TLS), and
 
 ## 1. Deploying the stack
 
+> **Kubernetes CD is opt-in.** The `Deploy to Kubernetes` CI job only runs when
+> the `DEPLOY_TO_KUBERNETES` repo variable is `'true'` **and** a valid
+> `KUBE_CONFIG` secret exists. Until a reachable cluster is configured the job
+> skips (a dead endpoint would fail every main push).
+
 ### Prerequisites (one-time)
 
 - EC2 host with Docker Engine + Compose v2 installed.
