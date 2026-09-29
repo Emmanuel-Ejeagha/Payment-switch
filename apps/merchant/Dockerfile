@@ -34,6 +34,11 @@ ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
+# The node:22-alpine base ships a bundled npm whose transitive deps carry
+# HIGH/CRITICAL advisories (picomatch, brace-expansion, pacote, ...). The
+# runtime only ever runs `node server.js`, so drop npm entirely: smaller
+# image and no dead vulnerable surface for Trivy to flag.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 COPY --from=builder /app/apps/merchant/.next/standalone ./
 COPY --from=builder /app/apps/merchant/.next/static ./apps/merchant/.next/static
 COPY --from=builder /app/apps/merchant/public ./apps/merchant/public
