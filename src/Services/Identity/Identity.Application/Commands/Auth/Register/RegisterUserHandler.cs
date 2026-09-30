@@ -1,11 +1,9 @@
-﻿using BuildingBlocks.Shared.Email;
-using BuildingBlocks.Shared.Results;
+﻿using BuildingBlocks.Shared.Results;
 using BuildingBlocks.Shared.Security;
 using FluentValidation;
 using Identity.Application.Configuration;
 using Identity.Application.Exceptions;
 using Identity.Application.Interfaces;
-using Identity.Application.Services;
 using Identity.Domain.DomainErrors;
 using Identity.Domain.Entities;
 using Identity.Domain.ValueObjects;
@@ -20,7 +18,6 @@ public class RegisterUserHandler
     private readonly IPasswordHasher _passwordHasher;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IEmailVerificationTokenFactory _tokenFactory;
-    private readonly IEmailSender _emailSender;
     private readonly EmailVerificationOptions _options;
     private readonly IValidator<RegisterUserCommand> _validator;
     private readonly ILogger<RegisterUserHandler> _logger;
@@ -30,7 +27,6 @@ public class RegisterUserHandler
         IPasswordHasher passwordHasher,
         IUnitOfWork unitOfWork,
         IEmailVerificationTokenFactory tokenFactory,
-        IEmailSender emailSender,
         IOptions<EmailVerificationOptions> options,
         IValidator<RegisterUserCommand> validator,
         ILogger<RegisterUserHandler> logger)
@@ -39,7 +35,6 @@ public class RegisterUserHandler
         _passwordHasher = passwordHasher;
         _unitOfWork = unitOfWork;
         _tokenFactory = tokenFactory;
-        _emailSender = emailSender;
         _options = options.Value;
         _validator = validator;
         _logger = logger;
@@ -64,6 +59,7 @@ public class RegisterUserHandler
 
         var token = _tokenFactory.Generate(TimeSpan.FromHours(_options.TokenLifetimeHours));
         user.InitiateEmailVerification(token.Hash, token.PlainText, token.ExpiresAtUtc);
+        user.RecordVerificationEmailSent();
 
         await _userRepository.AddAsync(user, cancellationToken);
         try
@@ -77,12 +73,10 @@ public class RegisterUserHandler
             return IdentityErrors.EmailAlreadyInUse(command.Email);
         }
 
-        var message = VerificationEmailBuilder.Build(user.Email.Value, token.PlainText, _options.Subject, _options.FrontendBaseUrl);
-        var sendResult = await _emailSender.SendAsync(message, cancellationToken);
-        if (sendResult.IsFailure)
-            _logger.LogError("Failed to send verification email to {Identifier}: {Errors}",
-                DataMasker.MaskEmail(command.Email), string.Join("; ", sendResult.Errors.Select(e => e.Message)));
-
+        // Delivery is event-driven: InitiateEmailVerification raised
+        // EmailVerificationRequestedDomainEvent, captured into the outbox by
+        // OutboxInterceptor in the same SaveChanges and delivered by the
+        // Notification service (Resend). User + event persist atomically.
         return new RegisterUserResponse(user.Id);
     }
 }

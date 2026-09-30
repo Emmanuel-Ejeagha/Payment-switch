@@ -220,6 +220,36 @@ public class LoginHandlerTests
         Assert.Null(user.LockoutEnd);
     }
 
+    [Fact]
+    public async Task Handle_UnverifiedUser_ShouldSucceedAndReportUnconfirmed()
+    {
+        // Policy (D-05): unverified users can log in; the response reports the
+        // state and capability gating happens downstream (e.g. API-key issue).
+        var command = new LoginCommand("unverified@example.com", "Password123");
+        var user = CreateActiveUser("unverified@example.com");
+        Assert.False(user.EmailConfirmed);
+
+        SetupValidatorSuccess(command);
+        _userRepositoryMock.Setup(r => r.GetByEmailAsync(command.Email, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+        _passwordHasherMock.Setup(h => h.Verify(command.Password, user.PasswordHash))
+            .Returns(true);
+        _tokenServiceMock.Setup(t => t.GenerateAccessToken(user))
+            .Returns("access_token");
+        _tokenServiceMock.Setup(t => t.GenerateRefreshToken())
+            .Returns("refresh_token");
+        _tokenServiceMock.Setup(t => t.HashRefreshToken(It.IsAny<string>()))
+            .Returns<string>(token => $"hash-{token}");
+        _tokenServiceMock.Setup(t => t.AccessTokenExpirationSeconds).Returns(3600);
+        _unitOfWorkMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsSuccess);
+        Assert.False(result.Value!.EmailConfirmed);
+    }
+
     private static User CreateActiveUser(string email)
     {
         var user = new User(Guid.NewGuid(), new Email(email), new PasswordHash("hashed"), new FullName("Test User"));

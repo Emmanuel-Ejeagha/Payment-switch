@@ -34,6 +34,9 @@ public static class IdentityErrors
     public static Error VerificationTokenExpired =>
         new("Identity.VerificationTokenExpired", "This verification link has expired. Request a new one.");
 
+    public static Error VerificationResendThrottled(int retryAfterSeconds) =>
+        new("Identity.VerificationResendThrottled", $"A verification email was sent recently. Please wait {retryAfterSeconds} seconds before requesting another.");
+
     public static Error InvalidCurrentPassword =>
         new("Identity.InvalidCurrentPassword", "The current password is incorrect.");
 

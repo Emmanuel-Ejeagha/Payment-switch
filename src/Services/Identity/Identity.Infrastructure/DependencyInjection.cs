@@ -6,6 +6,7 @@ using Identity.Infrastructure.Messaging;
 using Identity.Infrastructure.Outbox;
 using Identity.Infrastructure.Persistence;
 using Identity.Infrastructure.Persistence.Repositories;
+using Identity.Infrastructure.Retention;
 using Identity.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -68,6 +69,9 @@ public static class DependencyInjection
             "RabbitMQ HostName is required");
         services.AddSingleton<IEventBus, RabbitMQEventBus>();
         services.AddHostedService<OutboxPublisherService>();
+        services.AddOptions<OutboxRetentionOptions>()
+            .Bind(configuration.GetSection(OutboxRetentionOptions.SectionName));
+        services.AddHostedService<OutboxRetentionService>();
 
         return services;
     }

@@ -96,10 +96,19 @@ public class User : AggregateRoot
         if (string.IsNullOrWhiteSpace(plainToken))
             throw new ArgumentNullException(nameof(plainToken));
         EmailVerificationTokenExpiresAt = expiresAtUtc;
-        LastVerificationEmailSentAtUtc = DateTime.UtcNow;
+        var issuedAtUtc = DateTime.UtcNow;
         AddDomainEvent(new EmailVerificationRequestedDomainEvent(
-            Id, Email.Value, plainToken, LastVerificationEmailSentAtUtc.Value, expiresAtUtc));
+            Id, Email.Value, plainToken, issuedAtUtc, expiresAtUtc));
     }
+
+    /// <summary>
+    /// Records that a verification email was accepted for delivery (outbox).
+    /// Separate from issuance so the cooldown check stays deterministic and
+    /// testable; called by the registration/resend handlers after issuing.
+    /// The optional timestamp exists for tests simulating an aged send.
+    /// </summary>
+    public void RecordVerificationEmailSent(DateTime? sentAtUtc = null) =>
+        LastVerificationEmailSentAtUtc = sentAtUtc ?? DateTime.UtcNow;
 
     /// <summary>
     /// Attempts to confirm the email with the supplied hashed token.
