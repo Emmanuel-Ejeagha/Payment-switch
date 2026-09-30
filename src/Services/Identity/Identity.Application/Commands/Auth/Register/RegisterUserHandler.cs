@@ -63,7 +63,7 @@ public class RegisterUserHandler
         var user = new User(Guid.NewGuid(), email, passwordHash, fullName);
 
         var token = _tokenFactory.Generate(TimeSpan.FromHours(_options.TokenLifetimeHours));
-        user.InitiateEmailVerification(token.Hash, token.ExpiresAtUtc);
+        user.InitiateEmailVerification(token.Hash, token.PlainText, token.ExpiresAtUtc);
 
         await _userRepository.AddAsync(user, cancellationToken);
         try

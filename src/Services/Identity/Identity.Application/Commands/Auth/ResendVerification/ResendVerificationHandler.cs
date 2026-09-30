@@ -54,7 +54,7 @@ public class ResendVerificationHandler
             return IdentityErrors.EmailAlreadyVerified;
 
         var token = _tokenFactory.Generate(TimeSpan.FromHours(_options.TokenLifetimeHours));
-        user.InitiateEmailVerification(token.Hash, token.ExpiresAtUtc);
+        user.InitiateEmailVerification(token.Hash, token.PlainText, token.ExpiresAtUtc);
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
