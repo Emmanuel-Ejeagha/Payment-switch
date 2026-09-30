@@ -129,16 +129,23 @@ public class PaymentIntent : AggregateRoot
 
     public void Void(string? idempotencyKey = null)
     {
-        if (Status != PaymentStatus.Authorized)
+        if (Status != PaymentStatus.Authorized && Status != PaymentStatus.PartiallyCaptured)
             throw new InvalidOperationException($"Cannot void payment in '{Status}' status.");
+
+        // From Authorized the whole intent is still held; after a partial
+        // capture only the uncaptured remainder is. Either way the voided
+        // amount is exactly what the ledger must release.
+        var voidAmount = Status == PaymentStatus.Authorized
+            ? Amount
+            : new Money(Amount.Amount - GetTotalCaptured(), Amount.Currency);
 
         Status = PaymentStatus.Voided;
         UpdatedAt = DateTime.UtcNow;
 
-        var transaction = new Transaction(TransactionType.Void, Amount, idempotencyKey: idempotencyKey);
+        var transaction = new Transaction(TransactionType.Void, voidAmount, idempotencyKey: idempotencyKey);
         _transactions.Add(transaction);
 
-        AddDomainEvent(new PaymentVoidedDomainEvent(Id, MerchantId));
+        AddDomainEvent(new PaymentVoidedDomainEvent(Id, MerchantId, voidAmount));
     }
 
     public void Refund(Money? amount = null, string? idempotencyKey = null)

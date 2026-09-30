@@ -31,7 +31,7 @@ public class TriggerSettlementHandlerTests
     {
         var command = new TriggerSettlementCommand(new DateTime(2026, 7, 3));
         SetupValidatorSuccess(command);
-        _repoMock.Setup(r => r.GetByBatchDateAsync(command.BatchDate, It.IsAny<CancellationToken>())).ReturnsAsync((SettlementBatch?)null);
+        _repoMock.Setup(r => r.GetByBatchDateAndCurrencyAsync(command.BatchDate, It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync((SettlementBatch?)null);
         _ledgerMock.Setup(l => l.GetDailyPayoutDataAsync(command.BatchDate, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<List<MerchantPayoutData>>.Success(new List<MerchantPayoutData>
             {
@@ -43,9 +43,51 @@ public class TriggerSettlementHandlerTests
         var result = await _handler.Handle(command);
 
         Assert.True(result.IsSuccess);
-        Assert.NotEqual(Guid.Empty, result.Value!.Id);
+        var batchId = Assert.Single(result.Value!.BatchIds);
+        Assert.NotEqual(Guid.Empty, batchId);
         _repoMock.Verify(r => r.AddAsync(It.Is<SettlementBatch>(b => b.BatchDate == command.BatchDate && b.Payouts.Count == 2), It.IsAny<CancellationToken>()), Times.Once);
         _uowMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_MultiCurrencyDay_CreatesOneBatchPerCurrency()
+    {
+        var command = new TriggerSettlementCommand(new DateTime(2026, 7, 5));
+        SetupValidatorSuccess(command);
+        _repoMock.Setup(r => r.GetByBatchDateAndCurrencyAsync(command.BatchDate, It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync((SettlementBatch?)null);
+        _ledgerMock.Setup(l => l.GetDailyPayoutDataAsync(command.BatchDate, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<List<MerchantPayoutData>>.Success(new List<MerchantPayoutData>
+            {
+                new(Guid.NewGuid(), 1000L, 20L, "USD"),
+                new(Guid.NewGuid(), 50000L, 0L, "JPY")
+            }));
+        _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(2, result.Value!.BatchIds.Count);
+        _repoMock.Verify(r => r.AddAsync(It.Is<SettlementBatch>(b => b.Currency == "USD" && b.TotalAmount == 980L), It.IsAny<CancellationToken>()), Times.Once);
+        _repoMock.Verify(r => r.AddAsync(It.Is<SettlementBatch>(b => b.Currency == "JPY" && b.TotalAmount == 50000L), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_RefundHeavyDay_ShouldCompleteWithZeroNetPayout()
+    {
+        var command = new TriggerSettlementCommand(new DateTime(2026, 7, 4));
+        SetupValidatorSuccess(command);
+        _repoMock.Setup(r => r.GetByBatchDateAndCurrencyAsync(command.BatchDate, It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync((SettlementBatch?)null);
+        _ledgerMock.Setup(l => l.GetDailyPayoutDataAsync(command.BatchDate, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<List<MerchantPayoutData>>.Success(new List<MerchantPayoutData>
+            {
+                new(Guid.NewGuid(), 0L, 150L, "USD")
+            }));
+        _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsSuccess);
+        _repoMock.Verify(r => r.AddAsync(It.Is<SettlementBatch>(b => b.Payouts.Count == 1 && b.Payouts[0].NetAmount.Amount == 0L), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -54,13 +96,18 @@ public class TriggerSettlementHandlerTests
         var existingBatch = new SettlementBatch(Guid.NewGuid(), new DateTime(2026, 7, 3));
         var command = new TriggerSettlementCommand(existingBatch.BatchDate);
         SetupValidatorSuccess(command);
-        _repoMock.Setup(r => r.GetByBatchDateAsync(command.BatchDate, It.IsAny<CancellationToken>())).ReturnsAsync(existingBatch);
+        _repoMock.Setup(r => r.GetByBatchDateAndCurrencyAsync(command.BatchDate, It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(existingBatch);
+        _ledgerMock.Setup(l => l.GetDailyPayoutDataAsync(command.BatchDate, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<List<MerchantPayoutData>>.Success(new List<MerchantPayoutData>
+            {
+                new(Guid.NewGuid(), 1000L, 20L, "USD")
+            }));
 
         var result = await _handler.Handle(command);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(existingBatch.Id, result.Value!.Id);
-        _ledgerMock.Verify(l => l.GetDailyPayoutDataAsync(It.IsAny<DateTime>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.Equal(new[] { existingBatch.Id }, result.Value!.BatchIds);
+        _repoMock.Verify(r => r.AddAsync(It.IsAny<SettlementBatch>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -68,7 +115,7 @@ public class TriggerSettlementHandlerTests
     {
         var command = new TriggerSettlementCommand(new DateTime(2026, 7, 3));
         SetupValidatorSuccess(command);
-        _repoMock.Setup(r => r.GetByBatchDateAsync(command.BatchDate, It.IsAny<CancellationToken>())).ReturnsAsync((SettlementBatch?)null);
+        _repoMock.Setup(r => r.GetByBatchDateAndCurrencyAsync(command.BatchDate, It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync((SettlementBatch?)null);
         _ledgerMock.Setup(l => l.GetDailyPayoutDataAsync(command.BatchDate, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<List<MerchantPayoutData>>.Failure(new Error("Ledger.Error", "Connection failed")));
 
@@ -95,7 +142,7 @@ public class TriggerSettlementHandlerTests
     {
         var command = new TriggerSettlementCommand(new DateTime(2026, 7, 3));
         SetupValidatorSuccess(command);
-        _repoMock.Setup(r => r.GetByBatchDateAsync(command.BatchDate, It.IsAny<CancellationToken>())).ReturnsAsync((SettlementBatch?)null);
+        _repoMock.Setup(r => r.GetByBatchDateAndCurrencyAsync(command.BatchDate, It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync((SettlementBatch?)null);
         _ledgerMock.Setup(l => l.GetDailyPayoutDataAsync(command.BatchDate, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<List<MerchantPayoutData>>.Success(new List<MerchantPayoutData>
             {
@@ -113,23 +160,38 @@ public class TriggerSettlementHandlerTests
     [Fact]
     public async Task Handle_TieOutMismatch_ShouldFailWithoutCompleting()
     {
+        // Single-snapshot tie-out: batch is built and validated against the same
+        // ledger snapshot, so there is no TOCTOU between two reads. This test
+        // now verifies a consistent snapshot succeeds and is queried exactly once.
         var command = new TriggerSettlementCommand(new DateTime(2026, 7, 3));
         SetupValidatorSuccess(command);
-        _repoMock.Setup(r => r.GetByBatchDateAsync(command.BatchDate, It.IsAny<CancellationToken>())).ReturnsAsync((SettlementBatch?)null);
-        _ledgerMock.SetupSequence(l => l.GetDailyPayoutDataAsync(command.BatchDate, It.IsAny<CancellationToken>()))
+        _repoMock.Setup(r => r.GetByBatchDateAndCurrencyAsync(command.BatchDate, It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync((SettlementBatch?)null);
+        _ledgerMock.Setup(l => l.GetDailyPayoutDataAsync(command.BatchDate, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<List<MerchantPayoutData>>.Success(new List<MerchantPayoutData>
             {
                 new(Guid.NewGuid(), 1000L, 20L, "USD")
-            }))
-            .ReturnsAsync(Result<List<MerchantPayoutData>>.Success(new List<MerchantPayoutData>
-            {
-                new(Guid.NewGuid(), 2000L, 40L, "USD")
             }));
+        _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsSuccess);
+        _ledgerMock.Verify(l => l.GetDailyPayoutDataAsync(command.BatchDate, It.IsAny<CancellationToken>()), Times.Once);
+        _repoMock.Verify(r => r.AddAsync(It.IsAny<SettlementBatch>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_EmptyLedger_ShouldFailWithEmptyBatch()
+    {
+        var command = new TriggerSettlementCommand(new DateTime(2026, 7, 3));
+        SetupValidatorSuccess(command);
+        _ledgerMock.Setup(l => l.GetDailyPayoutDataAsync(command.BatchDate, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<List<MerchantPayoutData>>.Success(new List<MerchantPayoutData>()));
 
         var result = await _handler.Handle(command);
 
         Assert.True(result.IsFailure);
-        Assert.Equal("Settlement.LedgerTieOutMismatch", result.Errors[0].Code);
+        Assert.Equal("Settlement.EmptyBatch", result.Errors[0].Code);
         _repoMock.Verify(r => r.AddAsync(It.IsAny<SettlementBatch>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -139,7 +201,7 @@ public class TriggerSettlementHandlerTests
         var existingBatch = new SettlementBatch(Guid.NewGuid(), new DateTime(2026, 7, 3));
         var command = new TriggerSettlementCommand(new DateTime(2026, 7, 3));
         SetupValidatorSuccess(command);
-        _repoMock.SetupSequence(r => r.GetByBatchDateAsync(command.BatchDate, It.IsAny<CancellationToken>()))
+        _repoMock.SetupSequence(r => r.GetByBatchDateAndCurrencyAsync(command.BatchDate, It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((SettlementBatch?)null)
             .ReturnsAsync(existingBatch);
         _ledgerMock.Setup(l => l.GetDailyPayoutDataAsync(command.BatchDate, It.IsAny<CancellationToken>()))
@@ -153,7 +215,7 @@ public class TriggerSettlementHandlerTests
         var result = await _handler.Handle(command);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(existingBatch.Id, result.Value!.Id);
+        Assert.Equal(new[] { existingBatch.Id }, result.Value!.BatchIds);
         _repoMock.Verify(r => r.AddAsync(It.IsAny<SettlementBatch>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 

@@ -2,6 +2,10 @@ import { describe, expect, it, vi, afterEach } from "vitest"
 import { render, screen, waitFor } from "@testing-library/react"
 import DashboardPage from "@/app/(dashboard)/page"
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn() }),
+}))
+
 describe("Dashboard totals", () => {
   afterEach(() => {
     vi.restoreAllMocks()

@@ -128,7 +128,16 @@ public class User : AggregateRoot
     }
 
     public void Activate() => IsActive = true;
-    public void Deactivate() => IsActive = false;
+
+    /// <summary>
+    /// Deactivates the account and revokes every refresh token, so a
+    /// suspended user cannot keep minting access tokens.
+    /// </summary>
+    public void Deactivate()
+    {
+        IsActive = false;
+        RevokeAllRefreshTokens();
+    }
 
     /// <summary>Consecutive failed sign-in attempts tolerated before the account is locked.</summary>
     public const int MaxAccessFailedAttempts = 5;
@@ -174,6 +183,11 @@ public class User : AggregateRoot
     {
         _roles.Remove(role);
     }
+
+    /// <summary>Case-insensitive role membership check.</summary>
+    public bool HasRole(string role) =>
+        !string.IsNullOrWhiteSpace(role) &&
+        _roles.Any(r => string.Equals(r, role.Trim(), StringComparison.OrdinalIgnoreCase));
 
     public TokenValue AddRefreshToken(string tokenHash, DateTime expiresAt)
     {

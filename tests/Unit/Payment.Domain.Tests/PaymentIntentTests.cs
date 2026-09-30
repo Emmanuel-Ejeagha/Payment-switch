@@ -106,6 +106,33 @@ public class PaymentIntentTests
     }
 
     [Fact]
+    public void Void_FromAuthorized_EventCarriesFullAmount()
+    {
+        var intent = CreateAuthorizedIntent();
+
+        intent.Void();
+
+        var voidedEvent = Assert.Single(intent.DomainEvents.OfType<PaymentVoidedDomainEvent>());
+        Assert.Equal(100L, voidedEvent.Amount.Amount);
+        Assert.Equal("USD", voidedEvent.Amount.Currency);
+    }
+
+    [Fact]
+    public void Void_FromPartiallyCaptured_ReleasesRemainder()
+    {
+        var intent = CreateAuthorizedIntent();
+        intent.Capture(new Money(60L, "USD"));
+        intent.ClearDomainEvents();
+
+        intent.Void();
+
+        Assert.Equal(PaymentStatus.Voided, intent.Status);
+        var voidedEvent = Assert.Single(intent.DomainEvents.OfType<PaymentVoidedDomainEvent>());
+        Assert.Equal(40L, voidedEvent.Amount.Amount);
+        Assert.Equal("USD", voidedEvent.Amount.Currency);
+    }
+
+    [Fact]
     public void Void_FromNonAuthorized_Throws()
     {
         var intent = CreatePendingIntent();

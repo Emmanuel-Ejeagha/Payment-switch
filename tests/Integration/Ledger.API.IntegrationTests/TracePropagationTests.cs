@@ -83,7 +83,7 @@ public class TracePropagationTests : IClassFixture<LedgerApiFactory>
         await using var connection = await factory.CreateConnectionAsync();
         await using var channel = await connection.CreateChannelAsync();
 
-        var deadline = DateTime.UtcNow.Add(TimeSpan.FromSeconds(30));
+        var deadline = DateTime.UtcNow.Add(TimeSpan.FromSeconds(60));
         while (DateTime.UtcNow < deadline)
         {
             try

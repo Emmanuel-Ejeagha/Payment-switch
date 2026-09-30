@@ -137,6 +137,12 @@ public class BrokerFlowTests : IClassFixture<LedgerApiFactory>
 
     private async Task PublishToPaymentEventsAsync(string messageId, string payload)
     {
+        // The broker + API host are fresh per test class; the consumer needs a
+        // few seconds to declare and bind its queue on a loaded host. Publishes
+        // are mandatory=false, so an early publish is silently dropped — wait
+        // until the queue exists and a consumer is attached before publishing.
+        await WaitUntilConsumerReadyAsync();
+
         using var scope = _factory.Services.CreateScope();
         var settings = scope.ServiceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<RabbitMQSettings>>();
         var factory = new ConnectionFactory
@@ -161,6 +167,40 @@ public class BrokerFlowTests : IClassFixture<LedgerApiFactory>
             mandatory: false,
             basicProperties: properties,
             body: Encoding.UTF8.GetBytes(payload));
+    }
+
+    private async Task WaitUntilConsumerReadyAsync()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var settings = scope.ServiceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<RabbitMQSettings>>();
+        var factory = new ConnectionFactory
+        {
+            HostName = settings.Value.HostName,
+            Port = settings.Value.Port,
+            UserName = settings.Value.UserName,
+            Password = settings.Value.Password
+        };
+        await using var connection = await factory.CreateConnectionAsync();
+        await using var channel = await connection.CreateChannelAsync();
+
+        var deadline = DateTime.UtcNow.Add(TimeSpan.FromSeconds(60));
+        while (DateTime.UtcNow < deadline)
+        {
+            try
+            {
+                var queueInfo = await channel.QueueDeclarePassiveAsync("ledger.payment.events");
+                if (queueInfo.ConsumerCount > 0)
+                    return;
+            }
+            catch (Exception)
+            {
+                // Queue not declared yet; keep polling.
+            }
+
+            await Task.Delay(250);
+        }
+
+        Assert.Fail("Ledger consumer never became ready to consume.");
     }
 
     private static async Task WaitUntilAsync(Func<Task<bool>> predicate, TimeSpan? timeout = null)

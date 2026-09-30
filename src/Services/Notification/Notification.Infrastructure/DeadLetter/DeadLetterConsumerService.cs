@@ -54,6 +54,8 @@ public class DeadLetterConsumerService : BackgroundService
             {
                 break;
             }
+            // codeql[cs/catch-of-all-exceptions]: intentional resilient-consumer loop;
+            // a poison message must be logged and retried, never crash the host.
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Dead-letter consumer error. Retrying in 10 seconds...");

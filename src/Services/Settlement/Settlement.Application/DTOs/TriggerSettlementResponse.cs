@@ -1,3 +1,3 @@
 namespace Settlement.Application.DTOs;
 
-public record TriggerSettlementResponse(Guid Id);
+public record TriggerSettlementResponse(List<Guid> BatchIds);

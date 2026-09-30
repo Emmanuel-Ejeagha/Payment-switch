@@ -37,6 +37,10 @@ namespace Settlement.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("Currency")
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
                     b.Property<uint>("RowVersion")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()
@@ -52,7 +56,7 @@ namespace Settlement.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("BatchDate")
+                    b.HasIndex("BatchDate", "Currency")
                         .IsUnique();
 
                     b.ToTable("SettlementBatches");

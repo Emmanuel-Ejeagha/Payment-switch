@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Notification.Application.Interfaces;
 using Notification.Infrastructure.Persistence;
+using Notification.Infrastructure.Services;
 using PaymentSwitch.IntegrationTests.Shared;
 using RabbitMQ.Client;
 using Testcontainers.PostgreSql;
@@ -36,6 +37,15 @@ public class NotificationApiFactory : WebApplicationFactory<Program>, IAsyncLife
             // never resolve a recipient. Stub it so the notification-creation
             // flow can be exercised end-to-end.
             services.AddScoped<IMerchantContactService, StubMerchantContactService>();
+
+            // The sender polls every 5s and claims pending rows for itself; it
+            // races the lease tests' explicit claims (seeded rows vanish under
+            // it on slow hosts). Lease/broker behavior is driven explicitly in
+            // tests, so the background sender stays off here.
+            var sender = services.FirstOrDefault(d =>
+                d.ImplementationType == typeof(NotificationSenderBackgroundService));
+            if (sender is not null)
+                services.Remove(sender);
         });
     }
 

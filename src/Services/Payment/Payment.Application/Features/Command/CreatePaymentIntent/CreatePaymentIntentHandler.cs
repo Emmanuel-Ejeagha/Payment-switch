@@ -49,6 +49,16 @@ public class CreatePaymentIntentHandler
         var existing = await _repository.GetByIdempotencyKeyAsync(command.MerchantId, command.IdempotencyKey, cancellationToken);
         if (existing is not null)
         {
+            // Same key must mean the same request: a different amount or
+            // currency is a client bug, not a replay — fail loudly instead of
+            // returning someone else's intent.
+            if (!string.Equals(existing.Amount.Currency, command.Currency, StringComparison.OrdinalIgnoreCase)
+                || existing.Amount.Amount != command.Amount)
+            {
+                _logger.LogWarning("Idempotency key {Key} reused with different parameters for Merchant {MerchantId}", command.IdempotencyKey, command.MerchantId);
+                return PaymentErrors.IdempotencyKeyConflict(command.IdempotencyKey);
+            }
+
             _logger.LogInformation("Replaying create for Merchant {MerchantId} with key {Key}", command.MerchantId, command.IdempotencyKey);
             return ToResponse(existing);
         }
@@ -100,6 +110,13 @@ public class CreatePaymentIntentHandler
                 await _unitOfWork.RollbackAsync(cancellationToken);
                 return PaymentErrors.ConcurrencyConflict;
             }
+            catch (UniqueConstraintViolationException)
+            {
+                // Lost an insert race on the idempotency key: load the winner
+                // and replay it instead of failing.
+                await _unitOfWork.RollbackAsync(cancellationToken);
+                return await ReplayWinnerAsync(command, cancellationToken);
+            }
             return new PaymentIntentResponse(intent.Id, intent.Status.Value, null);
         }
 
@@ -131,8 +148,29 @@ public class CreatePaymentIntentHandler
             await _unitOfWork.RollbackAsync(cancellationToken);
             return PaymentErrors.ConcurrencyConflict;
         }
+        catch (UniqueConstraintViolationException)
+        {
+            await _unitOfWork.RollbackAsync(cancellationToken);
+            return await ReplayWinnerAsync(command, cancellationToken);
+        }
 
         return ToResponse(intent);
+    }
+
+    private async Task<Result<PaymentIntentResponse>> ReplayWinnerAsync(
+        CreatePaymentIntentCommand command, CancellationToken cancellationToken)
+    {
+        var winner = await _repository.GetByIdempotencyKeyAsync(command.MerchantId, command.IdempotencyKey, cancellationToken);
+        if (winner is null)
+            return new Error("Payment.CreateFailed", "Could not create payment intent.");
+
+        if (!string.Equals(winner.Amount.Currency, command.Currency, StringComparison.OrdinalIgnoreCase)
+            || winner.Amount.Amount != command.Amount)
+        {
+            return PaymentErrors.IdempotencyKeyConflict(command.IdempotencyKey);
+        }
+
+        return ToResponse(winner);
     }
 
     private static PaymentIntentResponse ToResponse(PaymentIntent intent)
