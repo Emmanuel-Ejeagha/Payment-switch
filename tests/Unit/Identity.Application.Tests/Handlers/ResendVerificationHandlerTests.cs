@@ -106,7 +106,7 @@ public class ResendVerificationHandlerTests
         }
 
         if (tokenHash is not null && expiresAt is not null)
-            user.InitiateEmailVerification(tokenHash, expiresAt.Value);
+            user.InitiateEmailVerification(tokenHash, "plain-token", expiresAt.Value);
         return user;
     }
 }

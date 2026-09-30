@@ -1,3 +1,4 @@
+using Identity.Domain.DomainEvents;
 using Identity.Domain.Entities;
 using Identity.Domain.ValueObjects;
 
@@ -22,7 +23,7 @@ public class UserEmailVerificationTests
     public void VerifyEmail_WithValidToken_ConfirmsAndClearsToken()
     {
         var user = CreateUser();
-        user.InitiateEmailVerification("hash", DateTime.UtcNow.AddHours(24));
+        user.InitiateEmailVerification("hash", "plain-token", DateTime.UtcNow.AddHours(24));
 
         var result = user.VerifyEmail("hash");
 
@@ -37,7 +38,7 @@ public class UserEmailVerificationTests
     public void VerifyEmail_TokenIsSingleUse()
     {
         var user = CreateUser();
-        user.InitiateEmailVerification("hash", DateTime.UtcNow.AddHours(24));
+        user.InitiateEmailVerification("hash", "plain-token", DateTime.UtcNow.AddHours(24));
 
         Assert.Equal(EmailVerificationResult.Success, user.VerifyEmail("hash"));
         var second = user.VerifyEmail("hash");
@@ -50,7 +51,7 @@ public class UserEmailVerificationTests
     public void VerifyEmail_WithWrongToken_Fails()
     {
         var user = CreateUser();
-        user.InitiateEmailVerification("hash", DateTime.UtcNow.AddHours(24));
+        user.InitiateEmailVerification("hash", "plain-token", DateTime.UtcNow.AddHours(24));
 
         var result = user.VerifyEmail("wrong");
 
@@ -63,7 +64,7 @@ public class UserEmailVerificationTests
     public void VerifyEmail_WithExpiredToken_Fails()
     {
         var user = CreateUser();
-        user.InitiateEmailVerification("hash", DateTime.UtcNow.AddHours(-1));
+        user.InitiateEmailVerification("hash", "plain-token", DateTime.UtcNow.AddHours(-1));
 
         var result = user.VerifyEmail("hash");
 
@@ -93,8 +94,8 @@ public class UserEmailVerificationTests
     public void InitiateEmailVerification_ReplacesPreviousToken()
     {
         var user = CreateUser();
-        user.InitiateEmailVerification("old-hash", DateTime.UtcNow.AddHours(24));
-        user.InitiateEmailVerification("new-hash", DateTime.UtcNow.AddHours(24));
+        user.InitiateEmailVerification("old-hash", "plain-old", DateTime.UtcNow.AddHours(24));
+        user.InitiateEmailVerification("new-hash", "plain-new", DateTime.UtcNow.AddHours(24));
 
         Assert.Equal("new-hash", user.EmailVerificationTokenHash);
         Assert.Equal(EmailVerificationResult.InvalidToken, user.VerifyEmail("old-hash"));
@@ -107,6 +108,37 @@ public class UserEmailVerificationTests
         var user = CreateUser();
         user.MarkEmailConfirmed();
 
-        Assert.Throws<InvalidOperationException>(() => user.InitiateEmailVerification("hash", DateTime.UtcNow.AddHours(24)));
+        Assert.Throws<InvalidOperationException>(() => user.InitiateEmailVerification("hash", "plain-token", DateTime.UtcNow.AddHours(24)));
+    }
+
+    [Fact]
+    public void InitiateEmailVerification_RaisesEventWithRawTokenAndTracksSendTime()
+    {
+        var user = CreateUser();
+        var before = DateTime.UtcNow;
+        var expiresAt = before.AddHours(24);
+
+        user.InitiateEmailVerification("hash", "plain-token", expiresAt);
+
+        Assert.NotNull(user.LastVerificationEmailSentAtUtc);
+        Assert.True(user.LastVerificationEmailSentAtUtc >= before);
+        var raised = Assert.Single(user.DomainEvents.OfType<EmailVerificationRequestedDomainEvent>());
+        Assert.Equal(user.Id, raised.UserId);
+        Assert.Equal("user@example.com", raised.Email);
+        Assert.Equal("plain-token", raised.Token);
+        Assert.Equal(expiresAt, raised.ExpiresAtUtc);
+        Assert.True(raised.IssuedAtUtc >= before);
+    }
+
+    [Fact]
+    public void InitiateEmailVerification_RotationRaisesOneEventPerIssuance()
+    {
+        var user = CreateUser();
+        user.InitiateEmailVerification("old-hash", "plain-old", DateTime.UtcNow.AddHours(24));
+        user.InitiateEmailVerification("new-hash", "plain-new", DateTime.UtcNow.AddHours(24));
+
+        var events = user.DomainEvents.OfType<EmailVerificationRequestedDomainEvent>().ToList();
+        Assert.Equal(2, events.Count);
+        Assert.Equal("plain-new", events.Last().Token);
     }
 }

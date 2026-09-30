@@ -1,6 +1,8 @@
 ﻿using BuildingBlocks.Shared.Aggregate;
 using Identity.Domain.DomainEvents;
 using Identity.Domain.ValueObjects;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Identity.Domain.Entities;
 
@@ -14,6 +16,7 @@ public class User : AggregateRoot
     public DateTime? EmailVerifiedAt { get; private set; }
     public string? EmailVerificationTokenHash { get; private set; }
     public DateTime? EmailVerificationTokenExpiresAt { get; private set; }
+    public DateTime? LastVerificationEmailSentAtUtc { get; private set; }
     public string? PasswordResetTokenHash { get; private set; }
     public DateTime? PasswordResetTokenExpiresAt { get; private set; }
     public int AccessFailedCount { get; private set; }
@@ -79,20 +82,30 @@ public class User : AggregateRoot
 
     /// <summary>
     /// Registers a new verification token for an unconfirmed email, replacing any
-    /// outstanding token (so a resend invalidates the previous one).
+    /// outstanding token (so a resend invalidates the previous one), and raises
+    /// <see cref="EmailVerificationRequestedDomainEvent"/> so the Notification
+    /// service delivers it via the outbox. The raw token travels only in the
+    /// event payload — storage keeps the hash.
     /// </summary>
-    public void InitiateEmailVerification(string tokenHash, DateTime expiresAtUtc)
+    public void InitiateEmailVerification(string tokenHash, string plainToken, DateTime expiresAtUtc)
     {
         if (EmailConfirmed)
             throw new InvalidOperationException("Email is already confirmed.");
 
         EmailVerificationTokenHash = tokenHash ?? throw new ArgumentNullException(nameof(tokenHash));
+        if (string.IsNullOrWhiteSpace(plainToken))
+            throw new ArgumentNullException(nameof(plainToken));
         EmailVerificationTokenExpiresAt = expiresAtUtc;
+        LastVerificationEmailSentAtUtc = DateTime.UtcNow;
+        AddDomainEvent(new EmailVerificationRequestedDomainEvent(
+            Id, Email.Value, plainToken, LastVerificationEmailSentAtUtc.Value, expiresAtUtc));
     }
 
     /// <summary>
     /// Attempts to confirm the email with the supplied hashed token.
     /// The token is single-use: a successful confirmation clears it.
+    /// Comparison is constant-time so response latency reveals nothing about
+    /// how much of a guessed hash matches.
     /// </summary>
     public EmailVerificationResult VerifyEmail(string tokenHash)
     {
@@ -102,7 +115,7 @@ public class User : AggregateRoot
         if (string.IsNullOrEmpty(EmailVerificationTokenHash))
             return EmailVerificationResult.NoToken;
 
-        if (!string.Equals(EmailVerificationTokenHash, tokenHash, StringComparison.Ordinal))
+        if (!FixedTimeHashEquals(EmailVerificationTokenHash, tokenHash))
             return EmailVerificationResult.InvalidToken;
 
         if (EmailVerificationTokenExpiresAt is null || EmailVerificationTokenExpiresAt < DateTime.UtcNow)
@@ -113,6 +126,17 @@ public class User : AggregateRoot
         EmailVerificationTokenHash = null;
         EmailVerificationTokenExpiresAt = null;
         return EmailVerificationResult.Success;
+    }
+
+    private static bool FixedTimeHashEquals(string expected, string actual)
+    {
+        if (actual is null)
+            return false;
+        var expectedBytes = Encoding.UTF8.GetBytes(expected);
+        var actualBytes = Encoding.UTF8.GetBytes(actual);
+        if (expectedBytes.Length != actualBytes.Length)
+            return false;
+        return CryptographicOperations.FixedTimeEquals(expectedBytes, actualBytes);
     }
 
     /// <summary>

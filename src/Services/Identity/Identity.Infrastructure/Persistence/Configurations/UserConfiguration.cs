@@ -48,6 +48,7 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.EmailVerifiedAt);
         builder.Property(u => u.EmailVerificationTokenHash).HasMaxLength(128);
         builder.Property(u => u.EmailVerificationTokenExpiresAt);
+        builder.Property(u => u.LastVerificationEmailSentAtUtc);
         builder.Property(u => u.PasswordResetTokenHash).HasMaxLength(128);
         builder.Property(u => u.PasswordResetTokenExpiresAt);
         builder.Property(u => u.AccessFailedCount).IsRequired();
