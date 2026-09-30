@@ -1,12 +1,15 @@
 # API Reference
 
 All endpoints return JSON. Authentication uses JWT Bearer tokens obtained from the Identity service.
+Money amounts are integer minor units (e.g. $100 USD is `10000`).
 
 ## Identity Service
 
 | Method | Endpoint                            | Auth     | Description                  |
 |--------|-------------------------------------|----------|------------------------------|
 | POST   | `/api/v1/auth/register`             | None     | Register a new user          |
+| POST   | `/api/v1/auth/verify-email`         | None     | Verify email with token      |
+| POST   | `/api/v1/auth/resend-verification`  | None     | Re-request verification email |
 | POST   | `/api/v1/auth/login`                | None     | Login, returns tokens        |
 | POST   | `/api/v1/auth/refresh`              | None     | Refresh access token         |
 | POST   | `/api/v1/auth/revoke`               | None     | Revoke a refresh token       |
@@ -15,6 +18,25 @@ All endpoints return JSON. Authentication uses JWT Bearer tokens obtained from t
 | GET    | `/api/v1/api-keys`                  | User     | List API keys                |
 | DELETE | `/api/v1/api-keys/{id}`             | User     | Revoke an API key            |
 | POST   | `/api/v1/admin/roles`               | Admin    | Assign a role to a user      |
+
+### Email verification
+
+Registration creates the user **unverified** and queues a verification email
+(outbox → Notification service → Resend). Tokens are single-use, expire after
+`EmailVerification__TokenLifetimeHours` (default 24), and are rotated on resend.
+
+`POST /api/v1/auth/verify-email` body: `{ "email": "...", "token": "..." }`.
+Responses: `200` verified; `400` invalid/used/expired token; `404` unknown email.
+Verifying twice returns `409` (already confirmed). Login works before
+verification but reports `"emailConfirmed": false`; verified-only actions
+(e.g. merchant API-key issue) return `403` until confirmed.
+
+`POST /api/v1/auth/resend-verification` body: `{ "email": "..." }`. Always
+returns `200` for well-formed requests — including unknown or already-verified
+addresses — so the endpoint cannot be used to enumerate accounts. A resend
+inside the cooldown (`EmailVerification__ResendCooldownSeconds`, default 60)
+returns `429` and sends/rotates nothing; otherwise the previous token is
+invalidated and a new email is queued.
 
 ## Merchant Service
 
