@@ -1,4 +1,5 @@
 ﻿using FluentValidation;
+using Notification.Domain;
 
 namespace Notification.Application.Features.Commands.CreateNotification;
 
@@ -11,6 +12,8 @@ public class CreateNotificationCommandValidator : AbstractValidator<CreateNotifi
             .WithMessage("Channel must be email, sms, or webhook.");
         RuleFor(x => x.Payload).NotEmpty().WithMessage("Payload is required.");
         RuleFor(x => x.MaxRetries).GreaterThanOrEqualTo(0).When(x => x.MaxRetries.HasValue);
+        RuleFor(x => x.Provider).Must(p => p is null or NotificationProviders.Smtp or NotificationProviders.Resend)
+            .WithMessage("Provider must be smtp, resend, or omitted.");
         When(x => x.Channel == "email", () =>
         {
             RuleFor(x => x.Subject).NotEmpty().WithMessage("Subject is required for email.");

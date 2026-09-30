@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using Notification.Application.Services;
 
 namespace Notification.Application.Templates;
 
@@ -64,4 +65,52 @@ public static class EmailTemplateRenderer
         "Payment Refunded" => "#0f766e",
         _ => "#111827"
     };
+
+    /// <summary>
+    /// Renders the branded verification email: purpose, action button, plain-link
+    /// fallback, expiry, and a did-not-register notice. The link carries only the
+    /// Identity-issued token — never keys or secrets.
+    /// </summary>
+    public static string RenderVerification(VerificationEmail email)
+    {
+        var safeSubject = WebUtility.HtmlEncode(email.Subject);
+        var safeLink = WebUtility.HtmlEncode(email.Link);
+        var safeExpiry = WebUtility.HtmlEncode(email.ExpiryLabel);
+
+        var sb = new StringBuilder();
+        sb.AppendLine("<!DOCTYPE html>");
+        sb.AppendLine("<html lang=\"en\">");
+        sb.AppendLine("<head>");
+        sb.AppendLine("<meta charset=\"utf-8\">");
+        sb.AppendLine($"<title>{safeSubject}</title>");
+        sb.AppendLine("</head>");
+        sb.AppendLine("<body style=\"margin:0;padding:0;background-color:#f3f4f6;font-family:Arial,Helvetica,sans-serif;\">");
+        sb.AppendLine("<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"padding:32px 16px;\">");
+        sb.AppendLine("  <tr><td align=\"center\">");
+        sb.AppendLine("    <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:560px;background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.08);\">");
+        sb.AppendLine("      <tr><td style=\"background-color:#111827;padding:20px 28px;\">");
+        sb.AppendLine($"        <span style=\"color:#ffffff;font-size:18px;font-weight:bold;\">{Brand}</span>");
+        sb.AppendLine("      </td></tr>");
+        sb.AppendLine("      <tr><td style=\"padding:32px 28px 16px 28px;\">");
+        sb.AppendLine("        <h1 style=\"margin:0 0 16px 0;font-size:22px;color:#111827;\">Confirm your email address</h1>");
+        sb.AppendLine("        <p style=\"margin:0 0 16px 0;font-size:15px;line-height:1.6;color:#374151;\">Please confirm your email address by clicking the button below:</p>");
+        if (!string.IsNullOrEmpty(email.Link))
+        {
+            sb.AppendLine($"        <p style=\"margin:24px 0\"><a href=\"{safeLink}\" style=\"background:#111827;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none\">Verify email</a></p>");
+            sb.AppendLine("        <p style=\"margin:0 0 8px 0;font-size:15px;line-height:1.6;color:#374151;\">Or copy and paste this link into your browser:</p>");
+            sb.AppendLine($"        <p style=\"margin:0;font-size:13px;line-height:1.6;word-break:break-all\"><a href=\"{safeLink}\">{safeLink}</a></p>");
+        }
+        sb.AppendLine($"        <p style=\"margin:16px 0 0 0;font-size:12px;color:#6b7280;\">This link expires in {safeExpiry}.</p>");
+        sb.AppendLine("        <p style=\"margin:8px 0 0 0;font-size:12px;color:#6b7280;\">If you did not register for PaymentSwitch, you can ignore this email.</p>");
+        sb.AppendLine("      </td></tr>");
+        sb.AppendLine("      <tr><td style=\"padding:24px 28px;border-top:1px solid #e5e7eb;\">");
+        sb.AppendLine("        <p style=\"margin:0;font-size:12px;color:#6b7280;\">&copy; PaymentSwitch. This is an automated notification; please do not reply.</p>");
+        sb.AppendLine("      </td></tr>");
+        sb.AppendLine("    </table>");
+        sb.AppendLine("  </td></tr>");
+        sb.AppendLine("</table>");
+        sb.AppendLine("</body>");
+        sb.AppendLine("</html>");
+        return sb.ToString();
+    }
 }

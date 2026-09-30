@@ -12,6 +12,13 @@ public static class NotificationEventTypes
     public const string PaymentIntentCreated = "PaymentIntentCreatedDomainEvent";
     public const string PaymentVoided = "PaymentVoidedDomainEvent";
 
+    /// <summary>
+    /// Identity verification request (exchange <c>identity.events</c>).
+    /// Transactional and never preference-gated: deliberately NOT part of
+    /// <see cref="All"/>/<see cref="IsValid"/>, which drive user opt-out.
+    /// </summary>
+    public const string EmailVerificationRequested = "EmailVerificationRequestedDomainEvent";
+
     public static readonly IReadOnlyList<string> All = new[]
     {
         PaymentAuthorized,
