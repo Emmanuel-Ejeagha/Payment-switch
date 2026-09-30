@@ -54,6 +54,8 @@ public class DeadLetterConsumerService : BackgroundService
             {
                 break;
             }
+            // codeql[cs/catch-of-all-exceptions]: intentional resilient-consumer loop;
+            // a poison message must be logged and retried, never crash the host.
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Dead-letter consumer error. Retrying in 10 seconds...");
@@ -113,6 +115,8 @@ public class DeadLetterConsumerService : BackgroundService
 
                 await channel.BasicAckAsync(ea.DeliveryTag, false, cancellationToken);
             }
+            // codeql[cs/catch-of-all-exceptions]: per-message handler; a poison record
+            // must be left on the queue for retry, never crash the consumer loop.
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to record dead-lettered message {MessageId}; leaving on queue for retry", messageId);
@@ -134,6 +138,8 @@ public class DeadLetterConsumerService : BackgroundService
                 var declare = await channel.QueueDeclarePassiveAsync(QueueName, cancellationToken);
                 DlqDepth.Record(declare.MessageCount);
             }
+            // codeql[cs/catch-of-all-exceptions]: metrics polling is best-effort;
+            // a gauge failure must never crash the consumer loop.
             catch (Exception ex)
             {
                 _logger.LogDebug(ex, "Failed to poll DLQ depth");

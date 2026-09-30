@@ -161,10 +161,17 @@ namespace Ledger.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer");
+
                     b.Property<string>("EventType")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
 
                     b.Property<string>("MessageId")
                         .IsRequired()

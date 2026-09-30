@@ -57,7 +57,7 @@ Authenticate with `Authorization: Bearer sk_live_...` or `sk_test_...`. The merc
 
 ```json
 {
-  "amount": 100.00,
+  "amount": 10000,
   "currency": "USD",
   "paymentMethod": "Card",
   "cardLastFour": "4242",

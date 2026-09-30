@@ -43,7 +43,7 @@ public class RefundFundsHandler
         {
             var amount = new Money(command.Amount, command.Currency);
             var correlationId = new CorrelationId(command.CorrelationId);
-            account.RefundFunds(amount, correlationId);
+            account.RefundFunds(amount, correlationId, command.EventOccurredOn);
         }
         catch (InvalidOperationException ex)
         {

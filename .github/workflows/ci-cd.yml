@@ -41,6 +41,12 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore PaymentSwitch.slnx
 
+      - name: Audit NuGet packages for vulnerabilities
+        # Step 9.8: explicit report step. The gate itself lives in
+        # Directory.Build.props (NU1901-NU1904 escalated to errors), so any
+        # build/test also fails on vulnerable packages.
+        run: dotnet list PaymentSwitch.slnx package --vulnerable --include-transitive
+
       - name: Verify formatting
         run: dotnet format PaymentSwitch.slnx --verify-no-changes --no-restore
 
@@ -66,6 +72,15 @@ jobs:
     name: Integration Tests
     if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    # One suite per runner (matrix): six sequential suites on a single 2-core
+    # runner starve cold Testcontainers boots (RabbitMQ attach takes 30-60s+)
+    # and cause broker-readiness flakes. fail-fast false so one red suite does
+    # not hide the others' results. The job name stays un-suffixed so the
+    # branch-protection required check keeps matching.
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [Identity, Merchant, Payment, Ledger, Notification, Settlement]
     steps:
       - uses: actions/checkout@v4
 
@@ -91,21 +106,16 @@ jobs:
       - name: Pre-pull Postgres image
         run: docker pull postgres:16-alpine
 
-      # Each project runs in its own step so Testcontainers containers are not
-      # spun up concurrently (parallel container startup can exceed the Docker
-      # connection limit and cause flaky named-pipe timeouts).
-      - name: Integration tests - Identity
-        run: dotnet test tests/Integration/Identity.API.IntegrationTests --configuration Release --no-build
-      - name: Integration tests - Merchant
-        run: dotnet test tests/Integration/Merchant.API.IntegrationTests --configuration Release --no-build
-      - name: Integration tests - Payment
-        run: dotnet test tests/Integration/Payment.API.IntegrationTests --configuration Release --no-build
-      - name: Integration tests - Ledger
-        run: dotnet test tests/Integration/Ledger.API.IntegrationTests --configuration Release --no-build
-      - name: Integration tests - Notification
-        run: dotnet test tests/Integration/Notification.API.IntegrationTests --configuration Release --no-build
-      - name: Integration tests - Settlement
-        run: dotnet test tests/Integration/Settlement.API.IntegrationTests --configuration Release --no-build
+      - name: Pre-pull RabbitMQ images
+        # Step 9.8: Testcontainers pulls at runtime; pre-pulling warms the
+        # cache and fails fast on registry outages (3.13-alpine is what the
+        # Ledger suites actually boot).
+        run: |
+          docker pull rabbitmq:3-management-alpine
+          docker pull rabbitmq:3.13-alpine
+
+      - name: Integration tests - ${{ matrix.suite }}
+        run: dotnet test tests/Integration/${{ matrix.suite }}.API.IntegrationTests --configuration Release --no-build
 
   frontend:
     name: Frontend Build & Lint
@@ -137,11 +147,73 @@ jobs:
       - name: Lint merchant
         run: npm run lint --workspace=merchant
 
+      - name: Test admin
+        run: npm run test --workspace=admin
+
+      - name: Test merchant
+        run: npm run test --workspace=merchant
+
       - name: Build admin
         run: npm run build --workspace=admin
 
       - name: Build merchant
         run: npm run build --workspace=merchant
+
+  manifest-validate:
+    name: Manifest Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+
+      - name: Helm lint
+        # Lint renders the chart, so the required-secret guards need the same
+        # dummy values as the render step (never real secrets).
+        run: >
+          helm lint helm/payment-switch
+          --set config.postgres.password=dummy
+          --set config.jwt.secret=0123456789abcdef0123456789abcdef
+          --set config.serviceToken.secret=dummy-service-token-secret-0123456789abcdef
+          --set config.rabbitmq.password=dummy
+          --set config.seed.adminPassword=dummy
+          --set config.webhookSecretEncryption.key=dummy
+          --set config.smtp.password=dummy
+          --set config.grafana.adminPassword=dummy
+
+      - name: Render chart (ingress enabled)
+        # Dummy secrets: rendering only needs the keys present, never real values.
+        run: >
+          helm template payment-switch helm/payment-switch --namespace payment-switch
+          --set config.postgres.password=dummy
+          --set config.jwt.secret=0123456789abcdef0123456789abcdef
+          --set config.serviceToken.secret=dummy-service-token-secret-0123456789abcdef
+          --set config.rabbitmq.password=dummy
+          --set config.seed.adminPassword=dummy
+          --set config.webhookSecretEncryption.key=dummy
+          --set config.smtp.password=dummy
+          --set config.grafana.adminPassword=dummy
+          --set ingress.enabled=true
+          --set ingress.host=paymentswitch.example.com
+          --set ingress.tls.enabled=true
+          --set ingress.tls.secretName=payment-switch-tls
+          > /tmp/helm-rendered.yaml
+
+      - name: Install kubeconform
+        run: |
+          curl -sL https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz \
+            | tar xz kubeconform
+          sudo mv kubeconform /usr/local/bin/kubeconform
+
+      - name: Validate k8s manifests
+        # ClusterIssuer is a cert-manager CRD with no stock schema; everything
+        # else must validate strictly (this caught a merged-documents bug in
+        # hpa.yaml and a dangling selector in pdb.yaml).
+        run: kubeconform -strict -summary -skip ClusterIssuer k8s/
+
+      - name: Validate rendered chart
+        run: kubeconform -strict -summary /tmp/helm-rendered.yaml
 
   docker:
     name: Docker Build & Push
@@ -178,7 +250,7 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service }}-api:latest
 
       - name: Scan image for vulnerabilities
-        uses: aquasecurity/trivy-action@0.24.0
+        uses: aquasecurity/trivy-action@v0.33.1
         with:
           image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service }}-api:${{ github.sha }}
           severity: HIGH,CRITICAL
@@ -228,7 +300,7 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.app.name }}-web:latest
 
       - name: Scan image for vulnerabilities
-        uses: aquasecurity/trivy-action@0.24.0
+        uses: aquasecurity/trivy-action@v0.33.1
         with:
           image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.app.name }}-web:${{ github.sha }}
           severity: HIGH,CRITICAL
@@ -245,7 +317,7 @@ jobs:
 
   deploy:
     name: Deploy to Kubernetes (production)
-    needs: [docker, docker-frontend]
+    needs: [docker, docker-frontend, manifest-validate]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: production

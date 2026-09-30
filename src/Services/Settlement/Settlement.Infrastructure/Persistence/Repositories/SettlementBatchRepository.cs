@@ -21,12 +21,12 @@ public class SettlementBatchRepository : ISettlementBatchRepository
             .FirstOrDefaultAsync(b => b.Id == id, cancellationToken);
     }
 
-    public async Task<SettlementBatch?> GetByBatchDateAsync(DateTime date, CancellationToken cancellationToken = default)
+    public async Task<SettlementBatch?> GetByBatchDateAndCurrencyAsync(DateTime date, string currency, CancellationToken cancellationToken = default)
     {
         var normalized = date.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(date, DateTimeKind.Utc) : date;
         return await _context.SettlementBatches
             .Include(b => b.Payouts)
-            .FirstOrDefaultAsync(b => b.BatchDate == normalized.Date, cancellationToken);
+            .FirstOrDefaultAsync(b => b.BatchDate == normalized.Date && b.Currency == currency, cancellationToken);
     }
 
     public async Task AddAsync(SettlementBatch batch, CancellationToken cancellationToken = default)
@@ -49,6 +49,7 @@ public class SettlementBatchRepository : ISettlementBatchRepository
             b.BatchDate,
             b.Status.Value,
             b.TotalAmount,
+            b.Currency,
             b.Payouts.Select(p => new PayoutDto(
                 p.MerchantId,
                 p.GrossVolume.Amount,
