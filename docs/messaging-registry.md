@@ -22,7 +22,7 @@ if a consumer delivers business value, otherwise it is removed from the bus**
 |---|---|---:|---|
 | `payment.events` | Payment | Payment | Ledger, Notification |
 | `merchant.events` | Merchant + Ledger consumer | Merchant | Ledger |
-| `identity.events` | Identity | — (nothing published) | — |
+| `identity.events` | Identity | Identity | Notification |
 | `ledger.events` | Ledger | — (nothing published) | — |
 | `notification.events` | Notification | — (nothing published) | — |
 | `settlement.events` | Settlement | — (nothing published) | — |
@@ -69,6 +69,7 @@ cross-service value).
 | EventType | Fate | Consumers | Notes |
 |---|---|---|---|
 | `UserRegisteredDomainEvent` | removed | — | No consumer |
+| `EmailVerificationRequestedDomainEvent` | consumed | Notification | Verification email via Resend; payload carries the raw single-use token (TTL-bounded, never logged) |
 | `ApiKeyGeneratedDomainEvent` | removed | — | No consumer |
 | `ApiKeyRevokedDomainEvent` | removed | — | No consumer |
 
@@ -102,6 +103,7 @@ cross-service value).
 | `ledger.payment.events` | `payment.events` | `PaymentAuthorizedDomainEvent`, `PaymentCapturedDomainEvent`, `PaymentRefundedDomainEvent` | Ledger `RabbitMQConsumerService` |
 | `ledger.merchant.events` | `merchant.events` | `MerchantOnboardedEvent` | Ledger `MerchantEventConsumerService` |
 | `notification.events` | `payment.events` | `PaymentAuthorizedDomainEvent`, `PaymentCapturedDomainEvent`, `PaymentRefundedDomainEvent`, `PaymentIntentCreatedDomainEvent`, `PaymentVoidedDomainEvent` | Notification `RabbitMQConsumerService` |
+| `notification.events` | `identity.events` | `EmailVerificationRequestedDomainEvent` | Notification `RabbitMQConsumerService` (verification mail; skips merchant lookup, preference suppression, SignalR fan-out) |
 
 ## Implementation touchpoints
 

@@ -15,6 +15,12 @@ public class Notification : AggregateRoot
     public string? Body { get; private set; }
     public string? WebhookUrl { get; private set; }
     public string Payload { get; private set; } = default!;
+    /// <summary>
+    /// Email provider hint: <c>"resend"</c> routes through Resend, anything
+    /// else (including null) uses SMTP. Set only for verification mail;
+    /// all other email keeps the existing SMTP path.
+    /// </summary>
+    public string? Provider { get; private set; }
     public NotificationStatus Status { get; internal set; } = default!;
     public int RetryCount { get; internal set; }
     public int MaxRetries { get; private set; }
@@ -43,7 +49,8 @@ public class Notification : AggregateRoot
         string? body,
         string? webhookUrl,
         string payload,
-        int maxRetries = 5) : base(id)
+        int maxRetries = 5,
+        string? provider = null) : base(id)
     {
         if (string.IsNullOrWhiteSpace(recipient))
             throw new ArgumentException("Recipient cannot be empty.", nameof(recipient));
@@ -56,6 +63,7 @@ public class Notification : AggregateRoot
         Body = body;
         WebhookUrl = webhookUrl;
         Payload = payload;
+        Provider = provider;
         Status = NotificationStatus.Pending;
         MaxRetries = maxRetries;
         CreatedAt = DateTime.UtcNow;

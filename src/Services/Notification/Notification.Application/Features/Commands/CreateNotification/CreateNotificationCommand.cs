@@ -7,5 +7,6 @@ public record CreateNotificationCommand(
     string? Body,
     string? WebhookUrl,
     string Payload,
-    int? MaxRetries = 5
+    int? MaxRetries = 5,
+    string? Provider = null
 );

@@ -55,7 +55,7 @@ public class NotificationApiFactory : WebApplicationFactory<Program>, IAsyncLife
         await _rabbitMq.StartAsync();
         TestSecrets.ApplyConnectionString("NotificationDb", _postgres.GetConnectionString());
         TestSecrets.ApplyRabbitMqHost(_rabbitMq.Hostname, _rabbitMq.GetMappedPublicPort(5672));
-        await DeclarePaymentEventsExchangeAsync();
+        await DeclareSourceExchangesAsync();
 
         using var scope = Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -63,13 +63,14 @@ public class NotificationApiFactory : WebApplicationFactory<Program>, IAsyncLife
     }
 
     /// <summary>
-    /// The <c>payment.events</c> exchange is normally declared by the Payment API
-    /// at startup. The Notification consumer binds its queue to it, so the
-    /// exchange must exist before the API host starts or the consumer's first
-    /// bind attempt fails and it falls into its 10s reconnect loop. Declaring it
-    /// here (idempotent) makes the consumer connect on the first attempt.
+    /// The <c>payment.events</c> (Payment API) and <c>identity.events</c> (Identity
+    /// API) exchanges are normally declared by their producers at startup. The
+    /// Notification consumer binds its queue to both, so the exchanges must exist
+    /// before the API host starts or the consumer's first bind attempt fails and
+    /// it falls into its 10s reconnect loop. Declaring them here (idempotent)
+    /// makes the consumer connect on the first attempt.
     /// </summary>
-    private async Task DeclarePaymentEventsExchangeAsync()
+    private async Task DeclareSourceExchangesAsync()
     {
         var factory = new ConnectionFactory
         {
@@ -81,6 +82,7 @@ public class NotificationApiFactory : WebApplicationFactory<Program>, IAsyncLife
         await using var connection = await factory.CreateConnectionAsync();
         await using var channel = await connection.CreateChannelAsync();
         await channel.ExchangeDeclareAsync("payment.events", ExchangeType.Topic, durable: true);
+        await channel.ExchangeDeclareAsync("identity.events", ExchangeType.Topic, durable: true);
     }
 
     public new async Task DisposeAsync()

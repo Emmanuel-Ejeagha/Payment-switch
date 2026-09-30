@@ -109,4 +109,20 @@ public class CreateNotificationCommandValidatorTests
 
         Assert.True(result.IsValid);
     }
+
+    [Fact]
+    public void ResendProvider_Passes()
+    {
+        var result = _validator.Validate(new CreateNotificationCommand("user@example.com", "email", "Hello", "Hi", null, "{}", 5, "resend"));
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void UnknownProvider_Fails()
+    {
+        var result = _validator.Validate(new CreateNotificationCommand("user@example.com", "email", "Hello", "Hi", null, "{}", 5, "carrier-pigeon"));
+
+        Assert.Contains(result.Errors, e => e.PropertyName == "Provider");
+    }
 }
