@@ -5,10 +5,15 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { ArrowRight, Eye, EyeOff, Loader2, AlertCircle, MailCheck } from "lucide-react"
 import { AuthShell, inputClass, labelClass, submitClass } from "@/components/auth/auth-shell"
 import { authArtwork } from "@/lib/images"
+import {
+  NEUTRAL_RESEND_MESSAGE,
+  cooldownSecondsLeft,
+  parseRetryAfterSeconds,
+} from "@/lib/verification"
 
 const registerSchema = z.object({
   businessName: z.string().min(2, "Business name must be at least 2 characters"),
@@ -41,6 +46,23 @@ export default function RegisterPage() {
   const [registeredEmail, setRegisteredEmail] = useState("")
   const [resending, setResending] = useState(false)
   const [resendMsg, setResendMsg] = useState<string | null>(null)
+  const [cooldownUntil, setCooldownUntil] = useState<number | null>(null)
+  const [nowMs, setNowMs] = useState(() => Date.now())
+
+  // Ticks the resend-cooldown countdown; stops once it lapses.
+  useEffect(() => {
+    if (cooldownUntil === null) return
+    const timer = window.setInterval(() => {
+      setNowMs(Date.now())
+      if (Date.now() >= (cooldownUntil ?? 0)) {
+        window.clearInterval(timer)
+        setCooldownUntil(null)
+      }
+    }, 1000)
+    return () => window.clearInterval(timer)
+  }, [cooldownUntil])
+
+  const cooldownLeft = cooldownSecondsLeft(cooldownUntil, nowMs)
 
   const {
     register,
@@ -51,6 +73,7 @@ export default function RegisterPage() {
   })
 
   const resendVerification = async () => {
+    if (cooldownLeft > 0) return
     setResending(true)
     setResendMsg(null)
     try {
@@ -62,12 +85,19 @@ export default function RegisterPage() {
           body: JSON.stringify({ email: registeredEmail }),
         }
       )
+      if (res.status === 429) {
+        const body = await res.json()
+        const message = body.message ?? body.detail ?? "Please wait before requesting another email."
+        setResendMsg(message)
+        setCooldownUntil(Date.now() + parseRetryAfterSeconds(message) * 1000)
+        return
+      }
       if (!res.ok) {
         const body = await res.json()
         setResendMsg(body.message ?? body.detail ?? "Could not resend the email. Try again shortly.")
         return
       }
-      setResendMsg("A new verification email is on its way.")
+      setResendMsg(NEUTRAL_RESEND_MESSAGE)
     } catch {
       setResendMsg("Backend unreachable. Please try again later.")
     } finally {
@@ -168,7 +198,7 @@ export default function RegisterPage() {
           <button
             type="button"
             onClick={resendVerification}
-            disabled={resending}
+            disabled={resending || cooldownLeft > 0}
             className={submitClass}
           >
             {resending ? (
@@ -176,6 +206,8 @@ export default function RegisterPage() {
                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                 Sending...
               </>
+            ) : cooldownLeft > 0 ? (
+              `Resend available in ${cooldownLeft}s`
             ) : (
               "Resend verification email"
             )}
