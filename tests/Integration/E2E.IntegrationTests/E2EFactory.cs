@@ -64,6 +64,7 @@ public class E2EFactory : IAsyncLifetime
     public WebApplicationFactory<NotificationProgram> NotificationHost { get; private set; } = null!;
     public WebApplicationFactory<SettlementProgram> SettlementHost { get; private set; } = null!;
 
+    public string IdentityDbConnectionString { get; private set; } = string.Empty;
     public string MerchantDbConnectionString { get; private set; } = string.Empty;
     public string LedgerDbConnectionString { get; private set; } = string.Empty;
     public string NotificationDbConnectionString { get; private set; } = string.Empty;
@@ -82,7 +83,8 @@ public class E2EFactory : IAsyncLifetime
 
         await CreateDatabasesAsync();
 
-        TestSecrets.ApplyConnectionString("IdentityDb", ConnectionStringFor("IdentityDb"));
+        IdentityDbConnectionString = ConnectionStringFor("IdentityDb");
+        TestSecrets.ApplyConnectionString("IdentityDb", IdentityDbConnectionString);
         MerchantDbConnectionString = ConnectionStringFor("MerchantDb");
         TestSecrets.ApplyConnectionString("MerchantDb", MerchantDbConnectionString);
         TestSecrets.ApplyConnectionString("PaymentDb", ConnectionStringFor("PaymentDb"));

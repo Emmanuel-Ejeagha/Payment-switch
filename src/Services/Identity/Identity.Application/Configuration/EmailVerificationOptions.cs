@@ -7,5 +7,11 @@ public class EmailVerificationOptions
 
     public int TokenLifetimeHours { get; set; } = 24;
 
+    /// <summary>
+    /// Minimum seconds between verification emails for the same address.
+    /// Enforced in the database-backed handler so it holds across instances.
+    /// </summary>
+    public int ResendCooldownSeconds { get; set; } = 60;
+
     public string Subject { get; set; } = "Confirm your email address";
 }

@@ -1,5 +1,4 @@
 ﻿using BuildingBlocks.Shared;
-using BuildingBlocks.Shared.Email;
 using BuildingBlocks.Shared.Results;
 using FluentValidation;
 using FluentValidation.Results;
@@ -7,6 +6,7 @@ using Identity.Application.Commands.Auth.Register;
 using Identity.Application.Configuration;
 using Identity.Application.Exceptions;
 using Identity.Application.Interfaces;
+using Identity.Domain.DomainEvents;
 using Identity.Domain.Entities;
 using Identity.Domain.ValueObjects;
 using Microsoft.Extensions.Options;
@@ -20,7 +20,6 @@ public class RegisterUserHandlerTests
     private readonly Mock<IPasswordHasher> _passwordHasherMock = new();
     private readonly Mock<IUnitOfWork> _unitOfWorkMock = new();
     private readonly Mock<IEmailVerificationTokenFactory> _tokenFactoryMock = new();
-    private readonly Mock<IEmailSender> _emailSenderMock = new();
     private readonly IOptions<EmailVerificationOptions> _options;
     private readonly Mock<IValidator<RegisterUserCommand>> _validatorMock = new();
     private readonly Mock<ILogger<RegisterUserHandler>> _loggerMock = new();
@@ -31,15 +30,12 @@ public class RegisterUserHandlerTests
         _options = Options.Create(new EmailVerificationOptions { FrontendBaseUrl = "http://localhost:3000" });
         _tokenFactoryMock.Setup(f => f.Generate(It.IsAny<TimeSpan>()))
             .Returns(new EmailVerificationTokenData("plain-token", "token-hash", DateTime.UtcNow.AddHours(24)));
-        _emailSenderMock.Setup(s => s.SendAsync(It.IsAny<EmailMessage>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result.Success());
 
         _handler = new RegisterUserHandler(
             _userRepositoryMock.Object,
             _passwordHasherMock.Object,
             _unitOfWorkMock.Object,
             _tokenFactoryMock.Object,
-            _emailSenderMock.Object,
             _options,
             _validatorMock.Object, _loggerMock.Object);
     }
@@ -69,8 +65,9 @@ public class RegisterUserHandlerTests
             u.EmailVerificationTokenHash == "token-hash" &&
             u.EmailVerificationTokenExpiresAt != null), It.IsAny<CancellationToken>()), Times.Once);
         _unitOfWorkMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
-        _emailSenderMock.Verify(s => s.SendAsync(
-            It.Is<EmailMessage>(m => m.To == command.Email && m.TextBody.Contains("plain-token")),
+        _userRepositoryMock.Verify(r => r.AddAsync(It.Is<User>(u =>
+            u.DomainEvents.OfType<EmailVerificationRequestedDomainEvent>().Count() == 1 &&
+            u.DomainEvents.OfType<EmailVerificationRequestedDomainEvent>().Single().Token == "plain-token"),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -89,7 +86,6 @@ public class RegisterUserHandlerTests
         // Assert
         Assert.True(result.IsFailure);
         Assert.Contains(result.Errors, e => e.Code == "Identity.EmailAlreadyInUse");
-        _emailSenderMock.Verify(s => s.SendAsync(It.IsAny<EmailMessage>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -133,11 +129,10 @@ public class RegisterUserHandlerTests
         // Assert
         Assert.True(result.IsFailure);
         Assert.Contains(result.Errors, e => e.Code == "Identity.EmailAlreadyInUse");
-        _emailSenderMock.Verify(s => s.SendAsync(It.IsAny<EmailMessage>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
-    public async Task Handle_EmailSendFailure_ShouldStillRegister()
+    public async Task Handle_ValidCommand_RaisesVerificationEventForOutboxDelivery()
     {
         var command = new RegisterUserCommand("test@example.com", "Password123", "John Doe");
         SetupValidatorSuccess(command);
@@ -147,13 +142,18 @@ public class RegisterUserHandlerTests
             .Returns(new PasswordHash("hashed_password"));
         _unitOfWorkMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);
-        _emailSenderMock.Setup(s => s.SendAsync(It.IsAny<EmailMessage>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Error("Email.SendFailed", "SMTP down"));
 
         var result = await _handler.Handle(command);
 
+        // Delivery is event-driven (outbox → Notification/Resend): the handler
+        // sends nothing itself, it only records the verifiable event.
         Assert.True(result.IsSuccess);
-        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+        _userRepositoryMock.Verify(r => r.AddAsync(It.Is<User>(u =>
+            u.DomainEvents.OfType<EmailVerificationRequestedDomainEvent>().Any(e =>
+                e.Email == command.Email &&
+                e.Token == "plain-token" &&
+                e.ExpiresAtUtc > DateTime.UtcNow)),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     private void SetupValidatorSuccess(RegisterUserCommand command)

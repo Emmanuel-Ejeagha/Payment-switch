@@ -1,8 +1,8 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using System.Text.RegularExpressions;
 using Identity.Application.Commands.Auth.Login;
 using Identity.Application.Commands.Auth.Register;
+using IdentityAppDbContext = Identity.Infrastructure.Persistence.AppDbContext;
 using LedgerAppDbContext = Ledger.Infrastructure.Persistence.AppDbContext;
 using Merchant.Application.Features.Commands.GenerateMerchantApiKey;
 using Merchant.Application.Features.Commands.OnboardMerchant;
@@ -273,10 +273,22 @@ public class E2EFlowTests : IClassFixture<E2EFactory>
 
     private string ExtractVerificationToken(string email)
     {
-        var message = _factory.Emails.Sent.Single(m => m.To == email);
-        var match = Regex.Match(message.TextBody, @"Your verification token is: ([A-F0-9]+)|token=([A-F0-9]+)");
-        Assert.True(match.Success, $"No verification token in email body: {message.TextBody}");
-        return match.Groups[1].Success ? match.Groups[1].Value : match.Groups[2].Value;
+        // Delivery is event-driven (outbox → Notification/Resend): the raw
+        // token travels in the outbox event payload, never in logs. Tests are
+        // the only readers. The row persists even after the publisher marks it
+        // processed, so no waiting is needed.
+        using var db = new IdentityAppDbContext(DbOptions<IdentityAppDbContext>(_factory.IdentityDbConnectionString));
+        var payload = db.OutboxMessages
+            .Where(m => m.EventType == "EmailVerificationRequestedDomainEvent")
+            .OrderBy(m => m.OccurredOn)
+            .AsEnumerable()
+            .Select(m => System.Text.Json.JsonDocument.Parse(m.Payload).RootElement)
+            .LastOrDefault(e => e.GetProperty("Email").GetString() == email);
+        Assert.True(payload.ValueKind != System.Text.Json.JsonValueKind.Undefined,
+            $"No verification event in outbox for {email}.");
+        var token = payload.GetProperty("Token").GetString();
+        Assert.False(string.IsNullOrWhiteSpace(token), "Verification event did not carry a token.");
+        return token!;
     }
     private static DbContextOptions<T> DbOptions<T>(string connectionString) where T : DbContext
     => new DbContextOptionsBuilder<T>().UseNpgsql(connectionString).Options;

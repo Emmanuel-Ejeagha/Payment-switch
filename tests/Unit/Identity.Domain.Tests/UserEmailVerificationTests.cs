@@ -112,7 +112,20 @@ public class UserEmailVerificationTests
     }
 
     [Fact]
-    public void InitiateEmailVerification_RaisesEventWithRawTokenAndTracksSendTime()
+    public void RecordVerificationEmailSent_TracksSendTimeForCooldown()
+    {
+        var user = CreateUser();
+        Assert.Null(user.LastVerificationEmailSentAtUtc);
+
+        var before = DateTime.UtcNow;
+        user.RecordVerificationEmailSent();
+
+        Assert.NotNull(user.LastVerificationEmailSentAtUtc);
+        Assert.True(user.LastVerificationEmailSentAtUtc >= before);
+    }
+
+    [Fact]
+    public void InitiateEmailVerification_RaisesEventCarryingRawToken()
     {
         var user = CreateUser();
         var before = DateTime.UtcNow;
@@ -120,8 +133,6 @@ public class UserEmailVerificationTests
 
         user.InitiateEmailVerification("hash", "plain-token", expiresAt);
 
-        Assert.NotNull(user.LastVerificationEmailSentAtUtc);
-        Assert.True(user.LastVerificationEmailSentAtUtc >= before);
         var raised = Assert.Single(user.DomainEvents.OfType<EmailVerificationRequestedDomainEvent>());
         Assert.Equal(user.Id, raised.UserId);
         Assert.Equal("user@example.com", raised.Email);
