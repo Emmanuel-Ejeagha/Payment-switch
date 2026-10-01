@@ -13,9 +13,11 @@ concurrency:
 env:
   REGISTRY: ghcr.io
   NAMESPACE: payment-switch
-  # github.repository is "owner/repo" (owner and repo names are already lowercase).
-  # The previous `lower(...)` is not a valid GitHub Actions expression and
-  # produced an empty owner, silently corrupting image paths and deploy refs.
+  # github.repository is "owner/repo" but preserves the account's display
+  # case (Emmanuel-Ejeagha/...), while GHCR paths must be lowercase. There is
+  # no lower() in GitHub Actions expressions, so the docker/docker-frontend/
+  # deploy jobs lowercase it via shell (${GITHUB_REPOSITORY,,}) into
+  # IMAGE_NAMESPACE before tagging, scanning, or deploying.
   IMAGE_NAMESPACE: ${{ github.repository }}
 
 jobs:
@@ -222,15 +224,28 @@ jobs:
     needs: [build-test, integration]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
     strategy:
       matrix:
+        # `service` stays lowercase for image tags; `dir` matches the real
+        # on-disk casing (Linux runners are case-sensitive, so the Dockerfile
+        # path cannot use the lowercase tag name).
         service:
-          - identity
-          - merchant
-          - payment
-          - ledger
-          - notification
-          - settlement
+          - name: identity
+            dir: Identity
+          - name: merchant
+            dir: Merchant
+          - name: payment
+            dir: Payment
+          - name: ledger
+            dir: Ledger
+          - name: notification
+            dir: Notification
+          - name: settlement
+            dir: Settlement
     steps:
       - uses: actions/checkout@v4
 
@@ -241,23 +256,32 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Lowercase image namespace for GHCR
+        # GHCR repository paths must be lowercase, but github.repository
+        # preserves the account's display case (Emmanuel-Ejeagha/...).
+        # Overriding IMAGE_NAMESPACE here fixes every tag/image-ref below.
+        run: echo "IMAGE_NAMESPACE=${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: src/Services/${{ matrix.service }}/${{ matrix.service }}.API/Dockerfile
+          file: src/Services/${{ matrix.service.dir }}/${{ matrix.service.dir }}.API/Dockerfile
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service }}-api:${{ github.sha }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service }}-api:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service.name }}-api:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service.name }}-api:latest
 
       - name: Scan image for vulnerabilities
         uses: aquasecurity/trivy-action@v0.33.1
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service }}-api:${{ github.sha }}
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service.name }}-api:${{ github.sha }}
+          # The action's default Trivy version does not exist upstream;
+          # pin a real one (verified via the aquasecurity/trivy releases API).
+          version: v0.74.0
           severity: HIGH,CRITICAL
           format: sarif
-          output: trivy-${{ matrix.service }}.sarif
+          output: trivy-${{ matrix.service.name }}.sarif
           exit-code: '1'
           ignore-unfixed: true
 
@@ -265,13 +289,17 @@ jobs:
         uses: github/codeql-action/upload-sarif@v3
         if: success() || failure()
         with:
-          sarif_file: trivy-${{ matrix.service }}.sarif
+          sarif_file: trivy-${{ matrix.service.name }}.sarif
 
   docker-frontend:
     name: Docker Build & Push (frontends)
     needs: [frontend, build-test]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
     strategy:
       matrix:
         app:
@@ -289,6 +317,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Lowercase image namespace for GHCR
+        # GHCR repository paths must be lowercase, but github.repository
+        # preserves the account's display case (Emmanuel-Ejeagha/...).
+        # Overriding IMAGE_NAMESPACE here fixes every tag/image-ref below.
+        run: echo "IMAGE_NAMESPACE=${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
@@ -305,6 +339,9 @@ jobs:
         uses: aquasecurity/trivy-action@v0.33.1
         with:
           image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.app.name }}-web:${{ github.sha }}
+          # The action's default Trivy version does not exist upstream;
+          # pin a real one (verified via the aquasecurity/trivy releases API).
+          version: v0.74.0
           severity: HIGH,CRITICAL
           format: sarif
           output: trivy-${{ matrix.app.name }}-web.sarif
@@ -320,11 +357,20 @@ jobs:
   deploy:
     name: Deploy to Kubernetes (production)
     needs: [docker, docker-frontend, manifest-validate]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # CD is opt-in: it needs a reachable cluster (KUBE_CONFIG secret) which the
+    # current EC2-Compose production does not have. Set the DEPLOY_TO_KUBERNETES
+    # repo variable to 'true' (plus a valid KUBE_CONFIG) to activate it; until
+    # then the job skips instead of failing every main push against a dead endpoint.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.DEPLOY_TO_KUBERNETES == 'true'
     runs-on: ubuntu-latest
     environment: production
     steps:
       - uses: actions/checkout@v4
+
+      - name: Lowercase image namespace for GHCR
+        # Must match the tags pushed by the docker jobs (GHCR paths are
+        # lowercase; github.repository preserves display case).
+        run: echo "IMAGE_NAMESPACE=${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
 
       - name: Setup kubectl
         uses: azure/setup-kubectl@v3
