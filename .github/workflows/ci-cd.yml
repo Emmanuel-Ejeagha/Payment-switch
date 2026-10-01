@@ -180,6 +180,7 @@ jobs:
           --set config.seed.adminPassword=dummy
           --set config.webhookSecretEncryption.key=dummy
           --set config.smtp.password=dummy
+          --set config.resend.apiKey=dummy
           --set config.grafana.adminPassword=dummy
 
       - name: Render chart (ingress enabled)
@@ -193,6 +194,7 @@ jobs:
           --set config.seed.adminPassword=dummy
           --set config.webhookSecretEncryption.key=dummy
           --set config.smtp.password=dummy
+          --set config.resend.apiKey=dummy
           --set config.grafana.adminPassword=dummy
           --set ingress.enabled=true
           --set ingress.host=paymentswitch.example.com

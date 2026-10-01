@@ -110,6 +110,31 @@ spec:
                 configMapKeyRef:
                   name: payment-switch-config
                   key: Sms__Enabled
+            - name: Resend__ApiKey
+              valueFrom:
+                secretKeyRef:
+                  name: payment-switch-secret
+                  key: Resend__ApiKey
+            - name: Resend__FromEmail
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-switch-config
+                  key: Resend__FromEmail
+            - name: Resend__FromName
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-switch-config
+                  key: Resend__FromName
+            - name: Resend__TimeoutSeconds
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-switch-config
+                  key: Resend__TimeoutSeconds
+            - name: EmailVerification__FrontendBaseUrl
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-switch-config
+                  key: EmailVerification__FrontendBaseUrl
           ports:
             - containerPort: 8080
           resources:

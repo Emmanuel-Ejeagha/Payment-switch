@@ -117,6 +117,16 @@ spec:
                 configMapKeyRef:
                   name: payment-switch-config
                   key: Smtp__FromName
+            - name: EmailVerification__FrontendBaseUrl
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-switch-config
+                  key: EmailVerification__FrontendBaseUrl
+            - name: EmailVerification__ResendCooldownSeconds
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-switch-config
+                  key: EmailVerification__ResendCooldownSeconds
             - name: Seed__AdminEmail
               value: {{ $.Values.config.seed.adminEmail | quote }}
             - name: Seed__AdminPassword
@@ -168,6 +178,31 @@ spec:
                 configMapKeyRef:
                   name: payment-switch-config
                   key: Sms__Enabled
+            - name: Resend__ApiKey
+              valueFrom:
+                secretKeyRef:
+                  name: payment-switch-secret
+                  key: Resend__ApiKey
+            - name: Resend__FromEmail
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-switch-config
+                  key: Resend__FromEmail
+            - name: Resend__FromName
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-switch-config
+                  key: Resend__FromName
+            - name: Resend__TimeoutSeconds
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-switch-config
+                  key: Resend__TimeoutSeconds
+            - name: EmailVerification__FrontendBaseUrl
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-switch-config
+                  key: EmailVerification__FrontendBaseUrl
             {{- end }}
             {{- if $svc.retentionBusinessDays }}
             - name: Retention__CleanupIntervalMinutes

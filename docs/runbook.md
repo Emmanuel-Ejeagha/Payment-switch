@@ -194,3 +194,38 @@ on k8s in production:
   Operator, and confirm the Ingress + cert-manager issuance.
 - Confirm the frontend deployments (`merchant-web`, `admin-web`) route through
   the frontend Ingress (`/` and `/admin`).
+
+## 7. Transactional email (Resend verification mail)
+
+Registration and resend publish `EmailVerificationRequestedDomainEvent` to the
+Identity outbox; the Notification service consumes it from `identity.events`
+and delivers via Resend (SMTP keeps serving every other mail channel).
+
+### Resend account and sender setup (one-time, Resend dashboard)
+
+1. Create an API key at `https://resend.com/api-keys` (starts with `re_`) and
+   store it in the managed secret store as `RESEND_API_KEY` (compose `.env`),
+   `Resend__ApiKey` (k8s `payment-switch-secret`, Helm `--set
+   config.resend.apiKey=...`). Never commit it; never log it.
+2. Add and verify the sender domain at `https://resend.com/domains` (SPF/DKIM
+   DNS records Resend shows you; delivery from unverified domains is rejected).
+   Set `RESEND_FROM_EMAIL` to an address on that domain
+   (e.g. `noreply@paymentswitch.example.com`).
+3. Set `EMAIL_VERIFICATION_BASE_URL` to the trusted https frontend origin
+   (production). Links are built from this value only — never from request
+   Host headers.
+
+### Behavior and troubleshooting
+
+- Leave `RESEND_API_KEY` empty in Development for simulated-email mode (logged
+  without the token). In Production an empty key fails startup loudly — the
+  service never silently drops verification mail.
+- Resend throttling: `EMAIL_VERIFICATION_RESEND_COOLDOWN_SECONDS` (default 60)
+  per address (429 inside the window, nothing sent/rotated); endpoint rate
+  limiting (`Strict`) applies on top.
+- Delivery failures ride the notification retry budget (exponential backoff,
+  then DLQ recorded by the dead-letter consumer); provider outages never report
+  success. Check `docker compose logs notification-api` (masked recipients,
+  provider message id, no tokens) and the RabbitMQ management UI queue depth.
+- Processed Identity outbox rows older than 7 days are hard-deleted by the
+  retention sweep (transport envelopes; business facts live in `Users`).
