@@ -41,6 +41,7 @@ SEED_ADMIN_PASSWORD=$(openssl rand -base64 18)
 WEBHOOK_KEY=$(openssl rand -base64 32)
 GRAFANA_PASSWORD=$(openssl rand -base64 18)
 SMTP_PASS='<smtp-password>'
+RESEND_API_KEY='<resend-api-key>'
 
 kubectl create secret generic payment-switch-secret \
   --namespace payment-switch \
@@ -54,6 +55,7 @@ kubectl create secret generic payment-switch-secret \
   --from-literal=GrafanaAdminUser="admin" \
   --from-literal=GrafanaAdminPassword="$GRAFANA_PASSWORD" \
   --from-literal=Smtp__Password="$SMTP_PASS" \
+  --from-literal=Resend__ApiKey="$RESEND_API_KEY" \
   --from-literal=IdentityDb__ConnectionString="Host=postgres;Database=IdentityDb;Username=paymentswitch;Password=$DB_PASSWORD" \
   --from-literal=MerchantDb__ConnectionString="Host=postgres;Database=MerchantDb;Username=paymentswitch;Password=$DB_PASSWORD" \
   --from-literal=PaymentDb__ConnectionString="Host=postgres;Database=PaymentDb;Username=paymentswitch;Password=$DB_PASSWORD" \
