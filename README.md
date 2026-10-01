@@ -138,7 +138,10 @@ All services follow **Clean Architecture** with distinct **Domain**, **Applicati
    ```
 
 2. **Create your `.env`** (copy `.env.example`; every secret is required —
-   compose fails fast on missing values)
+   compose fails fast on missing values). Leave `RESEND_API_KEY` empty for
+   local development: verification mail is simulated in logs (dev only).
+   Set it (plus a verified sender domain, see `docs/runbook.md` §7) for real
+   delivery — registration then sends verification email via Resend.
 
 3. **Start the whole stack**
 

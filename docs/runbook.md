@@ -211,8 +211,9 @@ and delivers via Resend (SMTP keeps serving every other mail channel).
    DNS records Resend shows you; delivery from unverified domains is rejected).
    Set `RESEND_FROM_EMAIL` to an address on that domain
    (e.g. `noreply@paymentswitch.example.com`).
-3. Set `EMAIL_VERIFICATION_BASE_URL` to the trusted https frontend origin
-   (production). Links are built from this value only — never from request
+3. Set `FRONTEND_BASE_URL` to the trusted https frontend origin
+   (production; this is the same origin the portals and password-reset links
+   use). Verification links are built from this value only — never from request
    Host headers.
 
 ### Behavior and troubleshooting
@@ -229,3 +230,34 @@ and delivers via Resend (SMTP keeps serving every other mail channel).
   provider message id, no tokens) and the RabbitMQ management UI queue depth.
 - Processed Identity outbox rows older than 7 days are hard-deleted by the
   retention sweep (transport envelopes; business facts live in `Users`).
+
+### Migrations, existing accounts, and smoke test
+
+- The feature adds three additive, nullable migrations (no backfill, no
+  downtime): Identity `AddVerificationResendTracking`
+  (`Users.LastVerificationEmailSentAtUtc`), Notification
+  `AddNotificationProviderHint` (`Notifications.Provider`), plus the standard
+  model snapshots. Compose runs them on startup (`RunMigrations=true`).
+  Rollback drops only send-timestamps/provider hints; verification state
+  (`EmailConfirmed`, token hashes) is untouched.
+- Existing accounts are never mass-verified or locked out: unverified users
+  keep logging in (gated only on key issuance/creation paths) and verify
+  through the normal resend flow; the seeded admin stays pre-confirmed.
+- After deploy, smoke the flow against the local stack:
+  ```bash
+  # 1. Register (creates user + outbox verification event)
+  curl -fsS -X POST http://localhost/identity/api/v1/auth/register \
+    -H 'Content-Type: application/json' \
+    -d '{"email":"smoke@example.com","password":"SmokePass123!","fullName":"Smoke"}'
+  # 2. Immediate resend must be throttled (proves the cooldown wiring)
+  curl -s -o /dev/null -w "%{http_code}\n" -X POST \
+    http://localhost/identity/api/v1/auth/resend-verification \
+    -H 'Content-Type: application/json' -d '{"email":"smoke@example.com"}'  # expect 429
+  # 3. Unknown addresses stay neutral (no enumeration oracle)
+  curl -s -o /dev/null -w "%{http_code}\n" -X POST \
+    http://localhost/identity/api/v1/auth/resend-verification \
+    -H 'Content-Type: application/json' -d '{"email":"nobody@example.com"}'  # expect 200
+  # 4. Notification consumed the event (Resend/simulated delivery afterwards)
+  docker compose exec -T postgres psql -U paymentswitch -d NotificationDb \
+    -c "SELECT \"Recipient\",\"Provider\",\"Status\" FROM \"Notifications\" WHERE \"Recipient\"='smoke@example.com';"
+  ```
