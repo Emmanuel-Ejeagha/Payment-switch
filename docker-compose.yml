@@ -112,6 +112,7 @@ services:
       - Seed__AdminEmail=${SEED_ADMIN_EMAIL:-admin@paymentswitch.com}
       - Seed__AdminPassword=${SEED_ADMIN_PASSWORD:?Set SEED_ADMIN_PASSWORD in .env}
       - EmailVerification__FrontendBaseUrl=${FRONTEND_BASE_URL:-http://localhost:3000}
+      - EmailVerification__ResendCooldownSeconds=${EMAIL_VERIFICATION_RESEND_COOLDOWN_SECONDS:-60}
       - PasswordReset__FrontendBaseUrl=${FRONTEND_BASE_URL:-http://localhost:3000}
       - PasswordReset__TokenLifetimeHours=${PASSWORD_RESET_TOKEN_LIFETIME_HOURS:-1}
       - Smtp__Host=${SMTP_HOST:-}
@@ -240,6 +241,11 @@ services:
       - Smtp__FromAddress=${SMTP_FROM_ADDRESS:-noreply@paymentswitch.com}
       - Smtp__FromName=${SMTP_FROM_NAME:-PaymentSwitch}
       - Sms__Enabled=${SMS_ENABLED:-false}
+      - Resend__ApiKey=${RESEND_API_KEY:-}
+      - Resend__FromEmail=${RESEND_FROM_EMAIL:-noreply@paymentswitch.com}
+      - Resend__FromName=${RESEND_FROM_NAME:-PaymentSwitch}
+      - Resend__TimeoutSeconds=${RESEND_TIMEOUT_SECONDS:-30}
+      - EmailVerification__FrontendBaseUrl=${FRONTEND_BASE_URL:-http://localhost:3000}
     depends_on:
       postgres:
         condition: service_healthy
