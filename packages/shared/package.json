@@ -9,6 +9,6 @@
     "tailwind-merge": "^2.3.0"
   },
   "devDependencies": {
-    "@types/react": "^19.0.0"
+    "@types/react": "^19.3.0"
   }
 }
