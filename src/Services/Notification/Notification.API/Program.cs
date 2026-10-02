@@ -109,7 +109,7 @@ builder.Services.AddNotificationInfrastructure(builder.Configuration);
 builder.Services.AddScoped<IRealTimeNotifier, SignalRRealTimeNotifier>();
 
 builder.Services.AddCorrelationId();
-builder.Services.AddPaymentSwitchRateLimiting(builder.Configuration);
+builder.Services.AddPaymentSwitchRateLimiting();
 builder.Services.AddPaymentSwitchVersioning();
 builder.Services.AddPaymentSwitchOutputCache();
 

@@ -54,3 +54,6 @@ apps/*/logs/
 
 # Task tracker - kept local only, not committed
 TODO.md
+
+# Resend email-verification working checklist - local only, never commit
+/SendEmailTodo.md

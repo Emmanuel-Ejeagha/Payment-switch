@@ -77,7 +77,7 @@ builder.Services.AddMemoryCache();
 builder.Services.Configure<ApiKeyAuthOptions>(builder.Configuration.GetSection(ApiKeyAuthOptions.SectionName));
 builder.Services.AddSingleton<ApiKeyResolutionCache>();
 builder.Services.AddSingleton<ApiKeyFailureThrottle>();
-builder.Services.AddPaymentSwitchRateLimiting(builder.Configuration);
+builder.Services.AddPaymentSwitchRateLimiting();
 builder.Services.AddPaymentSwitchVersioning();
 builder.Services.AddPaymentSwitchOutputCache();
 

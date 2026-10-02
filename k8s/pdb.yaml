@@ -1,15 +1,10 @@
-# Step 9.4: every workload currently runs a single replica, so requiring
-# one pod to stay available would forbid ALL voluntary disruptions (drains
-# hang forever). Allowing a single unavailable pod lets the singleton be
-# evicted and rescheduled; it still protects scaled-out Deployments one pod
-# at a time.
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: identity-api
   namespace: payment-switch
 spec:
-  maxUnavailable: 1
+  minAvailable: 1
   selector:
     matchLabels:
       app: identity-api
@@ -20,7 +15,7 @@ metadata:
   name: merchant-api
   namespace: payment-switch
 spec:
-  maxUnavailable: 1
+  minAvailable: 1
   selector:
     matchLabels:
       app: merchant-api
@@ -31,7 +26,7 @@ metadata:
   name: payment-api
   namespace: payment-switch
 spec:
-  maxUnavailable: 1
+  minAvailable: 1
   selector:
     matchLabels:
       app: payment-api
@@ -42,7 +37,7 @@ metadata:
   name: ledger-api
   namespace: payment-switch
 spec:
-  maxUnavailable: 1
+  minAvailable: 1
   selector:
     matchLabels:
       app: ledger-api
@@ -53,7 +48,7 @@ metadata:
   name: notification-api
   namespace: payment-switch
 spec:
-  maxUnavailable: 1
+  minAvailable: 1
   selector:
     matchLabels:
       app: notification-api
@@ -64,7 +59,7 @@ metadata:
   name: settlement-api
   namespace: payment-switch
 spec:
-  maxUnavailable: 1
+  minAvailable: 1
   selector:
     matchLabels:
       app: settlement-api
@@ -75,7 +70,7 @@ metadata:
   name: merchant-web
   namespace: payment-switch
 spec:
-  maxUnavailable: 1
+  minAvailable: 1
   selector:
     matchLabels:
       app: merchant-web
@@ -86,7 +81,7 @@ metadata:
   name: admin-web
   namespace: payment-switch
 spec:
-  maxUnavailable: 1
+  minAvailable: 1
   selector:
     matchLabels:
       app: admin-web

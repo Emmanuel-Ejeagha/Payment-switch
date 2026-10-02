@@ -197,6 +197,7 @@ config:
     # key: <set-me>
   emailVerification:
     frontendBaseUrl: "http://localhost:3000"
+    resendCooldownSeconds: 60
   passwordReset:
     frontendBaseUrl: "http://localhost:3000"
     tokenLifetimeHours: 1
@@ -210,6 +211,14 @@ config:
     password: "CHANGEME-via---set-config.smtp.password-or-secrets-file"
     fromAddress: "noreply@paymentswitch.com"
     fromName: "PaymentSwitch"
+  resend:
+    # REQUIRED in Production: Resend API token for verification mail.
+    # Provide via --set config.resend.apiKey="..." or a secrets values file.
+    # No default is shipped on purpose (fail-fast in templates/secret.yaml).
+    apiKey: "CHANGEME-via---set-config.resend.apiKey-or-secrets-file"
+    fromEmail: "noreply@paymentswitch.com"
+    fromName: "PaymentSwitch"
+    timeoutSeconds: 30
   sms:
     enabled: false
   retention:

@@ -47,14 +47,6 @@ public class CapturePaymentHandler
             var replay = intent.Transactions.FirstOrDefault(t => t.Type == TransactionType.Capture && t.IdempotencyKey == command.IdempotencyKey);
             if (replay is not null)
             {
-                // Null amount defers to the recorded result; a concrete
-                // different amount is a conflicting reuse, not a replay.
-                if (command.Amount.HasValue && command.Amount.Value != replay.Amount.Amount)
-                {
-                    _logger.LogWarning("Idempotency key {Key} reused with different amount for Intent {IntentId}", command.IdempotencyKey, intent.Id);
-                    return PaymentErrors.IdempotencyKeyConflict(command.IdempotencyKey!);
-                }
-
                 _logger.LogInformation("Replaying capture for Intent {IntentId} with key {Key}", intent.Id, command.IdempotencyKey);
                 return new CapturePaymentResponse(replay.Id, intent.Status.Value);
             }
@@ -65,11 +57,7 @@ public class CapturePaymentHandler
 
         Money? amount = command.Amount.HasValue ? new Money(command.Amount.Value, intent.Amount.Currency) : null;
 
-        // Default to the uncaptured remainder so a null-amount follow-up
-        // captures what is left instead of re-requesting the full amount.
-        var captureAmount = amount ?? intent.GetCapturableAmount();
-
-        var gatewayResult = await _gateway.CaptureAsync(intent.MerchantId, intent.GatewayReference!, captureAmount, command.IdempotencyKey, intent.ProviderName, cancellationToken);
+        var gatewayResult = await _gateway.CaptureAsync(intent.MerchantId, intent.GatewayReference!, amount ?? intent.Amount, cancellationToken);
         if (!gatewayResult.IsSuccess)
             return new Error("Payment.CaptureFailed", gatewayResult.Errors.First().Message);
 

@@ -231,10 +231,6 @@ namespace Payment.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("ProviderName")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
                     b.Property<uint>("RowVersion")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()

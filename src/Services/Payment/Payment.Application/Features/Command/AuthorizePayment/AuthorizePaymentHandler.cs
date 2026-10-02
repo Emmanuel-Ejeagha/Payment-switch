@@ -63,7 +63,7 @@ public class AuthorizePaymentHandler
 
         // Merchant-initiated authorization of a stored intent: no cardholder present,
         // and the CVC from intent creation was never retained, so none is forwarded.
-        var gatewayResult = await _gateway.AuthorizeAsync(intent.MerchantId, intent.Amount, intent.CardDetails, idempotencyKey: command.IdempotencyKey, cancellationToken: cancellationToken);
+        var gatewayResult = await _gateway.AuthorizeAsync(intent.MerchantId, intent.Amount, intent.CardDetails, cancellationToken: cancellationToken);
         if (!gatewayResult.IsSuccess)
             return new Error("Payment.AuthorizationFailed", gatewayResult.Errors.First().Message);
 
@@ -75,12 +75,12 @@ public class AuthorizePaymentHandler
         {
             if (gwResponse.RequiresChallenge)
             {
-                intent.RequireAction(gatewayRef, gwResponse.ProviderName);
+                intent.RequireAction(gatewayRef);
             }
             else
             {
                 var authCode = new AuthorizationCode(gwResponse.AuthorizationCode!);
-                intent.Authorize(authCode, gatewayRef, command.IdempotencyKey, gwResponse.ProviderName);
+                intent.Authorize(authCode, gatewayRef, command.IdempotencyKey);
             }
         }
         catch (InvalidOperationException)

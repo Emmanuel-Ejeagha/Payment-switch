@@ -55,16 +55,18 @@ public class AuthController : BaseApiController
     }
 
     /// <summary>
-    /// Issue a new verification token and email it to the account (rate-limited).
-    /// The previous token, if any, is invalidated.
+    /// Issue a new verification token and queue it for email delivery (rate-limited).
+    /// The previous token, if any, is invalidated. Always returns 200 OK for valid
+    /// requests (unknown or already-verified addresses included) so the endpoint
+    /// cannot be used to enumerate accounts; 429 applies inside the resend cooldown.
     /// </summary>
     /// <param name="command">Email address of the unverified account.</param>
     /// <param name="handler">Handler injected via DI.</param>
-    /// <returns>200 OK when a new verification email was issued.</returns>
+    /// <returns>200 OK when the request was accepted; 429 inside the cooldown.</returns>
     [HttpPost("resend-verification")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> ResendVerification(
         [FromBody] ResendVerificationCommand command,
         [FromServices] ResendVerificationHandler handler)

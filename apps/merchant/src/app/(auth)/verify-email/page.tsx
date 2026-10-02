@@ -6,6 +6,11 @@ import { Suspense, useEffect, useState } from "react"
 import { AlertCircle, CheckCircle2, Loader2, MailCheck } from "lucide-react"
 import { AuthShell, inputClass, labelClass, submitClass } from "@/components/auth/auth-shell"
 import { authArtwork } from "@/lib/images"
+import {
+  NEUTRAL_RESEND_MESSAGE,
+  cooldownSecondsLeft,
+  parseRetryAfterSeconds,
+} from "@/lib/verification"
 
 type VerifyState =
   | { status: "verifying" }
@@ -25,6 +30,23 @@ function VerifyEmailContent() {
   const [resendEmail, setResendEmail] = useState(email)
   const [resending, setResending] = useState(false)
   const [resendMsg, setResendMsg] = useState<string | null>(null)
+  const [cooldownUntil, setCooldownUntil] = useState<number | null>(null)
+  const [nowMs, setNowMs] = useState(() => Date.now())
+
+  // Ticks the resend-cooldown countdown; stops once it lapses.
+  useEffect(() => {
+    if (cooldownUntil === null) return
+    const timer = window.setInterval(() => {
+      setNowMs(Date.now())
+      if (Date.now() >= (cooldownUntil ?? 0)) {
+        window.clearInterval(timer)
+        setCooldownUntil(null)
+      }
+    }, 1000)
+    return () => window.clearInterval(timer)
+  }, [cooldownUntil])
+
+  const cooldownLeft = cooldownSecondsLeft(cooldownUntil, nowMs)
 
   useEffect(() => {
     if (!token || !email) return
@@ -69,7 +91,7 @@ function VerifyEmailContent() {
   }, [email, token])
 
   const resend = async () => {
-    if (!resendEmail) return
+    if (!resendEmail || cooldownLeft > 0) return
     setResending(true)
     setResendMsg(null)
     try {
@@ -81,12 +103,19 @@ function VerifyEmailContent() {
           body: JSON.stringify({ email: resendEmail }),
         }
       )
+      if (res.status === 429) {
+        const body = await res.json()
+        const message = body.message ?? body.detail ?? "Please wait before requesting another email."
+        setResendMsg(message)
+        setCooldownUntil(Date.now() + parseRetryAfterSeconds(message) * 1000)
+        return
+      }
       if (!res.ok) {
         const body = await res.json()
         setResendMsg(body.message ?? body.detail ?? "Could not resend the email. Try again shortly.")
         return
       }
-      setResendMsg("A new verification email is on its way. Check your inbox.")
+      setResendMsg(NEUTRAL_RESEND_MESSAGE)
     } catch {
       setResendMsg("Backend unreachable. Please try again later.")
     } finally {
@@ -176,7 +205,7 @@ function VerifyEmailContent() {
                 <button
                   type="button"
                   onClick={resend}
-                  disabled={resending || !resendEmail}
+                  disabled={resending || !resendEmail || cooldownLeft > 0}
                   className={submitClass}
                 >
                   {resending ? (
@@ -184,6 +213,8 @@ function VerifyEmailContent() {
                       <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                       Sending…
                     </>
+                  ) : cooldownLeft > 0 ? (
+                    `Resend available in ${cooldownLeft}s`
                   ) : (
                     "Resend verification email"
                   )}

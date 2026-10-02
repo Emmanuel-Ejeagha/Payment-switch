@@ -22,10 +22,7 @@ public class MerchantRepository : IMerchantRepository
 
     public async Task<MerchantEntity?> GetByEmailAsync(string email, CancellationToken cancellationToken = default)
     {
-        // Mirror Identity's UserRepository: stored emails are normalized, so
-        // the lookup must trim/lowercase the input (and tolerate null) or a
-        // spaced/cased query misses its match.
-        var normalized = (email ?? string.Empty).Trim().ToLowerInvariant();
+        var normalized = email.ToLowerInvariant();
         return await _context.Merchants.FirstOrDefaultAsync(m => m.Email.Value == normalized, cancellationToken);
     }
 
@@ -42,19 +39,13 @@ public class MerchantRepository : IMerchantRepository
 
     public async Task<bool> ExistsByEmailAsync(string email, CancellationToken cancellationToken = default)
     {
-        var normalized = (email ?? string.Empty).Trim().ToLowerInvariant();
+        var normalized = email.ToLowerInvariant();
         return await _context.Merchants.AnyAsync(m => m.Email.Value == normalized, cancellationToken);
     }
 
-    public async Task<List<MerchantDto>> ListAsync(int skip, int take, string? search = null, CancellationToken cancellationToken = default)
+    public async Task<List<MerchantDto>> ListAsync(int skip, int take, CancellationToken cancellationToken = default)
     {
-        var query = _context.Merchants.AsQueryable();
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            var term = search.Trim().ToLowerInvariant();
-            query = query.Where(m => m.BusinessName.Value.ToLower().Contains(term) || m.Email.Value.ToLower().Contains(term));
-        }
-        return await query
+        return await _context.Merchants
             .OrderByDescending(m => m.CreatedAt)
             .Skip(skip).Take(take)
             .Select(m => new MerchantDto(
@@ -78,12 +69,9 @@ public class MerchantRepository : IMerchantRepository
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<int> CountAsync(string? search = null, CancellationToken cancellationToken = default)
+    public async Task<int> CountAsync(CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(search))
-            return await _context.Merchants.CountAsync(cancellationToken);
-        var term = search.Trim().ToLowerInvariant();
-        return await _context.Merchants.CountAsync(m => m.BusinessName.Value.ToLower().Contains(term) || m.Email.Value.ToLower().Contains(term), cancellationToken);
+        return await _context.Merchants.CountAsync(cancellationToken);
     }
 
     public async Task<MerchantEntity?> GetByIdWithApiKeysAsync(Guid id, CancellationToken cancellationToken = default)

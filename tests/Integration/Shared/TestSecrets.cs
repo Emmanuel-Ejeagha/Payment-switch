@@ -24,8 +24,8 @@ public static class TestSecrets
     public const string PostgresPassword = "integration-test-db-password";
 
     public const string JwtSecret = "integration-test-jwt-secret-32-bytes-min!";
-    public const string JwtAudience = "PaymentSwitch";
     public const string ServiceTokenSecret = "integration-test-service-secret-32bytes!";
+    public const string JwtAudience = "PaymentSwitch";
     public const string RabbitMqUserName = "integration-test";
     public const string RabbitMqPassword = "integration-test-rabbit-password";
     public const string WebhookSecretEncryptionKey = "integration-test-webhook-secret-encryption-key";

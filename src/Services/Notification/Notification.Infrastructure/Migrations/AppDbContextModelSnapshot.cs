@@ -81,6 +81,10 @@ namespace Notification.Infrastructure.Migrations
                     b.Property<DateTime?>("ProcessedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("Provider")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
                     b.Property<string>("Recipient")
                         .IsRequired()
                         .HasMaxLength(255)

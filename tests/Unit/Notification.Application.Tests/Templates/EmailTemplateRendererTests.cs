@@ -1,3 +1,4 @@
+using Notification.Application.Services;
 using Notification.Application.Templates;
 
 namespace Notification.Application.Tests.Templates;
@@ -61,5 +62,38 @@ public class EmailTemplateRendererTests
         Assert.StartsWith("<!DOCTYPE html>", html);
         Assert.Contains("This is an automated notification", html);
         Assert.Contains("automated notification", html);
+    }
+
+    [Fact]
+    public void RenderVerification_ContainsActionExpiryAndFallback()
+    {
+        var email = VerificationEmailBuilder.Build(
+            "user@example.com", "ABCDEF1234",
+            new DateTime(2026, 9, 30, 10, 0, 0, DateTimeKind.Utc),
+            new DateTime(2026, 10, 1, 10, 0, 0, DateTimeKind.Utc),
+            "Confirm your email address", "https://merchant.example.com");
+
+        var html = EmailTemplateRenderer.RenderVerification(email);
+
+        Assert.Contains("Confirm your email address", html);
+        Assert.Contains("Verify email", html);
+        Assert.Contains("https://merchant.example.com/verify-email?email=user%40example.com&amp;token=ABCDEF1234", html);
+        Assert.Contains("24 hours", html);
+        Assert.Contains("did not register", html);
+        Assert.Contains("PaymentSwitch", html);
+    }
+
+    [Fact]
+    public void RenderVerification_EscapesLinkAndExpiry()
+    {
+        var email = new VerificationEmail(
+            "user@example.com", "Confirm <b>it</b>", "body",
+            "https://example.com/verify?a=\"x\"", "24 <hours>");
+
+        var html = EmailTemplateRenderer.RenderVerification(email);
+
+        Assert.DoesNotContain("<b>it</b>", html);
+        Assert.DoesNotContain("a=\"x\"", html);
+        Assert.Contains("&lt;hours&gt;", html);
     }
 }

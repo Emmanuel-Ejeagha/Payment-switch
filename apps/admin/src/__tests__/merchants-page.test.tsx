@@ -27,7 +27,7 @@ describe("MerchantsPage search", () => {
       await Promise.resolve()
     })
     expect(fetchMock).toHaveBeenCalled()
-    const firstUrl = fetchMock.mock.calls[0][0] as string
+    const firstUrl = String(fetchMock.mock.calls[0]?.[0])
     expect(firstUrl).not.toContain("search=")
 
     fetchMock.mockClear()
@@ -45,7 +45,7 @@ describe("MerchantsPage search", () => {
       await Promise.resolve()
     })
     expect(fetchMock).toHaveBeenCalled()
-    const url = fetchMock.mock.calls[0][0] as string
+    const url = String(fetchMock.mock.calls[0]?.[0])
     expect(url).toContain("search=acme")
   })
 

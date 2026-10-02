@@ -117,6 +117,16 @@ spec:
                 configMapKeyRef:
                   name: payment-switch-config
                   key: Smtp__FromName
+            - name: EmailVerification__FrontendBaseUrl
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-switch-config
+                  key: EmailVerification__FrontendBaseUrl
+            - name: EmailVerification__ResendCooldownSeconds
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-switch-config
+                  key: EmailVerification__ResendCooldownSeconds
             - name: Seed__AdminEmail
               value: {{ $.Values.config.seed.adminEmail | quote }}
             - name: Seed__AdminPassword
@@ -168,6 +178,31 @@ spec:
                 configMapKeyRef:
                   name: payment-switch-config
                   key: Sms__Enabled
+            - name: Resend__ApiKey
+              valueFrom:
+                secretKeyRef:
+                  name: payment-switch-secret
+                  key: Resend__ApiKey
+            - name: Resend__FromEmail
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-switch-config
+                  key: Resend__FromEmail
+            - name: Resend__FromName
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-switch-config
+                  key: Resend__FromName
+            - name: Resend__TimeoutSeconds
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-switch-config
+                  key: Resend__TimeoutSeconds
+            - name: EmailVerification__FrontendBaseUrl
+              valueFrom:
+                configMapKeyRef:
+                  name: payment-switch-config
+                  key: EmailVerification__FrontendBaseUrl
             {{- end }}
             {{- if $svc.retentionBusinessDays }}
             - name: Retention__CleanupIntervalMinutes
@@ -196,7 +231,6 @@ spec:
               drop:
                 - ALL
             readOnlyRootFilesystem: true
-          # Step 9.5: probe timings match the k8s manifests exactly.
           startupProbe:
             httpGet:
               path: {{ $svc.probes.livenessPath }}
@@ -208,18 +242,14 @@ spec:
             httpGet:
               path: {{ $svc.probes.livenessPath }}
               port: {{ $svc.containerPort }}
-            initialDelaySeconds: 10
-            periodSeconds: 15
-            timeoutSeconds: 5
-            failureThreshold: 3
+            initialDelaySeconds: 15
+            periodSeconds: 10
           readinessProbe:
             httpGet:
               path: {{ $svc.probes.readinessPath }}
               port: {{ $svc.containerPort }}
-            initialDelaySeconds: 15
-            periodSeconds: 20
-            timeoutSeconds: 5
-            failureThreshold: 3
+            initialDelaySeconds: 10
+            periodSeconds: 5
 ---
 {{- end }}
 {{- end }}

@@ -1,6 +1,5 @@
 using Payment.Application.DTOs;
 using Payment.Domain.ValueObjects;
-using System.Collections.Concurrent;
 
 namespace Payment.Infrastructure.Services.Gateways;
 
@@ -8,11 +7,6 @@ public abstract class MockPaymentGatewayProvider : IPaymentGatewayProvider
 {
     private readonly string _declinedLastFour;
     private readonly string _challengeLastFour;
-
-    // Acquirer-side idempotency simulation: a repeated non-empty key returns the
-    // original response instead of moving money again. Real providers implement
-    // this durably; the mock keeps it process-scoped for tests and local runs.
-    private readonly ConcurrentDictionary<string, GatewayResponse> _idempotentResponses = new();
 
     protected MockPaymentGatewayProvider(string declinedLastFour, string challengeLastFour)
     {
@@ -22,76 +16,51 @@ public abstract class MockPaymentGatewayProvider : IPaymentGatewayProvider
 
     public abstract string Name { get; }
 
-    private Task<GatewayResponse> ExecuteOnce(string? idempotencyKey, Func<GatewayResponse> produce)
+    public Task<GatewayResponse> AuthorizeAsync(Guid merchantId, Money amount, CardDetails? cardDetails, CardSecurityCode? securityCode = null, CancellationToken cancellationToken = default)
     {
-        if (!string.IsNullOrWhiteSpace(idempotencyKey) && _idempotentResponses.TryGetValue(idempotencyKey, out var cached))
-            return Task.FromResult(cached);
+        if (IsDeclined(cardDetails))
+            return Task.FromResult(new GatewayResponse(false, null, null, $"Card ending {cardDetails!.LastFour} was declined by {Name}."));
 
-        var response = produce();
-
-        if (!string.IsNullOrWhiteSpace(idempotencyKey))
-            _idempotentResponses.TryAdd(idempotencyKey, response);
-
-        return Task.FromResult(response);
-    }
-
-    public Task<GatewayResponse> AuthorizeAsync(Guid merchantId, Money amount, CardDetails? cardDetails, CardSecurityCode? securityCode = null, string? idempotencyKey = null, CancellationToken cancellationToken = default)
-    {
-        return ExecuteOnce(idempotencyKey, () =>
-        {
-            if (IsDeclined(cardDetails))
-                return new GatewayResponse(false, null, null, $"Card ending {cardDetails!.LastFour} was declined by {Name}.");
-
-            if (RequiresChallenge(cardDetails))
-                return new GatewayResponse(
-                    true,
-                    null,
-                    $"{Name}-GW-{Guid.NewGuid().ToString("N")[..8]}",
-                    null,
-                    RequiresChallenge: true,
-                    ProviderName: Name);
-
-            return new GatewayResponse(
+        if (RequiresChallenge(cardDetails))
+            return Task.FromResult(new GatewayResponse(
                 true,
-                $"{Name}-AUTH-{Guid.NewGuid().ToString("N")[..8]}",
+                null,
                 $"{Name}-GW-{Guid.NewGuid().ToString("N")[..8]}",
                 null,
-                ProviderName: Name);
-        });
+                RequiresChallenge: true));
+
+        return Task.FromResult(new GatewayResponse(
+            true,
+            $"{Name}-AUTH-{Guid.NewGuid().ToString("N")[..8]}",
+            $"{Name}-GW-{Guid.NewGuid().ToString("N")[..8]}",
+            null));
     }
 
-    public Task<GatewayResponse> CaptureAsync(Guid merchantId, GatewayReference gatewayRef, Money amount, string? idempotencyKey = null, CancellationToken cancellationToken = default)
+    public Task<GatewayResponse> CaptureAsync(Guid merchantId, GatewayReference gatewayRef, Money amount, CancellationToken cancellationToken = default)
     {
-        return ExecuteOnce(idempotencyKey, () =>
-            new GatewayResponse(true, null, $"{Name}-CAP-{Guid.NewGuid().ToString("N")[..8]}", null, ProviderName: Name));
+        return Task.FromResult(new GatewayResponse(true, null, $"{Name}-CAP-{Guid.NewGuid().ToString("N")[..8]}", null));
     }
 
-    public Task<GatewayResponse> VoidAsync(Guid merchantId, GatewayReference gatewayRef, string? idempotencyKey = null, CancellationToken cancellationToken = default)
+    public Task<GatewayResponse> VoidAsync(Guid merchantId, GatewayReference gatewayRef, CancellationToken cancellationToken = default)
     {
-        return ExecuteOnce(idempotencyKey, () =>
-            new GatewayResponse(true, null, $"{Name}-VOID-{Guid.NewGuid().ToString("N")[..8]}", null, ProviderName: Name));
+        return Task.FromResult(new GatewayResponse(true, null, $"{Name}-VOID-{Guid.NewGuid().ToString("N")[..8]}", null));
     }
 
-    public Task<GatewayResponse> RefundAsync(Guid merchantId, GatewayReference gatewayRef, Money amount, string? idempotencyKey = null, CancellationToken cancellationToken = default)
+    public Task<GatewayResponse> RefundAsync(Guid merchantId, GatewayReference gatewayRef, Money amount, CancellationToken cancellationToken = default)
     {
-        return ExecuteOnce(idempotencyKey, () =>
-            new GatewayResponse(true, null, $"{Name}-REF-{Guid.NewGuid().ToString("N")[..8]}", null, ProviderName: Name));
+        return Task.FromResult(new GatewayResponse(true, null, $"{Name}-REF-{Guid.NewGuid().ToString("N")[..8]}", null));
     }
 
-    public Task<GatewayResponse> ConfirmChallengeAsync(Guid merchantId, Money amount, CardDetails? cardDetails, string gatewayReference, CardSecurityCode? securityCode = null, string? idempotencyKey = null, CancellationToken cancellationToken = default)
+    public Task<GatewayResponse> ConfirmChallengeAsync(Guid merchantId, Money amount, CardDetails? cardDetails, string gatewayReference, CardSecurityCode? securityCode = null, CancellationToken cancellationToken = default)
     {
-        return ExecuteOnce(idempotencyKey, () =>
-        {
-            if (IsDeclined(cardDetails))
-                return new GatewayResponse(false, null, null, $"Card ending {cardDetails!.LastFour} was declined by {Name}.");
+        if (IsDeclined(cardDetails))
+            return Task.FromResult(new GatewayResponse(false, null, null, $"Card ending {cardDetails!.LastFour} was declined by {Name}."));
 
-            return new GatewayResponse(
-                true,
-                $"{Name}-AUTH-{Guid.NewGuid().ToString("N")[..8]}",
-                gatewayReference,
-                null,
-                ProviderName: Name);
-        });
+        return Task.FromResult(new GatewayResponse(
+            true,
+            $"{Name}-AUTH-{Guid.NewGuid().ToString("N")[..8]}",
+            gatewayReference,
+            null));
     }
 
     private bool IsDeclined(CardDetails? cardDetails)

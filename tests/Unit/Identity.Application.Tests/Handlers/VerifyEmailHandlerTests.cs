@@ -103,7 +103,7 @@ public class VerifyEmailHandlerTests
     }
 
     [Fact]
-    public async Task Handle_UnknownUser_ShouldReturnSuccessWithoutRevealingExistence()
+    public async Task Handle_UnknownUser_ShouldReturnNotFound()
     {
         var command = new VerifyEmailCommand("missing@example.com", "plain-token");
         SetupValidatorSuccess(command);
@@ -112,8 +112,8 @@ public class VerifyEmailHandlerTests
 
         var result = await _handler.Handle(command);
 
-        Assert.True(result.IsSuccess);
-        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+        Assert.True(result.IsFailure);
+        Assert.Equal("Identity.UserNotFound", result.Errors[0].Code);
     }
 
     private void SetupValidatorSuccess(VerifyEmailCommand command)
@@ -132,7 +132,7 @@ public class VerifyEmailHandlerTests
         }
 
         if (tokenHash is not null && expiresAt is not null)
-            user.InitiateEmailVerification(tokenHash, expiresAt.Value);
+            user.InitiateEmailVerification(tokenHash, "plain-token", expiresAt.Value);
         return user;
     }
 }

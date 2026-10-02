@@ -9,12 +9,11 @@ public class RevokeMerchantApiKeyHandlerTests
     private readonly Mock<IUnitOfWork> _uowMock = new();
     private readonly Mock<IValidator<RevokeMerchantApiKeyCommand>> _validatorMock = new();
     private readonly Mock<ILogger<RevokeMerchantApiKeyHandler>> _loggerMock = new();
-    private readonly Mock<IApiKeyRevocationNotifier> _notifierMock = new();
     private readonly RevokeMerchantApiKeyHandler _handler;
 
     public RevokeMerchantApiKeyHandlerTests()
     {
-        _handler = new RevokeMerchantApiKeyHandler(_repoMock.Object, _uowMock.Object, _validatorMock.Object, _loggerMock.Object, _notifierMock.Object);
+        _handler = new RevokeMerchantApiKeyHandler(_repoMock.Object, _uowMock.Object, _validatorMock.Object, _loggerMock.Object);
     }
 
     [Fact]
@@ -71,34 +70,6 @@ public class RevokeMerchantApiKeyHandlerTests
 
         Assert.True(result.IsFailure);
         Assert.Equal("Merchant.Unauthorized", result.Errors[0].Code);
-    }
-
-    [Fact]
-    public async Task Handle_ExistingKey_ShouldNotifyPurge()
-    {
-        var merchant = CreateActiveMerchantWithKey(out var keyId);
-        var command = new RevokeMerchantApiKeyCommand(merchant.Id, keyId, OwnerCaller(merchant));
-        SetupValidatorSuccess(command);
-        _repoMock.Setup(r => r.GetByIdWithApiKeysAsync(merchant.Id, It.IsAny<CancellationToken>())).ReturnsAsync(merchant);
-        _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
-
-        var result = await _handler.Handle(command);
-
-        Assert.True(result.IsSuccess);
-        _notifierMock.Verify(n => n.NotifyRevokedAsync(merchant.Id, It.IsAny<CancellationToken>()), Times.Once);
-    }
-
-    [Fact]
-    public async Task Handle_Failure_ShouldNotNotifyPurge()
-    {
-        var command = new RevokeMerchantApiKeyCommand(Guid.NewGuid(), Guid.NewGuid(), new CallerContext(Guid.NewGuid(), null, false));
-        SetupValidatorSuccess(command);
-        _repoMock.Setup(r => r.GetByIdWithApiKeysAsync(command.MerchantId, It.IsAny<CancellationToken>())).ReturnsAsync((MerchantEntity?)null);
-
-        var result = await _handler.Handle(command);
-
-        Assert.True(result.IsFailure);
-        _notifierMock.Verify(n => n.NotifyRevokedAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     private CallerContext OwnerCaller(MerchantEntity merchant) => new(merchant.OwnerId, null, false);
