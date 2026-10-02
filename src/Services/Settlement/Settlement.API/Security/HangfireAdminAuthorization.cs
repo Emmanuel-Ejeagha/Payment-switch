@@ -1,4 +1,3 @@
-using BuildingBlocks.Shared.Auth;
 using Hangfire.Dashboard;
 using System.Security.Claims;
 
@@ -23,6 +22,6 @@ public static class HangfireAdminAuthorization
     public static bool IsAuthorized(ClaimsPrincipal? user)
     {
         return user?.Identity?.IsAuthenticated == true
-            && RoleNames.IsInRole(user, RoleNames.Admin);
+            && user.IsInRole("Admin");
     }
 }

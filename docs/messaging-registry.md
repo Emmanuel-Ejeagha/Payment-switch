@@ -22,7 +22,7 @@ if a consumer delivers business value, otherwise it is removed from the bus**
 |---|---|---:|---|
 | `payment.events` | Payment | Payment | Ledger, Notification |
 | `merchant.events` | Merchant + Ledger consumer | Merchant | Ledger |
-| `identity.events` | Identity | — (nothing published) | — |
+| `identity.events` | Identity | Identity | Notification |
 | `ledger.events` | Ledger | — (nothing published) | — |
 | `notification.events` | Notification | — (nothing published) | — |
 | `settlement.events` | Settlement | — (nothing published) | — |
@@ -42,10 +42,9 @@ cross-service value).
 | `PaymentRequiresActionDomainEvent` | removed | — | Webhook-only; no cross-service consumer |
 | `PaymentProcessingDomainEvent` | removed | — | Webhook-only; no cross-service consumer |
 | `PaymentCapturedDomainEvent` | consumed | Ledger, Notification | Ledger captures; webhook |
-| `PaymentVoidedDomainEvent` | consumed | Ledger, Notification | Ledger releases the reservation; merchant notified; webhook |
-| `PaymentFailedDomainEvent` | consumed | Notification | Merchant notified a payment failed; webhook |
+| `PaymentVoidedDomainEvent` | consumed | Notification | Merchant notified a payment was voided; webhook |
 | `PaymentRefundedDomainEvent` | consumed | Ledger, Notification | Ledger refunds; webhook |
-| `PaymentExpiredDomainEvent` | consumed | Notification | Merchant notified a payment expired; webhook |
+| `PaymentExpiredDomainEvent` | removed | — | No consumer, no webhook |
 | `SubscriptionCreatedDomainEvent` | removed | — | No consumer |
 | `SubscriptionRenewedDomainEvent` | removed | — | No consumer |
 | `SubscriptionPastDueDomainEvent` | removed | — | No consumer |
@@ -70,6 +69,7 @@ cross-service value).
 | EventType | Fate | Consumers | Notes |
 |---|---|---|---|
 | `UserRegisteredDomainEvent` | removed | — | No consumer |
+| `EmailVerificationRequestedDomainEvent` | consumed | Notification | Verification email via Resend; payload carries the raw single-use token (TTL-bounded, never logged) |
 | `ApiKeyGeneratedDomainEvent` | removed | — | No consumer |
 | `ApiKeyRevokedDomainEvent` | removed | — | No consumer |
 
@@ -100,9 +100,10 @@ cross-service value).
 
 | Queue | Source exchange | Routing keys | Consumer |
 |---|---|---|---|
-| `ledger.payment.events` | `payment.events` | `PaymentAuthorizedDomainEvent`, `PaymentCapturedDomainEvent`, `PaymentRefundedDomainEvent`, `PaymentVoidedDomainEvent` | Ledger `RabbitMQConsumerService` |
+| `ledger.payment.events` | `payment.events` | `PaymentAuthorizedDomainEvent`, `PaymentCapturedDomainEvent`, `PaymentRefundedDomainEvent` | Ledger `RabbitMQConsumerService` |
 | `ledger.merchant.events` | `merchant.events` | `MerchantOnboardedEvent` | Ledger `MerchantEventConsumerService` |
-| `notification.events` | `payment.events` | `PaymentAuthorizedDomainEvent`, `PaymentCapturedDomainEvent`, `PaymentRefundedDomainEvent`, `PaymentIntentCreatedDomainEvent`, `PaymentVoidedDomainEvent`, `PaymentFailedDomainEvent`, `PaymentExpiredDomainEvent` | Notification `RabbitMQConsumerService` |
+| `notification.events` | `payment.events` | `PaymentAuthorizedDomainEvent`, `PaymentCapturedDomainEvent`, `PaymentRefundedDomainEvent`, `PaymentIntentCreatedDomainEvent`, `PaymentVoidedDomainEvent` | Notification `RabbitMQConsumerService` |
+| `notification.events` | `identity.events` | `EmailVerificationRequestedDomainEvent` | Notification `RabbitMQConsumerService` (verification mail; skips merchant lookup, preference suppression, SignalR fan-out) |
 
 ## Implementation touchpoints
 

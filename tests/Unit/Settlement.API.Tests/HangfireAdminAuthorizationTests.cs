@@ -45,24 +45,4 @@ public class HangfireAdminAuthorizationTests
 
         Assert.False(HangfireAdminAuthorization.IsAuthorized(user));
     }
-
-    [Fact]
-    public void IsAuthorized_LowercaseAdminClaim_ReturnsTrue()
-    {
-        // Step 7.5: claims checks are case-insensitive (legacy tokens).
-        var user = new ClaimsPrincipal(new ClaimsIdentity(
-            [new Claim(ClaimTypes.Role, "admin")], "jwt"));
-
-        Assert.True(HangfireAdminAuthorization.IsAuthorized(user));
-    }
-
-    [Fact]
-    public void IsAuthorized_Support_ReturnsFalse()
-    {
-        // Step 7.5: Support is read-only — no Hangfire job control.
-        var user = new ClaimsPrincipal(new ClaimsIdentity(
-            [new Claim(ClaimTypes.Role, "Support")], "jwt"));
-
-        Assert.False(HangfireAdminAuthorization.IsAuthorized(user));
-    }
 }

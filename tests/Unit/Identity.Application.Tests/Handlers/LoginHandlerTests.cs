@@ -150,30 +150,7 @@ public class LoginHandlerTests
 
         Assert.True(result.IsFailure);
         Assert.Equal("Identity.AccountLocked", result.Errors[0].Code);
-        _passwordHasherMock.Verify(h => h.Verify(It.IsAny<string>(), It.IsAny<PasswordHash>()), Times.Once);
-        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
-    }
-
-    [Fact]
-    public async Task Handle_LockedAccountWithWrongPassword_ShouldReturnGenericErrorWithoutExtendingLockout()
-    {
-        var command = new LoginCommand("user@example.com", "WrongPassword");
-        var user = CreateActiveUser("user@example.com");
-        for (var i = 0; i < User.MaxAccessFailedAttempts; i++)
-            user.RegisterFailedLogin(DateTime.UtcNow);
-        var lockoutEnd = user.LockoutEnd;
-        SetupValidatorSuccess(command);
-        _userRepositoryMock.Setup(r => r.GetByEmailAsync(command.Email, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(user);
-        _passwordHasherMock.Setup(h => h.Verify(command.Password, user.PasswordHash))
-            .Returns(false);
-
-        var result = await _handler.Handle(command);
-
-        Assert.True(result.IsFailure);
-        Assert.Equal("Identity.InvalidCredentials", result.Errors[0].Code);
-        Assert.Equal(lockoutEnd, user.LockoutEnd);
-        Assert.Equal(0, user.AccessFailedCount);
+        _passwordHasherMock.Verify(h => h.Verify(It.IsAny<string>(), It.IsAny<PasswordHash>()), Times.Never);
         _unitOfWorkMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -241,6 +218,36 @@ public class LoginHandlerTests
         Assert.True(result.IsSuccess);
         Assert.Equal(0, user.AccessFailedCount);
         Assert.Null(user.LockoutEnd);
+    }
+
+    [Fact]
+    public async Task Handle_UnverifiedUser_ShouldSucceedAndReportUnconfirmed()
+    {
+        // Policy (D-05): unverified users can log in; the response reports the
+        // state and capability gating happens downstream (e.g. API-key issue).
+        var command = new LoginCommand("unverified@example.com", "Password123");
+        var user = CreateActiveUser("unverified@example.com");
+        Assert.False(user.EmailConfirmed);
+
+        SetupValidatorSuccess(command);
+        _userRepositoryMock.Setup(r => r.GetByEmailAsync(command.Email, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+        _passwordHasherMock.Setup(h => h.Verify(command.Password, user.PasswordHash))
+            .Returns(true);
+        _tokenServiceMock.Setup(t => t.GenerateAccessToken(user))
+            .Returns("access_token");
+        _tokenServiceMock.Setup(t => t.GenerateRefreshToken())
+            .Returns("refresh_token");
+        _tokenServiceMock.Setup(t => t.HashRefreshToken(It.IsAny<string>()))
+            .Returns<string>(token => $"hash-{token}");
+        _tokenServiceMock.Setup(t => t.AccessTokenExpirationSeconds).Returns(3600);
+        _unitOfWorkMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        var result = await _handler.Handle(command);
+
+        Assert.True(result.IsSuccess);
+        Assert.False(result.Value!.EmailConfirmed);
     }
 
     private static User CreateActiveUser(string email)

@@ -15,13 +15,11 @@ data:
   Smtp__Username: ""
   Smtp__FromAddress: "noreply@paymentswitch.com"
   Smtp__FromName: "PaymentSwitch"
+  Resend__FromEmail: "noreply@paymentswitch.com"
+  Resend__FromName: "PaymentSwitch"
+  Resend__TimeoutSeconds: "30"
+  EmailVerification__ResendCooldownSeconds: "60"
   Sms__Enabled: "false"
-  # Archival-sweep tuning (Step 9.5); per-service business-record retention
-  # differs, so it lives on the Deployments that run retention workers
-  # (payment/ledger 2557d, notification 90d).
-  Retention__CleanupIntervalMinutes: "60"
-  Retention__BatchSize: "100"
-  Retention__MessageRetentionDays: "7"
   # Frontend API base URL (inlined at build time, also injected at runtime so
   # the Next.js server-side API proxy reaches the right origin). HTTPS in prod.
   NEXT_PUBLIC_API_URL: "http://localhost"

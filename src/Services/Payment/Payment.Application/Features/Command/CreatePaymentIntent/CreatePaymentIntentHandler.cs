@@ -52,8 +52,6 @@ public class CreatePaymentIntentHandler
             // Same key must mean the same request: a different amount or
             // currency is a client bug, not a replay — fail loudly instead of
             // returning someone else's intent.
-            // Currency is checked first: it is cheaper and more discriminating
-            // than the amount comparison, so a currency mismatch short-circuits.
             if (!string.Equals(existing.Amount.Currency, command.Currency, StringComparison.OrdinalIgnoreCase)
                 || existing.Amount.Amount != command.Amount)
             {
@@ -96,7 +94,7 @@ public class CreatePaymentIntentHandler
         if (!configResult.IsSuccess)
             return new Error("Payment.MerchantConfigRetrievalFailed", "Unable to retrieve merchant configuration.");
 
-        var authResult = await _gateway.AuthorizeAsync(intent.MerchantId, intent.Amount, intent.CardDetails, securityCode, idempotencyKey.Value, cancellationToken: cancellationToken);
+        var authResult = await _gateway.AuthorizeAsync(intent.MerchantId, intent.Amount, intent.CardDetails, securityCode, cancellationToken);
         if (!authResult.IsSuccess)
         {
             intent.Fail();
@@ -127,15 +125,15 @@ public class CreatePaymentIntentHandler
 
         if (gwResponse.RequiresChallenge)
         {
-            intent.RequireAction(gatewayRef, gwResponse.ProviderName);
+            intent.RequireAction(gatewayRef);
         }
         else
         {
             var authCode = new AuthorizationCode(gwResponse.AuthorizationCode!);
-            intent.Authorize(authCode, gatewayRef, idempotencyKey.Value, gwResponse.ProviderName);
+            intent.Authorize(authCode, gatewayRef);
 
             if (configResult.Value!.AutoCapture)
-                intent.Capture(idempotencyKey: DeriveCaptureKey(idempotencyKey.Value));
+                intent.Capture();
         }
 
         await _unitOfWork.BeginTransactionAsync(cancellationToken);
@@ -188,12 +186,4 @@ public class CreatePaymentIntentHandler
         "MobileMoney" => PaymentMethod.MobileMoney,
         _ => throw new ArgumentException($"Unknown payment method: {method}")
     };
-
-    internal static string DeriveCaptureKey(string baseKey)
-    {
-        const string suffix = "-capture";
-        if (baseKey.Length + suffix.Length <= IdempotencyKey.MaxLength)
-            return baseKey + suffix;
-        return baseKey.Substring(0, IdempotencyKey.MaxLength - suffix.Length) + suffix;
-    }
 }

@@ -34,6 +34,9 @@ public static class IdentityErrors
     public static Error VerificationTokenExpired =>
         new("Identity.VerificationTokenExpired", "This verification link has expired. Request a new one.");
 
+    public static Error VerificationResendThrottled(int retryAfterSeconds) =>
+        new("Identity.VerificationResendThrottled", $"A verification email was sent recently. Please wait {retryAfterSeconds} seconds before requesting another.");
+
     public static Error InvalidCurrentPassword =>
         new("Identity.InvalidCurrentPassword", "The current password is incorrect.");
 
@@ -42,7 +45,4 @@ public static class IdentityErrors
 
     public static Error PasswordResetTokenExpired =>
         new("Identity.PasswordResetTokenExpired", "This password reset link has expired. Request a new one.");
-
-    public static Error ConcurrencyConflict =>
-        new("Identity.ConcurrencyConflict", "A concurrent update was detected. Please retry.");
 }

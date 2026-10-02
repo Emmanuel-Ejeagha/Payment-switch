@@ -47,6 +47,9 @@ namespace Identity.Infrastructure.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
+                    b.Property<DateTime?>("LastVerificationEmailSentAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTime?>("LockoutEnd")
                         .HasColumnType("timestamp with time zone");
 
@@ -60,12 +63,6 @@ namespace Identity.Infrastructure.Migrations
                     b.Property<string>("Roles")
                         .IsRequired()
                         .HasColumnType("jsonb");
-
-                    b.Property<uint>("RowVersion")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("xid")
-                        .HasColumnName("xmin");
 
                     b.HasKey("Id");
 
@@ -188,12 +185,6 @@ namespace Identity.Infrastructure.Migrations
 
                             b1.Property<bool>("IsRevoked")
                                 .HasColumnType("boolean");
-
-                            b1.Property<uint>("RowVersion")
-                                .IsConcurrencyToken()
-                                .ValueGeneratedOnAddOrUpdate()
-                                .HasColumnType("xid")
-                                .HasColumnName("xmin");
 
                             b1.Property<Guid>("UserId")
                                 .HasColumnType("uuid");

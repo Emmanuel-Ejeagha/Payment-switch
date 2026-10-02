@@ -27,28 +27,21 @@ export default function LedgerPage() {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [skip, setSkip] = useState(0)
-  const [retryKey, setRetryKey] = useState(0)
   const take = 10
 
   useEffect(() => {
     async function loadMerchants() {
-      try {
-        const res = await fetch(apiUrl("/api/proxy/merchant/api/v1/merchants?skip=0&take=100"))
-        if (res.ok) {
-          const list: MerchantDto[] = await res.json()
-          setMerchants(list)
-          if (list.length > 0 && !selectedMerchantId) {
-            setSelectedMerchantId(list[0].id)
-          }
-        } else {
-          setLoadError(`Failed to load merchants (${res.status})`)
+      const res = await fetch(apiUrl("/api/proxy/merchant/api/v1/merchants?skip=0&take=100"))
+      if (res.ok) {
+        const list: MerchantDto[] = await res.json()
+        setMerchants(list)
+        if (list.length > 0 && !selectedMerchantId) {
+          setSelectedMerchantId(list[0].id)
         }
-      } catch (e) {
-        setLoadError(e instanceof Error ? e.message : "Failed to load merchants")
       }
     }
     loadMerchants()
-  }, [retryKey])
+  }, [])
 
   useEffect(() => {
     if (!selectedMerchantId) return
@@ -67,14 +60,12 @@ export default function LedgerPage() {
         }
         if (txRes.ok) setTransactions(await txRes.json())
         if (!balRes.ok || !txRes.ok) setLoadError("Could not load ledger data")
-      } catch (e) {
-        setLoadError(e instanceof Error ? e.message : "Failed to load ledger data")
       } finally {
         setLoading(false)
       }
     }
     loadLedger()
-  }, [selectedMerchantId, skip, retryKey])
+  }, [selectedMerchantId, skip])
 
   const selectedMerchant = merchants.find((m) => m.id === selectedMerchantId)
 
@@ -210,15 +201,8 @@ export default function LedgerPage() {
           </div>
         </>
       ) : loadError ? (
-        <div role="alert" className="rounded-xl border border-destructive/50 bg-destructive/10 p-6 text-destructive">
+        <div className="rounded-xl border border-destructive/50 bg-destructive/10 p-6 text-destructive">
           <p className="font-medium">Could not load ledger data</p>
-          <p className="mt-1 text-sm">{loadError}</p>
-          <button
-            onClick={() => setRetryKey((k) => k + 1)}
-            className="mt-3 rounded-lg bg-destructive px-3 py-1.5 text-sm font-medium text-destructive-foreground hover:bg-destructive/90"
-          >
-            Retry
-          </button>
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-16 text-center">

@@ -10,12 +10,16 @@ namespace Identity.Infrastructure.Outbox;
 public class OutboxInterceptor : SaveChangesInterceptor
 {
     /// <summary>
-    /// Event types with a real RabbitMQ consumer. Empty: this service currently
-    /// publishes nothing onto the bus — its domain events have no consumer, so
-    /// writing them to the outbox would drop them into a void.
+    /// Event types with a real RabbitMQ consumer. `EmailVerificationRequested`
+    /// is consumed by the Notification service (verification email via Resend);
+    /// every other Identity domain event has no consumer and is intentionally
+    /// not written to the outbox (no dead messages).
     /// See docs/messaging-registry.md.
     /// </summary>
-    private static readonly HashSet<string> PublishedEventTypes = new();
+    private static readonly HashSet<string> PublishedEventTypes = new()
+    {
+        "EmailVerificationRequestedDomainEvent"
+    };
 
     private readonly ICorrelationIdProvider _correlationIdProvider;
 

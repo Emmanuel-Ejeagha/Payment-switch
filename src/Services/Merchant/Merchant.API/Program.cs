@@ -90,7 +90,7 @@ builder.Services.AddMerchantApplication();
 builder.Services.AddMerchantInfrastructure(builder.Configuration);
 
 builder.Services.AddCorrelationId();
-builder.Services.AddPaymentSwitchRateLimiting(builder.Configuration);
+builder.Services.AddPaymentSwitchRateLimiting();
 builder.Services.AddPaymentSwitchVersioning();
 builder.Services.AddPaymentSwitchOutputCache();
 

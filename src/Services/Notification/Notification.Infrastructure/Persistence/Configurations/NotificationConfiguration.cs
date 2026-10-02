@@ -19,6 +19,7 @@ public class NotificationConfiguration : IEntityTypeConfiguration<NotificationEn
         builder.Property(n => n.Body);
         builder.Property(n => n.WebhookUrl).HasMaxLength(500);
         builder.Property(n => n.Payload).IsRequired().HasColumnType("jsonb");
+        builder.Property(n => n.Provider).HasMaxLength(32);
         builder.Property(n => n.Status)
             .HasConversion(s => s.Value, s => NotificationStatus.FromString(s))
             .IsRequired();

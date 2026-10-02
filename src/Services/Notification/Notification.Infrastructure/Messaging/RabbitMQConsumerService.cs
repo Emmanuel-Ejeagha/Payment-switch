@@ -5,8 +5,11 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Notification.Application.Features.Commands.CreateNotification;
+using Notification.Application.Configuration;
 using Notification.Application.Interfaces;
 using Notification.Application.Messaging;
+using Notification.Application.Services;
+using Notification.Domain;
 using Notification.Application.Services;
 using Notification.Infrastructure.Inbox;
 using Notification.Infrastructure.Persistence;
@@ -25,6 +28,7 @@ public class RabbitMQConsumerService : BackgroundService
     private readonly ICorrelationIdProvider _correlationIdProvider;
     private readonly ILogger<RabbitMQConsumerService> _logger;
     private readonly RabbitMQSettings _settings;
+    private readonly VerificationEmailOptions _verificationOptions;
     private IConnection? _connection;
     private IChannel? _channel;
     private readonly string _queueName = "notification.events";
@@ -33,10 +37,12 @@ public class RabbitMQConsumerService : BackgroundService
     private readonly string _dlxExchange = "notification.events.dlx";
     private readonly string _dlq = "notification.events.dlq";
     private readonly string _sourceExchange = "payment.events";
+    private readonly string _identityExchange = "identity.events";
 
 
     public RabbitMQConsumerService(
         IOptions<RabbitMQSettings> settings,
+        IOptions<VerificationEmailOptions> verificationOptions,
         IServiceScopeFactory scopeFactory,
         ICorrelationIdProvider correlationIdProvider,
         ILogger<RabbitMQConsumerService> logger)
@@ -45,6 +51,7 @@ public class RabbitMQConsumerService : BackgroundService
         _correlationIdProvider = correlationIdProvider;
         _logger = logger;
         _settings = settings.Value;
+        _verificationOptions = verificationOptions.Value;
     }
 
     /// <summary>
@@ -116,8 +123,12 @@ public class RabbitMQConsumerService : BackgroundService
         await _channel.QueueBindAsync(_dlq, _dlxExchange, "#", null, cancellationToken: cancellationToken);
 
         await _channel.QueueDeclareAsync(_queueName, durable: true, exclusive: false, autoDelete: false, cancellationToken: cancellationToken);
-        foreach (var routingKey in PaymentEventChannels.NotificationBoundPaymentEvents)
-            await _channel.QueueBindAsync(_queueName, _sourceExchange, routingKey, null, cancellationToken: cancellationToken);
+        await _channel.QueueBindAsync(_queueName, _sourceExchange, "PaymentAuthorizedDomainEvent", null, cancellationToken: cancellationToken);
+        await _channel.QueueBindAsync(_queueName, _sourceExchange, "PaymentCapturedDomainEvent", null, cancellationToken: cancellationToken);
+        await _channel.QueueBindAsync(_queueName, _sourceExchange, "PaymentRefundedDomainEvent", null, cancellationToken: cancellationToken);
+        await _channel.QueueBindAsync(_queueName, _sourceExchange, "PaymentIntentCreatedDomainEvent", null, cancellationToken: cancellationToken);
+        await _channel.QueueBindAsync(_queueName, _sourceExchange, "PaymentVoidedDomainEvent", null, cancellationToken: cancellationToken);
+        await _channel.QueueBindAsync(_queueName, _identityExchange, NotificationEventTypes.EmailVerificationRequested, null, cancellationToken: cancellationToken);
 
         var consumer = new AsyncEventingBasicConsumer(_channel);
         consumer.ReceivedAsync += async (sender, ea) =>
@@ -198,22 +209,15 @@ public class RabbitMQConsumerService : BackgroundService
                             recipient => PaymentEventMapper.MapVoided(voidedEvent, recipient, body), cancellationToken);
                         break;
 
-                    case "PaymentFailedDomainEvent":
-                        var failedEvent = JsonSerializer.Deserialize<PaymentFailedEvent>(body)!;
-                        merchantId = failedEvent.MerchantId;
-                        command = await ResolveCommandAsync(merchantContacts, eventType, failedEvent.MerchantId,
-                            recipient => PaymentEventMapper.MapFailed(failedEvent, recipient, body), cancellationToken);
-                        break;
-
-                    case "PaymentExpiredDomainEvent":
-                        var expiredEvent = JsonSerializer.Deserialize<PaymentExpiredEvent>(body)!;
-                        merchantId = expiredEvent.MerchantId;
-                        command = await ResolveCommandAsync(merchantContacts, eventType, expiredEvent.MerchantId,
-                            recipient => PaymentEventMapper.MapExpired(expiredEvent, recipient, body), cancellationToken);
+                    case NotificationEventTypes.EmailVerificationRequested:
+                        command = BuildVerificationCommand(body);
                         break;
                 }
 
-                if (command != null && await IsSuppressedAsync(preferenceRepo, command, eventType, cancellationToken))
+                // Verification mail is transactional: never preference-gated and
+                // never fanned out over SignalR (no merchant context).
+                if (command != null && eventType != NotificationEventTypes.EmailVerificationRequested &&
+                    await IsSuppressedAsync(preferenceRepo, command, eventType, cancellationToken))
                 {
                     _logger.LogInformation("Notification suppressed for {Recipient} ({EventType}) by preference", command.Recipient, eventType);
                 }
@@ -328,6 +332,38 @@ public class RabbitMQConsumerService : BackgroundService
             _logger.LogError("Message {MessageId} failed after {MaxRetries} retries; moved to DLQ",
                 messageId, MessageRetryPolicy.MaxRetries);
         }
+    }
+
+    /// <summary>
+    /// Builds the verification notification directly from the event: the
+    /// recipient IS the address (no merchant lookup), delivery rides the
+    /// Resend provider hint, and presentation is owned by the verification
+    /// template. Malformed payloads throw into the standard retry → DLQ path.
+    /// </summary>
+    private CreateNotificationCommand BuildVerificationCommand(string body)
+    {
+        var verificationEvent = JsonSerializer.Deserialize<EmailVerificationRequestedEvent>(body)
+            ?? throw new InvalidOperationException("Empty verification event payload.");
+        if (string.IsNullOrWhiteSpace(verificationEvent.Email) || string.IsNullOrWhiteSpace(verificationEvent.Token))
+            throw new InvalidOperationException("Verification event payload is missing email or token.");
+
+        var content = VerificationEmailBuilder.Build(
+            verificationEvent.Email,
+            verificationEvent.Token,
+            verificationEvent.IssuedAtUtc,
+            verificationEvent.ExpiresAtUtc,
+            _verificationOptions.Subject,
+            _verificationOptions.FrontendBaseUrl);
+
+        return new CreateNotificationCommand(
+            verificationEvent.Email,
+            "email",
+            content.Subject,
+            content.TextBody,
+            null,
+            body,
+            MaxRetries: 5,
+            Provider: NotificationProviders.Resend);
     }
 
     private async Task<bool> IsSuppressedAsync(

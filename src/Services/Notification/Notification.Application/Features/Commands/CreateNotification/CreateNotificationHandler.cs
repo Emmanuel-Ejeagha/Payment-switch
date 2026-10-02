@@ -43,7 +43,8 @@ public class CreateNotificationHandler
             command.Body,
             command.WebhookUrl,
             command.Payload,
-            command.MaxRetries ?? 5);
+            command.MaxRetries ?? 5,
+            command.Provider);
 
         await _repository.AddAsync(notification, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);

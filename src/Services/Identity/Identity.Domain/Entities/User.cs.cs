@@ -1,7 +1,8 @@
 ﻿using BuildingBlocks.Shared.Aggregate;
-using BuildingBlocks.Shared.Auth;
 using Identity.Domain.DomainEvents;
 using Identity.Domain.ValueObjects;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Identity.Domain.Entities;
 
@@ -15,11 +16,11 @@ public class User : AggregateRoot
     public DateTime? EmailVerifiedAt { get; private set; }
     public string? EmailVerificationTokenHash { get; private set; }
     public DateTime? EmailVerificationTokenExpiresAt { get; private set; }
+    public DateTime? LastVerificationEmailSentAtUtc { get; private set; }
     public string? PasswordResetTokenHash { get; private set; }
     public DateTime? PasswordResetTokenExpiresAt { get; private set; }
     public int AccessFailedCount { get; private set; }
     public DateTime? LockoutEnd { get; private set; }
-    public uint RowVersion { get; private set; }
     private readonly List<string> _roles = new();
     private readonly List<TokenValue> _refreshTokens = new();
     public IReadOnlyList<string> Roles => _roles.AsReadOnly();
@@ -33,7 +34,7 @@ public class User : AggregateRoot
         PasswordHash = passwordHash ?? throw new ArgumentNullException(nameof(passwordHash));
         FullName = fullName ?? throw new ArgumentNullException(nameof(fullName));
         IsActive = true;
-        _roles = new List<string> { RoleNames.Merchant }; // default role
+        _roles = new List<string> { "Merchant" }; // default role
         AddDomainEvent(new UserRegisteredDomainEvent(Id, email.Value, fullName.Value));
     }
 
@@ -81,20 +82,39 @@ public class User : AggregateRoot
 
     /// <summary>
     /// Registers a new verification token for an unconfirmed email, replacing any
-    /// outstanding token (so a resend invalidates the previous one).
+    /// outstanding token (so a resend invalidates the previous one), and raises
+    /// <see cref="EmailVerificationRequestedDomainEvent"/> so the Notification
+    /// service delivers it via the outbox. The raw token travels only in the
+    /// event payload — storage keeps the hash.
     /// </summary>
-    public void InitiateEmailVerification(string tokenHash, DateTime expiresAtUtc)
+    public void InitiateEmailVerification(string tokenHash, string plainToken, DateTime expiresAtUtc)
     {
         if (EmailConfirmed)
             throw new InvalidOperationException("Email is already confirmed.");
 
         EmailVerificationTokenHash = tokenHash ?? throw new ArgumentNullException(nameof(tokenHash));
+        if (string.IsNullOrWhiteSpace(plainToken))
+            throw new ArgumentNullException(nameof(plainToken));
         EmailVerificationTokenExpiresAt = expiresAtUtc;
+        var issuedAtUtc = DateTime.UtcNow;
+        AddDomainEvent(new EmailVerificationRequestedDomainEvent(
+            Id, Email.Value, plainToken, issuedAtUtc, expiresAtUtc));
     }
+
+    /// <summary>
+    /// Records that a verification email was accepted for delivery (outbox).
+    /// Separate from issuance so the cooldown check stays deterministic and
+    /// testable; called by the registration/resend handlers after issuing.
+    /// The optional timestamp exists for tests simulating an aged send.
+    /// </summary>
+    public void RecordVerificationEmailSent(DateTime? sentAtUtc = null) =>
+        LastVerificationEmailSentAtUtc = sentAtUtc ?? DateTime.UtcNow;
 
     /// <summary>
     /// Attempts to confirm the email with the supplied hashed token.
     /// The token is single-use: a successful confirmation clears it.
+    /// Comparison is constant-time so response latency reveals nothing about
+    /// how much of a guessed hash matches.
     /// </summary>
     public EmailVerificationResult VerifyEmail(string tokenHash)
     {
@@ -104,7 +124,7 @@ public class User : AggregateRoot
         if (string.IsNullOrEmpty(EmailVerificationTokenHash))
             return EmailVerificationResult.NoToken;
 
-        if (!string.Equals(EmailVerificationTokenHash, tokenHash, StringComparison.Ordinal))
+        if (!FixedTimeHashEquals(EmailVerificationTokenHash, tokenHash))
             return EmailVerificationResult.InvalidToken;
 
         if (EmailVerificationTokenExpiresAt is null || EmailVerificationTokenExpiresAt < DateTime.UtcNow)
@@ -115,6 +135,17 @@ public class User : AggregateRoot
         EmailVerificationTokenHash = null;
         EmailVerificationTokenExpiresAt = null;
         return EmailVerificationResult.Success;
+    }
+
+    private static bool FixedTimeHashEquals(string expected, string actual)
+    {
+        if (actual is null)
+            return false;
+        var expectedBytes = Encoding.UTF8.GetBytes(expected);
+        var actualBytes = Encoding.UTF8.GetBytes(actual);
+        if (expectedBytes.Length != actualBytes.Length)
+            return false;
+        return CryptographicOperations.FixedTimeEquals(expectedBytes, actualBytes);
     }
 
     /// <summary>
@@ -133,7 +164,7 @@ public class User : AggregateRoot
 
     /// <summary>
     /// Deactivates the account and revokes every refresh token, so a
-    /// suspended user cannot keep minting access tokens (see Step 2.1).
+    /// suspended user cannot keep minting access tokens.
     /// </summary>
     public void Deactivate()
     {
@@ -175,26 +206,15 @@ public class User : AggregateRoot
         LockoutEnd = null;
     }
 
-    /// <summary>
-    /// Adds a role, normalizing to canonical casing (Step 7.5: roles are
-    /// case-insensitive — "admin" and " Admin " both store "Admin", never a
-    /// duplicate). Throws on unknown roles; validate user input with the
-    /// command validator first.
-    /// </summary>
     public void AddRole(string role)
     {
-        var canonical = RoleNames.Normalize(role)
-            ?? throw new ArgumentException($"Unknown role '{role}'.", nameof(role));
-        if (!HasRole(canonical))
-            _roles.Add(canonical);
+        if (!_roles.Contains(role))
+            _roles.Add(role);
     }
 
     public void RemoveRole(string role)
     {
-        var canonical = RoleNames.Normalize(role);
-        if (canonical is null)
-            return;
-        _roles.RemoveAll(r => string.Equals(r, canonical, StringComparison.OrdinalIgnoreCase));
+        _roles.Remove(role);
     }
 
     /// <summary>Case-insensitive role membership check.</summary>

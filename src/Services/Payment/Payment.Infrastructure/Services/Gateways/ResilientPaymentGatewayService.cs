@@ -22,9 +22,9 @@ public class ResilientPaymentGatewayService : IPaymentGatewayService
         _logger = logger;
     }
 
-    public async Task<Result<GatewayResponse>> AuthorizeAsync(Guid merchantId, Money amount, CardDetails? cardDetails, CardSecurityCode? securityCode = null, string? idempotencyKey = null, string? providerName = null, CancellationToken cancellationToken = default)
+    public async Task<Result<GatewayResponse>> AuthorizeAsync(Guid merchantId, Money amount, CardDetails? cardDetails, CardSecurityCode? securityCode = null, CancellationToken cancellationToken = default)
     {
-        var ordered = OrderProviders(amount, cardDetails, providerName);
+        var ordered = _router.Resolve(amount, cardDetails, _registry.All);
 
         foreach (var entry in ordered)
         {
@@ -36,11 +36,11 @@ public class ResilientPaymentGatewayService : IPaymentGatewayService
 
             try
             {
-                var response = await entry.Provider.AuthorizeAsync(merchantId, amount, cardDetails, securityCode, idempotencyKey, cancellationToken);
+                var response = await entry.Provider.AuthorizeAsync(merchantId, amount, cardDetails, securityCode, cancellationToken);
                 if (response.Success)
                 {
                     entry.CircuitBreaker.RecordSuccess();
-                    return Result<GatewayResponse>.Success(response with { ProviderName = response.ProviderName ?? entry.Provider.Name });
+                    return Result<GatewayResponse>.Success(response);
                 }
 
                 entry.CircuitBreaker.RecordFailure();
@@ -56,9 +56,9 @@ public class ResilientPaymentGatewayService : IPaymentGatewayService
         return new Error("Payment.GatewayUnavailable", "All payment gateways are unavailable.");
     }
 
-    public async Task<Result<GatewayResponse>> ConfirmChallengeAsync(Guid merchantId, Money amount, CardDetails? cardDetails, string gatewayReference, CardSecurityCode? securityCode = null, string? idempotencyKey = null, string? providerName = null, CancellationToken cancellationToken = default)
+    public async Task<Result<GatewayResponse>> ConfirmChallengeAsync(Guid merchantId, Money amount, CardDetails? cardDetails, string gatewayReference, CardSecurityCode? securityCode = null, CancellationToken cancellationToken = default)
     {
-        var ordered = OrderProviders(amount, cardDetails, providerName);
+        var ordered = _router.Resolve(amount, cardDetails, _registry.All);
 
         foreach (var entry in ordered)
         {
@@ -70,11 +70,11 @@ public class ResilientPaymentGatewayService : IPaymentGatewayService
 
             try
             {
-                var response = await entry.Provider.ConfirmChallengeAsync(merchantId, amount, cardDetails, gatewayReference, securityCode, idempotencyKey, cancellationToken);
+                var response = await entry.Provider.ConfirmChallengeAsync(merchantId, amount, cardDetails, gatewayReference, securityCode, cancellationToken);
                 if (response.Success)
                 {
                     entry.CircuitBreaker.RecordSuccess();
-                    return Result<GatewayResponse>.Success(response with { ProviderName = response.ProviderName ?? entry.Provider.Name });
+                    return Result<GatewayResponse>.Success(response);
                 }
 
                 entry.CircuitBreaker.RecordFailure();
@@ -90,9 +90,9 @@ public class ResilientPaymentGatewayService : IPaymentGatewayService
         return new Error("Payment.GatewayUnavailable", "All payment gateways are unavailable.");
     }
 
-    public async Task<Result<GatewayResponse>> CaptureAsync(Guid merchantId, GatewayReference gatewayRef, Money amount, string? idempotencyKey = null, string? providerName = null, CancellationToken cancellationToken = default)
+    public async Task<Result<GatewayResponse>> CaptureAsync(Guid merchantId, GatewayReference gatewayRef, Money amount, CancellationToken cancellationToken = default)
     {
-        var ordered = OrderProviders(amount, null, providerName);
+        var ordered = _router.Resolve(amount, null, _registry.All);
 
         foreach (var entry in ordered)
         {
@@ -104,11 +104,11 @@ public class ResilientPaymentGatewayService : IPaymentGatewayService
 
             try
             {
-                var response = await entry.Provider.CaptureAsync(merchantId, gatewayRef, amount, idempotencyKey, cancellationToken);
+                var response = await entry.Provider.CaptureAsync(merchantId, gatewayRef, amount, cancellationToken);
                 if (response.Success)
                 {
                     entry.CircuitBreaker.RecordSuccess();
-                    return Result<GatewayResponse>.Success(response with { ProviderName = response.ProviderName ?? entry.Provider.Name });
+                    return Result<GatewayResponse>.Success(response);
                 }
 
                 entry.CircuitBreaker.RecordFailure();
@@ -124,9 +124,9 @@ public class ResilientPaymentGatewayService : IPaymentGatewayService
         return new Error("Payment.GatewayUnavailable", "All payment gateways are unavailable.");
     }
 
-    public async Task<Result<GatewayResponse>> VoidAsync(Guid merchantId, GatewayReference gatewayRef, string? idempotencyKey = null, string? providerName = null, CancellationToken cancellationToken = default)
+    public async Task<Result<GatewayResponse>> VoidAsync(Guid merchantId, GatewayReference gatewayRef, CancellationToken cancellationToken = default)
     {
-        var ordered = OrderProviders(new Money(0, "NGN"), null, providerName);
+        var ordered = _router.Resolve(new Money(0, "NGN"), null, _registry.All);
 
         foreach (var entry in ordered)
         {
@@ -138,11 +138,11 @@ public class ResilientPaymentGatewayService : IPaymentGatewayService
 
             try
             {
-                var response = await entry.Provider.VoidAsync(merchantId, gatewayRef, idempotencyKey, cancellationToken);
+                var response = await entry.Provider.VoidAsync(merchantId, gatewayRef, cancellationToken);
                 if (response.Success)
                 {
                     entry.CircuitBreaker.RecordSuccess();
-                    return Result<GatewayResponse>.Success(response with { ProviderName = response.ProviderName ?? entry.Provider.Name });
+                    return Result<GatewayResponse>.Success(response);
                 }
 
                 entry.CircuitBreaker.RecordFailure();
@@ -158,9 +158,9 @@ public class ResilientPaymentGatewayService : IPaymentGatewayService
         return new Error("Payment.GatewayUnavailable", "All payment gateways are unavailable.");
     }
 
-    public async Task<Result<GatewayResponse>> RefundAsync(Guid merchantId, GatewayReference gatewayRef, Money amount, string? idempotencyKey = null, string? providerName = null, CancellationToken cancellationToken = default)
+    public async Task<Result<GatewayResponse>> RefundAsync(Guid merchantId, GatewayReference gatewayRef, Money amount, CancellationToken cancellationToken = default)
     {
-        var ordered = OrderProviders(amount, null, providerName);
+        var ordered = _router.Resolve(amount, null, _registry.All);
 
         foreach (var entry in ordered)
         {
@@ -172,11 +172,11 @@ public class ResilientPaymentGatewayService : IPaymentGatewayService
 
             try
             {
-                var response = await entry.Provider.RefundAsync(merchantId, gatewayRef, amount, idempotencyKey, cancellationToken);
+                var response = await entry.Provider.RefundAsync(merchantId, gatewayRef, amount, cancellationToken);
                 if (response.Success)
                 {
                     entry.CircuitBreaker.RecordSuccess();
-                    return Result<GatewayResponse>.Success(response with { ProviderName = response.ProviderName ?? entry.Provider.Name });
+                    return Result<GatewayResponse>.Success(response);
                 }
 
                 entry.CircuitBreaker.RecordFailure();
@@ -190,23 +190,5 @@ public class ResilientPaymentGatewayService : IPaymentGatewayService
         }
 
         return new Error("Payment.GatewayUnavailable", "All payment gateways are unavailable.");
-    }
-
-    private IReadOnlyList<GatewayProviderEntry> OrderProviders(Money amount, CardDetails? cardDetails, string? providerName)
-    {
-        // Pinned follow-ons (capture/void/refund/confirm) stay on the acquirer
-        // that authorized: failing over to a gateway that never authorized would
-        // orphan the hold and risk a duplicate charge. Fall back to normal
-        // routing only when the pinned provider is unknown or its circuit is
-        // open (genuinely unavailable).
-        if (!string.IsNullOrWhiteSpace(providerName)
-            && _registry.All.FirstOrDefault(p => string.Equals(p.Provider.Name, providerName, StringComparison.OrdinalIgnoreCase)) is { } pinned
-            && pinned.CircuitBreaker.CanProceed())
-        {
-            _logger.LogInformation("Routing to pinned gateway {Gateway}", pinned.Provider.Name);
-            return new[] { pinned };
-        }
-
-        return _router.Resolve(amount, cardDetails, _registry.All);
     }
 }

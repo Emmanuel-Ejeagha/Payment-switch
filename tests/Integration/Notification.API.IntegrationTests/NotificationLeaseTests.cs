@@ -2,6 +2,7 @@ using BuildingBlocks.Shared.Middleware;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Notification.Application.Configuration;
 using Notification.Application.Interfaces;
 using Notification.Domain.ValueObjects;
 using Notification.Infrastructure.Messaging;
@@ -83,11 +84,12 @@ public class NotificationLeaseTests : IClassFixture<NotificationApiFactory>
     public async Task Consumer_RestoresCorrelationIntoAsyncFlow()
     {
         var settings = _factory.Services.GetRequiredService<IOptions<RabbitMQSettings>>();
+        var verificationOptions = _factory.Services.GetRequiredService<IOptions<VerificationEmailOptions>>();
         var scopeFactory = _factory.Services.GetRequiredService<IServiceScopeFactory>();
         var provider = _factory.Services.GetRequiredService<ICorrelationIdProvider>();
         var logger = _factory.Services.GetRequiredService<Microsoft.Extensions.Logging.ILogger<RabbitMQConsumerService>>();
 
-        var consumer = new RabbitMQConsumerService(settings, scopeFactory, provider, logger);
+        var consumer = new RabbitMQConsumerService(settings, verificationOptions, scopeFactory, provider, logger);
 
         consumer.RestoreCorrelation("corr-987");
 

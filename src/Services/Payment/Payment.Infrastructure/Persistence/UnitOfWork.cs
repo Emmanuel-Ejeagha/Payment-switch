@@ -34,8 +34,9 @@ public class UnitOfWork : IUnitOfWork
         }
         catch (DbUpdateException ex) when (IsUniqueViolation(ex))
         {
-            // Backstop for check-then-insert races (e.g. duplicate idempotency
-            // keys): surface it as a domain result instead of a 500.
+            // Backstop for check-then-insert races (e.g. two concurrent creates
+            // with the same idempotency key): surface it as a domain result
+            // instead of leaking a 500 to the client.
             throw new UniqueConstraintViolationException(
                 $"A uniqueness constraint was violated while saving. {ex.Message}");
         }

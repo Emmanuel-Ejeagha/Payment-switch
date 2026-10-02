@@ -116,6 +116,6 @@ stay in lockstep.
 - [ ] Generate a new secret (`openssl rand -base64 32`).
 - [ ] Rotate the value in the managed store first.
 - [ ] Deploy with the dual-write window populated (JWT only).
-- [ ] Verify `GET /identity/health/live` and a real login succeed.
+- [ ] Verify `GET /identity/api/v1/health` and a real login succeed.
 - [ ] After the window, clear the previous value and redeploy.
 - [ ] Record the rotation date + reason in the ops log.

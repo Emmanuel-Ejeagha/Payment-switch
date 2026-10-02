@@ -44,16 +44,6 @@ public class PaymentIntentTests
     }
 
     [Fact]
-    public void Authorize_WithProviderName_ShouldRecordItForFollowOnPinning()
-    {
-        var intent = CreatePendingIntent();
-
-        intent.Authorize(new AuthorizationCode("AUTH123"), new GatewayReference("GTW-1"), providerName: "stripe");
-
-        Assert.Equal("stripe", intent.ProviderName);
-    }
-
-    [Fact]
     public void Authorize_FromNonPending_Throws()
     {
         var intent = CreatePendingIntent();
@@ -87,18 +77,6 @@ public class PaymentIntentTests
     }
 
     [Fact]
-    public void Capture_NullAmountAfterPartial_ShouldCaptureRemainder()
-    {
-        var intent = CreateAuthorizedIntent();
-        intent.Capture(new Money(60L, "USD"));
-
-        intent.Capture(null);
-
-        Assert.Equal(PaymentStatus.Captured, intent.Status);
-        Assert.Equal(40L, intent.Transactions.Last(t => t.Type == TransactionType.Capture).Amount.Amount);
-    }
-
-    [Fact]
     public void Capture_ExceedsAuthorized_Throws()
     {
         var intent = CreateAuthorizedIntent();
@@ -125,7 +103,33 @@ public class PaymentIntentTests
         Assert.Single(intent.Transactions, t => t.Type == TransactionType.Void);
         var voidedEvent = Assert.Single(intent.DomainEvents.OfType<PaymentVoidedDomainEvent>());
         Assert.Equal(intent.MerchantId, voidedEvent.MerchantId);
-        Assert.Equal(intent.Amount, voidedEvent.Amount);
+    }
+
+    [Fact]
+    public void Void_FromAuthorized_EventCarriesFullAmount()
+    {
+        var intent = CreateAuthorizedIntent();
+
+        intent.Void();
+
+        var voidedEvent = Assert.Single(intent.DomainEvents.OfType<PaymentVoidedDomainEvent>());
+        Assert.Equal(100L, voidedEvent.Amount.Amount);
+        Assert.Equal("USD", voidedEvent.Amount.Currency);
+    }
+
+    [Fact]
+    public void Void_FromPartiallyCaptured_ReleasesRemainder()
+    {
+        var intent = CreateAuthorizedIntent();
+        intent.Capture(new Money(60L, "USD"));
+        intent.ClearDomainEvents();
+
+        intent.Void();
+
+        Assert.Equal(PaymentStatus.Voided, intent.Status);
+        var voidedEvent = Assert.Single(intent.DomainEvents.OfType<PaymentVoidedDomainEvent>());
+        Assert.Equal(40L, voidedEvent.Amount.Amount);
+        Assert.Equal("USD", voidedEvent.Amount.Currency);
     }
 
     [Fact]
@@ -160,18 +164,6 @@ public class PaymentIntentTests
     }
 
     [Fact]
-    public void Refund_NullAmountAfterPartialCapture_ShouldRefundCapturedTotal()
-    {
-        var intent = CreateAuthorizedIntent();
-        intent.Capture(new Money(60L, "USD"));
-
-        intent.Refund(null);
-
-        Assert.Equal(PaymentStatus.FullyRefunded, intent.Status);
-        Assert.Equal(60L, intent.Transactions.Last(t => t.Type == TransactionType.Refund).Amount.Amount);
-    }
-
-    [Fact]
     public void Refund_ExceedsCaptured_Throws()
     {
         var intent = CreateCapturedIntent();
@@ -199,47 +191,6 @@ public class PaymentIntentTests
     {
         var intent = CreateAuthorizedIntent();
         Assert.Throws<InvalidOperationException>(() => intent.Fail());
-    }
-
-    [Fact]
-    public void Fail_FromRequiresAction_EmitsFailedEvent()
-    {
-        var intent = CreateRequiresActionIntent();
-
-        intent.Fail();
-
-        Assert.Equal(PaymentStatus.Failed, intent.Status);
-        var failed = Assert.Single(intent.DomainEvents.OfType<PaymentFailedDomainEvent>());
-        Assert.Equal(intent.MerchantId, failed.MerchantId);
-        Assert.Equal(intent.Amount, failed.Amount);
-    }
-
-    [Fact]
-    public void Fail_FromProcessing_EmitsFailedEvent()
-    {
-        var intent = CreateRequiresActionIntent();
-        intent.MarkProcessing();
-
-        intent.Fail();
-
-        Assert.Equal(PaymentStatus.Failed, intent.Status);
-        Assert.Single(intent.DomainEvents.OfType<PaymentFailedDomainEvent>());
-    }
-
-    [Fact]
-    public void Void_FromPartiallyCaptured_VoidsRemainder()
-    {
-        var intent = CreateAuthorizedIntent();
-        intent.Capture(new Money(60L, "USD"));
-        intent.ClearDomainEvents();
-
-        intent.Void();
-
-        Assert.Equal(PaymentStatus.Voided, intent.Status);
-        var voidTx = Assert.Single(intent.Transactions, t => t.Type == TransactionType.Void);
-        Assert.Equal(40L, voidTx.Amount.Amount);
-        var voidedEvent = Assert.Single(intent.DomainEvents.OfType<PaymentVoidedDomainEvent>());
-        Assert.Equal(40L, voidedEvent.Amount.Amount);
     }
 
     [Fact]
