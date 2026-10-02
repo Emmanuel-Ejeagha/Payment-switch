@@ -8,11 +8,63 @@ on:
 jobs:
   k6:
     runs-on: ubuntu-latest
+    # The smoke test needs a live API: boot throwaway Postgres + RabbitMQ
+    # service containers and run the Identity API from source (migrations run
+    # on startup). No compose stack, no staging dependency.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: paymentswitch
+          POSTGRES_PASSWORD: k6-smoke-db-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U paymentswitch"
+          --health-interval=5s --health-timeout=5s --health-retries=10
+      rabbitmq:
+        image: rabbitmq:3-management-alpine
+        env:
+          RABBITMQ_DEFAULT_USER: k6smoke
+          RABBITMQ_DEFAULT_PASS: k6-smoke-rabbit-password
+        ports:
+          - 5672:5672
     steps:
       - uses: actions/checkout@v4
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Start Identity API (smoke target)
+        run: |
+          dotnet run --project src/Services/Identity/Identity.API/Identity.API.csproj -c Release --no-launch-profile &
+          echo $! > /tmp/identity.pid
+        env:
+          ASPNETCORE_ENVIRONMENT: Development
+          ASPNETCORE_URLS: http://localhost:8080
+          ConnectionStrings__IdentityDb: Host=localhost;Port=5432;Database=IdentityDb;Username=paymentswitch;Password=k6-smoke-db-password
+          Jwt__Secret: k6-smoke-jwt-secret-32-bytes-minimum!
+          Jwt__Issuer: IdentityService
+          Jwt__Audience: PaymentSwitch
+          RabbitMQ__HostName: localhost
+          RabbitMQ__UserName: k6smoke
+          RabbitMQ__Password: k6-smoke-rabbit-password
+          Seed__AdminEmail: admin@paymentswitch.com
+          Seed__AdminPassword: k6-smoke-admin-password
+      - name: Wait for API health
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:8080/health/live; then exit 0; fi
+            sleep 5
+          done
+          echo "Identity API never became healthy"
+          exit 1
       - name: Run k6 smoke
         uses: grafana/k6-action@v0.3.1
         with:
           filename: tests/Performance/k6-smoke.js
         env:
-          BASE_URL: ${{ secrets.STAGING_BASE_URL }}
+          BASE_URL: ${{ secrets.STAGING_BASE_URL || 'http://localhost:8080' }}
+      - name: Stop Identity API
+        if: always()
+        run: kill $(cat /tmp/identity.pid) || true
