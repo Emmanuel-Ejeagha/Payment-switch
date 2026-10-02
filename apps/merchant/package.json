@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",
-    "@microsoft/signalr": "^10.0.0",
+    "@microsoft/signalr": "^10.0.11",
     "@paymentswitch/shared": "*",
     "@paymentswitch/ui": "*",
     "lucide-react": "^0.400.0",
