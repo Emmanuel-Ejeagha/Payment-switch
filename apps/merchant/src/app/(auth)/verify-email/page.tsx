@@ -11,6 +11,7 @@ import {
   cooldownSecondsLeft,
   parseRetryAfterSeconds,
 } from "@/lib/verification"
+import { apiErrorMessage } from "@/lib/api-error"
 
 type VerifyState =
   | { status: "verifying" }
@@ -70,8 +71,7 @@ function VerifyEmailContent() {
         }
 
         const body = await res.json()
-        const message =
-          body.message ?? body.detail ?? "We could not verify this link. Please try again."
+        const message = apiErrorMessage(body, "We could not verify this link. Please try again.")
         setState({ status: "error", message, canResend: true })
       } catch {
         if (!cancelled) {
@@ -105,14 +105,14 @@ function VerifyEmailContent() {
       )
       if (res.status === 429) {
         const body = await res.json()
-        const message = body.message ?? body.detail ?? "Please wait before requesting another email."
+        const message = apiErrorMessage(body, "Please wait before requesting another email.")
         setResendMsg(message)
         setCooldownUntil(Date.now() + parseRetryAfterSeconds(message) * 1000)
         return
       }
       if (!res.ok) {
         const body = await res.json()
-        setResendMsg(body.message ?? body.detail ?? "Could not resend the email. Try again shortly.")
+        setResendMsg(apiErrorMessage(body, "Could not resend the email. Try again shortly."))
         return
       }
       setResendMsg(NEUTRAL_RESEND_MESSAGE)

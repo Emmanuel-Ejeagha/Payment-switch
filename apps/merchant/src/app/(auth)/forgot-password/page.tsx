@@ -9,6 +9,7 @@ import { useState } from "react"
 import { ArrowRight, Loader2, AlertCircle, MailCheck } from "lucide-react"
 import { AuthShell, inputClass, labelClass, submitClass } from "@/components/auth/auth-shell"
 import { authArtwork } from "@/lib/images"
+import { apiErrorMessage } from "@/lib/api-error"
 
 const forgotSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -45,7 +46,7 @@ export default function ForgotPasswordPage() {
 
       if (!res.ok) {
         const body = await res.json()
-        setError(body.message ?? body.detail ?? "Could not send the reset link. Try again shortly.")
+        setError(apiErrorMessage(body, "Could not send the reset link. Try again shortly."))
         return
       }
 

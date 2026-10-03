@@ -9,6 +9,7 @@ import { useState } from "react"
 import { ArrowRight, Eye, EyeOff, Loader2, AlertCircle } from "lucide-react"
 import { AuthShell, inputClass, labelClass, submitClass } from "@/components/auth/auth-shell"
 import { authArtwork } from "@/lib/images"
+import { apiErrorMessage } from "@/lib/api-error"
 
 const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -40,7 +41,7 @@ export default function LoginPage() {
 
     if (!res.ok) {
       const body = await res.json()
-      setError(body.message ?? body.detail ?? "Login failed")
+      setError(apiErrorMessage(body, "Login failed"))
       return
     }
 
