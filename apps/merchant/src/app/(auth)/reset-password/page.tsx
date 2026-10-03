@@ -9,6 +9,7 @@ import { Suspense, useState } from "react"
 import { ArrowRight, CheckCircle2, Eye, EyeOff, Loader2, AlertCircle } from "lucide-react"
 import { AuthShell, inputClass, labelClass, submitClass } from "@/components/auth/auth-shell"
 import { authArtwork } from "@/lib/images"
+import { apiErrorMessage } from "@/lib/api-error"
 
 const resetSchema = z
   .object({
@@ -59,7 +60,7 @@ function ResetPasswordContent() {
 
       if (!res.ok) {
         const body = await res.json()
-        setError(body.message ?? body.detail ?? "Could not reset your password. Please try again.")
+        setError(apiErrorMessage(body, "Could not reset your password. Please try again."))
         return
       }
 

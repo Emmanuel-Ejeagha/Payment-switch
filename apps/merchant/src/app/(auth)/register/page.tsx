@@ -26,6 +26,7 @@ import {
   cooldownSecondsLeft,
   parseRetryAfterSeconds,
 } from "@/lib/verification";
+import { apiErrorCode, apiErrorMessage } from "@/lib/api-error";
 
 const registerSchema = z
   .object({
@@ -103,10 +104,10 @@ export default function RegisterPage() {
       );
       if (res.status === 429) {
         const body = await res.json();
-        const message =
-          body.message ??
-          body.detail ??
-          "Please wait before requesting another email.";
+        const message = apiErrorMessage(
+          body,
+          "Please wait before requesting another email.",
+        );
         setResendMsg(message);
         setCooldownUntil(Date.now() + parseRetryAfterSeconds(message) * 1000);
         return;
@@ -114,9 +115,7 @@ export default function RegisterPage() {
       if (!res.ok) {
         const body = await res.json();
         setResendMsg(
-          body.message ??
-            body.detail ??
-            "Could not resend the email. Try again shortly.",
+          apiErrorMessage(body, "Could not resend the email. Try again shortly."),
         );
         return;
       }
@@ -147,7 +146,16 @@ export default function RegisterPage() {
 
       if (!registerRes.ok) {
         const body = await registerRes.json();
-        setError(body.message ?? body.detail ?? "Registration failed");
+        if (
+          registerRes.status === 409 &&
+          apiErrorCode(body) === "Identity.EmailAlreadyInUse"
+        ) {
+          setError(
+            "An account with this email already exists. Try signing in instead.",
+          );
+        } else {
+          setError(apiErrorMessage(body, "Registration failed"));
+        }
         return;
       }
 
