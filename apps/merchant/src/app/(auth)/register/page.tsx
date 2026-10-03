@@ -61,6 +61,7 @@ export default function RegisterPage() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [registered, setRegistered] = useState(false);
   const [registeredEmail, setRegisteredEmail] = useState("");
+  const [showResend, setShowResend] = useState(false);
   const [resending, setResending] = useState(false);
   const [resendMsg, setResendMsg] = useState<string | null>(null);
   const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
@@ -129,6 +130,7 @@ export default function RegisterPage() {
 
   const onSubmit = async (data: RegisterForm) => {
     setError(null);
+    setShowResend(false);
 
     try {
       const registerRes = await fetch(
@@ -150,9 +152,16 @@ export default function RegisterPage() {
           registerRes.status === 409 &&
           apiErrorCode(body) === "Identity.EmailAlreadyInUse"
         ) {
+          // The address is taken — most often by the user themselves in an
+          // earlier unverified signup. Offer the resend flow inline so they can
+          // get a fresh verification link without hunting for another page.
+          // (The API deliberately does not auto-send here: doing so would let
+          // anyone trigger email to any address via this endpoint.)
           setError(
-            "An account with this email already exists. Try signing in instead.",
+            "An account with this email already exists. If you never verified it, request a new link below — or sign in.",
           );
+          setRegisteredEmail(data.email);
+          setShowResend(true);
         } else {
           setError(apiErrorMessage(body, "Registration failed"));
         }
@@ -409,6 +418,37 @@ export default function RegisterPage() {
               aria-hidden="true"
             />
             <span>{error}</span>
+          </div>
+        )}
+
+        {showResend && (
+          <div className="rounded-lg border border-muted bg-muted/40 p-4 space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Already signed up but never got (or lost) the link? Send a fresh
+              verification email to {registeredEmail}.
+            </p>
+            {resendMsg && (
+              <p role="status" className="text-xs text-primary">
+                {resendMsg}
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={resendVerification}
+              disabled={resending || cooldownLeft > 0}
+              className={submitClass}
+            >
+              {resending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                  Sending...
+                </>
+              ) : cooldownLeft > 0 ? (
+                `Resend available in ${cooldownLeft}s`
+              ) : (
+                "Resend verification email"
+              )}
+            </button>
           </div>
         )}
 
