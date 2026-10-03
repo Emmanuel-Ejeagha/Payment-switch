@@ -1,14 +1,14 @@
 import { NextRequest } from "next/server"
 import { POST as refreshTokens } from "../../auth/token/route"
+import { serverApiUrl } from "@/lib/server-url"
 
 async function handler(request: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const { path } = await params
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL
-  if (!baseUrl) {
-    return Response.json({ error: "NEXT_PUBLIC_API_URL not set" }, { status: 500 })
+  if (!process.env.INTERNAL_API_URL && !process.env.NEXT_PUBLIC_API_URL) {
+    return Response.json({ error: "API base URL not set" }, { status: 500 })
   }
 
-  const url = `${baseUrl}/${path.join("/")}${request.nextUrl.search}`
+  const url = serverApiUrl(`/${path.join("/")}${request.nextUrl.search}`)
   const cookie = request.headers.get("cookie")
   const contentType = request.headers.get("content-type")
 
@@ -43,7 +43,7 @@ async function handler(request: NextRequest, { params }: { params: Promise<{ pat
   // The access token may have expired between page renders. Rotate it once and
   // retry before surfacing a 401 to the browser.
   if (response.status === 401 && initialAccessToken) {
-    const rotated = await refreshTokens()
+    const rotated = await refreshTokens(request)
     if (rotated.ok) {
       const setCookies = rotated.headers.getSetCookie()
       const newToken = setCookies

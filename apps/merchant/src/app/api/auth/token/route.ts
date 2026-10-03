@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server"
 import { cookies } from "next/headers"
+import { isSecureRequest, serverApiUrl } from "@/lib/server-url"
 
-const isSecure = process.env.NODE_ENV === "production"
-
-async function refresh() {
+async function refresh(request?: Request) {
   const cookieStore = await cookies()
   const accessToken = cookieStore.get("access_token")?.value
   const refreshToken = cookieStore.get("refresh_token")?.value
@@ -12,7 +11,7 @@ async function refresh() {
     return { response: NextResponse.json({ error: "No refresh token" }, { status: 401 }), ok: false }
   }
 
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/identity/api/v1/auth/refresh`, {
+  const res = await fetch(serverApiUrl("/identity/api/v1/auth/refresh"), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -26,6 +25,7 @@ async function refresh() {
     return { response: NextResponse.json({ error: "Refresh failed" }, { status: 401 }), ok: false }
   }
 
+  const isSecure = request ? isSecureRequest(request) : process.env.NODE_ENV === "production"
   const response = NextResponse.json({ accessToken: data.accessToken })
   response.cookies.set("access_token", data.accessToken, {
     httpOnly: true,
@@ -44,10 +44,10 @@ async function refresh() {
   return { response, ok: true }
 }
 
-export async function GET() {
-  return (await refresh()).response
+export async function GET(request?: Request) {
+  return (await refresh(request)).response
 }
 
-export async function POST() {
-  return (await refresh()).response
+export async function POST(request?: Request) {
+  return (await refresh(request)).response
 }

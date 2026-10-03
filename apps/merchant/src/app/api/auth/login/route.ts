@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { isSecureRequest, serverApiUrl } from "@/lib/server-url"
 
 export async function POST(request: Request) {
   const body = await request.json()
@@ -6,7 +7,7 @@ export async function POST(request: Request) {
   let data: Record<string, unknown>
   try {
     const res = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/identity/api/v1/auth/login`,
+      serverApiUrl("/identity/api/v1/auth/login"),
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -26,7 +27,7 @@ export async function POST(request: Request) {
     )
   }
 
-  const isSecure = process.env.NODE_ENV === "production"
+  const isSecure = isSecureRequest(request)
   const response = NextResponse.json(data)
   response.cookies.set("access_token", data.accessToken as string, {
     httpOnly: true,
