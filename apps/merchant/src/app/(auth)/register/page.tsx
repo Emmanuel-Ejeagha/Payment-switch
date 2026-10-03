@@ -1,68 +1,84 @@
-"use client"
+"use client";
 
-import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { z } from "zod"
-import { useRouter } from "next/navigation"
-import Link from "next/link"
-import { useEffect, useState } from "react"
-import { ArrowRight, Eye, EyeOff, Loader2, AlertCircle, MailCheck } from "lucide-react"
-import { AuthShell, inputClass, labelClass, submitClass } from "@/components/auth/auth-shell"
-import { authArtwork } from "@/lib/images"
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import {
+  ArrowRight,
+  Eye,
+  EyeOff,
+  Loader2,
+  AlertCircle,
+  MailCheck,
+} from "lucide-react";
+import {
+  AuthShell,
+  inputClass,
+  labelClass,
+  submitClass,
+} from "@/components/auth/auth-shell";
+import { authArtwork } from "@/lib/images";
 import {
   NEUTRAL_RESEND_MESSAGE,
   cooldownSecondsLeft,
   parseRetryAfterSeconds,
-} from "@/lib/verification"
+} from "@/lib/verification";
 
-const registerSchema = z.object({
-  businessName: z.string().min(2, "Business name must be at least 2 characters"),
-  email: z.string().email("Invalid email address"),
-  password: z
-    .string()
-    .min(10, "Password must be at least 10 characters")
-    .regex(/[A-Za-z]/, "Password must contain at least one letter")
-    .regex(/[0-9]/, "Password must contain at least one digit"),
-  confirmPassword: z.string(),
-}).refine((d) => d.password === d.confirmPassword, {
-  message: "Passwords do not match",
-  path: ["confirmPassword"],
-})
+const registerSchema = z
+  .object({
+    businessName: z
+      .string()
+      .min(2, "Business name must be at least 2 characters"),
+    email: z.string().email("Invalid email address"),
+    password: z
+      .string()
+      .min(10, "Password must be at least 10 characters")
+      .regex(/[A-Za-z]/, "Password must contain at least one letter")
+      .regex(/[0-9]/, "Password must contain at least one digit"),
+    confirmPassword: z.string(),
+  })
+  .refine((d) => d.password === d.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  });
 
-type RegisterForm = z.infer<typeof registerSchema>
+type RegisterForm = z.infer<typeof registerSchema>;
 
 const benefits = [
   "Accept payments online in minutes",
   "Real-time transaction monitoring",
   "Automated daily settlements",
-]
+];
 
 export default function RegisterPage() {
-  const router = useRouter()
-  const [error, setError] = useState<string | null>(null)
-  const [showPassword, setShowPassword] = useState(false)
-  const [showConfirm, setShowConfirm] = useState(false)
-  const [registered, setRegistered] = useState(false)
-  const [registeredEmail, setRegisteredEmail] = useState("")
-  const [resending, setResending] = useState(false)
-  const [resendMsg, setResendMsg] = useState<string | null>(null)
-  const [cooldownUntil, setCooldownUntil] = useState<number | null>(null)
-  const [nowMs, setNowMs] = useState(() => Date.now())
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [registered, setRegistered] = useState(false);
+  const [registeredEmail, setRegisteredEmail] = useState("");
+  const [resending, setResending] = useState(false);
+  const [resendMsg, setResendMsg] = useState<string | null>(null);
+  const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
+  const [nowMs, setNowMs] = useState(() => Date.now());
 
   // Ticks the resend-cooldown countdown; stops once it lapses.
   useEffect(() => {
-    if (cooldownUntil === null) return
+    if (cooldownUntil === null) return;
     const timer = window.setInterval(() => {
-      setNowMs(Date.now())
+      setNowMs(Date.now());
       if (Date.now() >= (cooldownUntil ?? 0)) {
-        window.clearInterval(timer)
-        setCooldownUntil(null)
+        window.clearInterval(timer);
+        setCooldownUntil(null);
       }
-    }, 1000)
-    return () => window.clearInterval(timer)
-  }, [cooldownUntil])
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [cooldownUntil]);
 
-  const cooldownLeft = cooldownSecondsLeft(cooldownUntil, nowMs)
+  const cooldownLeft = cooldownSecondsLeft(cooldownUntil, nowMs);
 
   const {
     register,
@@ -70,12 +86,12 @@ export default function RegisterPage() {
     formState: { errors, isSubmitting },
   } = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema),
-  })
+  });
 
   const resendVerification = async () => {
-    if (cooldownLeft > 0) return
-    setResending(true)
-    setResendMsg(null)
+    if (cooldownLeft > 0) return;
+    setResending(true);
+    setResendMsg(null);
     try {
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/identity/api/v1/auth/resend-verification`,
@@ -83,30 +99,37 @@ export default function RegisterPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email: registeredEmail }),
-        }
-      )
+        },
+      );
       if (res.status === 429) {
-        const body = await res.json()
-        const message = body.message ?? body.detail ?? "Please wait before requesting another email."
-        setResendMsg(message)
-        setCooldownUntil(Date.now() + parseRetryAfterSeconds(message) * 1000)
-        return
+        const body = await res.json();
+        const message =
+          body.message ??
+          body.detail ??
+          "Please wait before requesting another email.";
+        setResendMsg(message);
+        setCooldownUntil(Date.now() + parseRetryAfterSeconds(message) * 1000);
+        return;
       }
       if (!res.ok) {
-        const body = await res.json()
-        setResendMsg(body.message ?? body.detail ?? "Could not resend the email. Try again shortly.")
-        return
+        const body = await res.json();
+        setResendMsg(
+          body.message ??
+            body.detail ??
+            "Could not resend the email. Try again shortly.",
+        );
+        return;
       }
-      setResendMsg(NEUTRAL_RESEND_MESSAGE)
+      setResendMsg(NEUTRAL_RESEND_MESSAGE);
     } catch {
-      setResendMsg("Backend unreachable. Please try again later.")
+      setResendMsg("Backend unreachable. Please try again later.");
     } finally {
-      setResending(false)
+      setResending(false);
     }
-  }
+  };
 
   const onSubmit = async (data: RegisterForm) => {
-    setError(null)
+    setError(null);
 
     try {
       const registerRes = await fetch(
@@ -119,16 +142,16 @@ export default function RegisterPage() {
             password: data.password,
             fullName: data.businessName,
           }),
-        }
-      )
+        },
+      );
 
       if (!registerRes.ok) {
-        const body = await registerRes.json()
-        setError(body.message ?? body.detail ?? "Registration failed")
-        return
+        const body = await registerRes.json();
+        setError(body.message ?? body.detail ?? "Registration failed");
+        return;
       }
 
-      const { userId } = await registerRes.json()
+      const { userId } = await registerRes.json();
 
       const onboardRes = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/merchant/api/v1/merchants`,
@@ -140,22 +163,24 @@ export default function RegisterPage() {
             businessName: data.businessName,
             email: data.email,
           }),
-        }
-      )
+        },
+      );
 
       if (!onboardRes.ok) {
         // The identity account exists, so signing in works — /onboarding lets them
         // retry the merchant profile instead of stranding them here.
-        setError("Account created, but merchant setup did not finish. Sign in to complete it.")
-        return
+        setError(
+          "Account created, but merchant setup did not finish. Sign in to complete it.",
+        );
+        return;
       }
 
-      setRegistered(true)
-      setRegisteredEmail(data.email)
+      setRegistered(true);
+      setRegisteredEmail(data.email);
     } catch {
-      setError("Backend unreachable. Please try again later.")
+      setError("Backend unreachable. Please try again later.");
     }
-  }
+  };
 
   if (registered) {
     return (
@@ -169,7 +194,10 @@ export default function RegisterPage() {
         footer={
           <>
             Already verified?{" "}
-            <Link href="/login" className="font-medium text-primary hover:underline">
+            <Link
+              href="/login"
+              className="font-medium text-primary hover:underline"
+            >
               Sign in
             </Link>
           </>
@@ -181,8 +209,9 @@ export default function RegisterPage() {
               <MailCheck className="h-7 w-7 text-primary" aria-hidden="true" />
             </div>
             <p className="text-sm leading-relaxed text-muted-foreground">
-              Confirm your email to activate your account. The link expires in 24 hours.
-              Once verified you can sign in and manage your merchant dashboard.
+              Confirm your email to activate your account. The link expires in
+              24 hours. Once verified you can sign in and manage your merchant
+              dashboard.
             </p>
           </div>
 
@@ -222,7 +251,7 @@ export default function RegisterPage() {
           </button>
         </div>
       </AuthShell>
-    )
+    );
   }
 
   return (
@@ -236,7 +265,10 @@ export default function RegisterPage() {
       footer={
         <>
           Already have an account?{" "}
-          <Link href="/login" className="font-medium text-primary hover:underline">
+          <Link
+            href="/login"
+            className="font-medium text-primary hover:underline"
+          >
             Sign in
           </Link>
         </>
@@ -253,7 +285,9 @@ export default function RegisterPage() {
             autoComplete="organization"
             placeholder="Your Business Ltd."
             aria-invalid={!!errors.businessName}
-            aria-describedby={errors.businessName ? "businessName-error" : undefined}
+            aria-describedby={
+              errors.businessName ? "businessName-error" : undefined
+            }
             className={inputClass}
             {...register("businessName")}
           />
@@ -294,7 +328,7 @@ export default function RegisterPage() {
               id="password"
               type={showPassword ? "text" : "password"}
               autoComplete="new-password"
-              placeholder="Min. 6 characters"
+              placeholder="Min. 10 characters"
               aria-invalid={!!errors.password}
               aria-describedby={errors.password ? "password-error" : undefined}
               className={`${inputClass} pr-11`}
@@ -331,7 +365,9 @@ export default function RegisterPage() {
               autoComplete="new-password"
               placeholder="Repeat your password"
               aria-invalid={!!errors.confirmPassword}
-              aria-describedby={errors.confirmPassword ? "confirmPassword-error" : undefined}
+              aria-describedby={
+                errors.confirmPassword ? "confirmPassword-error" : undefined
+              }
               className={`${inputClass} pr-11`}
               {...register("confirmPassword")}
             />
@@ -360,7 +396,10 @@ export default function RegisterPage() {
             role="alert"
             className="flex items-start gap-2.5 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
           >
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            <AlertCircle
+              className="mt-0.5 h-4 w-4 shrink-0"
+              aria-hidden="true"
+            />
             <span>{error}</span>
           </div>
         )}
@@ -380,9 +419,10 @@ export default function RegisterPage() {
         </button>
 
         <p className="text-center text-xs leading-relaxed text-muted-foreground">
-          By creating an account you agree to our terms of service and privacy policy.
+          By creating an account you agree to our terms of service and privacy
+          policy.
         </p>
       </form>
     </AuthShell>
-  )
+  );
 }
