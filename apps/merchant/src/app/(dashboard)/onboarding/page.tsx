@@ -5,6 +5,12 @@ import { useRouter } from "next/navigation"
 import { ArrowRight, CheckCircle2, CreditCard, KeyRound, Rocket, Store } from "lucide-react"
 import type { UserDto } from "@paymentswitch/shared"
 import { BrandMark } from "@/components/landing/brand-mark"
+import { apiErrorCode, apiErrorMessage } from "@/lib/api-error"
+import {
+  NEUTRAL_RESEND_MESSAGE,
+  cooldownSecondsLeft,
+  parseRetryAfterSeconds,
+} from "@/lib/verification"
 import {
   Alert,
   Button,
@@ -41,6 +47,26 @@ export default function OnboardingPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState(false)
+  const [showResend, setShowResend] = useState(false)
+  const [resending, setResending] = useState(false)
+  const [resendMsg, setResendMsg] = useState<string | null>(null)
+  const [cooldownUntil, setCooldownUntil] = useState<number | null>(null)
+  const [nowMs, setNowMs] = useState(() => Date.now())
+
+  // Ticks the resend-cooldown countdown; stops once it lapses.
+  useEffect(() => {
+    if (cooldownUntil === null) return
+    const timer = window.setInterval(() => {
+      setNowMs(Date.now())
+      if (Date.now() >= (cooldownUntil ?? 0)) {
+        window.clearInterval(timer)
+        setCooldownUntil(null)
+      }
+    }, 1000)
+    return () => window.clearInterval(timer)
+  }, [cooldownUntil])
+
+  const cooldownLeft = cooldownSecondsLeft(cooldownUntil, nowMs)
 
   useEffect(() => {
     async function load() {
@@ -75,6 +101,7 @@ export default function OnboardingPage() {
     if (!user || !businessName.trim()) return
     setSubmitting(true)
     setError(null)
+    setShowResend(false)
     try {
       const res = await fetch("/api/proxy/merchant/api/v1/merchants", {
         method: "POST",
@@ -87,7 +114,19 @@ export default function OnboardingPage() {
       })
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
-        setError(body.message ?? body.detail ?? "Onboarding failed")
+        if (
+          res.status === 403 &&
+          apiErrorCode(body) === "Identity.EmailNotVerified"
+        ) {
+          // Merchant creation requires a verified email. Point at the fix
+          // instead of stranding the user: a fresh link, right here.
+          setError(
+            "Please verify your email address first — your profile can't be created until then."
+          )
+          setShowResend(true)
+        } else {
+          setError(apiErrorMessage(body, "Onboarding failed"))
+        }
         return
       }
       setDone(true)
@@ -98,6 +137,39 @@ export default function OnboardingPage() {
       setError("Backend unreachable. Please try again later.")
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  const resendVerification = async () => {
+    if (!user?.email || cooldownLeft > 0) return
+    setResending(true)
+    setResendMsg(null)
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/identity/api/v1/auth/resend-verification`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: user.email }),
+        }
+      )
+      if (res.status === 429) {
+        const body = await res.json()
+        const message = apiErrorMessage(body, "Please wait before requesting another email.")
+        setResendMsg(message)
+        setCooldownUntil(Date.now() + parseRetryAfterSeconds(message) * 1000)
+        return
+      }
+      if (!res.ok) {
+        const body = await res.json()
+        setResendMsg(apiErrorMessage(body, "Could not resend the email. Try again shortly."))
+        return
+      }
+      setResendMsg(NEUTRAL_RESEND_MESSAGE)
+    } catch {
+      setResendMsg("Backend unreachable. Please try again later.")
+    } finally {
+      setResending(false)
     }
   }
 
@@ -139,6 +211,34 @@ export default function OnboardingPage() {
         <Alert variant="error" title="We could not create your profile">
           {error}
         </Alert>
+      )}
+
+      {showResend && user && (
+        <Card>
+          <CardBody className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              No link in your inbox? Send a fresh verification email to {user.email} —
+              profiles unlock as soon as the address is confirmed. After verifying,
+              sign in again so your session picks up the new status.
+            </p>
+            {resendMsg && (
+              <p role="status" className="text-xs text-primary">
+                {resendMsg}
+              </p>
+            )}
+            <Button
+              type="button"
+              onClick={resendVerification}
+              disabled={resending || cooldownLeft > 0}
+            >
+              {resending
+                ? "Sending…"
+                : cooldownLeft > 0
+                  ? `Resend available in ${cooldownLeft}s`
+                  : "Resend verification email"}
+            </Button>
+          </CardBody>
+        </Card>
       )}
 
       {done ? (

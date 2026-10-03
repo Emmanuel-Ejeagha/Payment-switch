@@ -9,6 +9,7 @@ import { useState } from "react"
 import { ArrowRight, Eye, EyeOff, Loader2, AlertCircle } from "lucide-react"
 import { AuthShell, inputClass, labelClass, submitClass } from "@/components/auth/auth-shell"
 import { authArtwork } from "@/lib/images"
+import { apiErrorMessage } from "@/lib/api-error"
 
 const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -32,15 +33,21 @@ export default function LoginPage() {
 
   const onSubmit = async (data: LoginForm) => {
     setError(null)
-    const res = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    })
+    let res: Response
+    try {
+      res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      })
+    } catch {
+      setError("Network error. Check your connection and try again.")
+      return
+    }
 
     if (!res.ok) {
       const body = await res.json()
-      setError(body.message ?? body.detail ?? "Login failed")
+      setError(apiErrorMessage(body, "Login failed"))
       return
     }
 
