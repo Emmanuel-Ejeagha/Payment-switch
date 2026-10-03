@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server"
-import { cookies } from "next/headers"
+import { cookies, headers } from "next/headers"
 import { isSecureRequest, serverApiUrl } from "@/lib/server-url"
 
-export async function POST(request: Request) {
+export async function POST() {
   const cookieStore = await cookies()
   const accessToken = cookieStore.get("access_token")?.value
   const refreshToken = cookieStore.get("refresh_token")?.value
@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     }
   }
 
-  const isSecure = isSecureRequest(request)
+  const isSecure = isSecureRequest({ headers: await headers() })
   const response = NextResponse.json({ ok: true })
   response.cookies.set("access_token", "", {
     httpOnly: true,

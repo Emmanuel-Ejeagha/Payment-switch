@@ -1,12 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { cookies } from "next/headers"
+import { cookies, headers } from "next/headers"
 import { GET } from "@/app/api/auth/token/route"
 
 vi.mock("next/headers", () => ({
   cookies: vi.fn(),
+  headers: vi.fn(async () => new Headers()),
 }))
 
 const mockedCookies = vi.mocked(cookies)
+vi.mocked(headers)
 
 function mockCookies(refreshToken?: string) {
   mockedCookies.mockResolvedValue({

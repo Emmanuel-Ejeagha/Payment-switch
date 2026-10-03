@@ -43,7 +43,7 @@ async function handler(request: NextRequest, { params }: { params: Promise<{ pat
   // The access token may have expired between page renders. Rotate it once and
   // retry before surfacing a 401 to the browser.
   if (response.status === 401 && initialAccessToken) {
-    const rotated = await refreshTokens(request)
+    const rotated = await refreshTokens()
     if (rotated.ok) {
       const setCookies = rotated.headers.getSetCookie()
       const newToken = setCookies
