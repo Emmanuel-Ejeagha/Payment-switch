@@ -49,6 +49,9 @@ describe("Merchant OnboardingPage unverified gate", () => {
 
     expect(await screen.findByText(/verify your email address first/i)).toBeInTheDocument()
     expect(screen.queryByText("Onboarding failed")).not.toBeInTheDocument()
+    // Stale sessions keep the old unverified claim: the panel must tell the
+    // user to sign in again after verifying.
+    expect(screen.getByText(/sign in again/i)).toBeInTheDocument()
 
     const resendButton = await screen.findByRole("button", { name: /Resend verification email/i })
     fireEvent.click(resendButton)

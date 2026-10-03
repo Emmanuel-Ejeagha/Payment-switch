@@ -218,7 +218,8 @@ export default function OnboardingPage() {
           <CardBody className="space-y-3">
             <p className="text-sm text-muted-foreground">
               No link in your inbox? Send a fresh verification email to {user.email} —
-              profiles unlock as soon as the address is confirmed.
+              profiles unlock as soon as the address is confirmed. After verifying,
+              sign in again so your session picks up the new status.
             </p>
             {resendMsg && (
               <p role="status" className="text-xs text-primary">
