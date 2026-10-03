@@ -27,20 +27,27 @@ export default function LedgerPage() {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [skip, setSkip] = useState(0)
+  const [reloadKey, setReloadKey] = useState(0)
   const take = 10
 
   useEffect(() => {
     async function loadMerchants() {
-      const res = await fetch(apiUrl("/api/proxy/merchant/api/v1/merchants?skip=0&take=100"))
-      if (res.ok) {
-        const list: MerchantDto[] = await res.json()
-        setMerchants(list)
-        if (list.length > 0 && !selectedMerchantId) {
-          setSelectedMerchantId(list[0].id)
+      try {
+        const res = await fetch(apiUrl("/api/proxy/merchant/api/v1/merchants?skip=0&take=100"))
+        if (res.ok) {
+          const list: MerchantDto[] = await res.json()
+          setMerchants(list)
+          if (list.length > 0 && !selectedMerchantId) {
+            setSelectedMerchantId(list[0].id)
+          }
         }
+      } catch {
+        // Merchant lookup is best-effort: the ledger section reports its own errors.
       }
     }
     loadMerchants()
+    // selectedMerchantId is read inside on first load only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -59,13 +66,15 @@ export default function LedgerPage() {
           setBalance(Array.isArray(balances) ? (balances[0] ?? null) : balances)
         }
         if (txRes.ok) setTransactions(await txRes.json())
-        if (!balRes.ok || !txRes.ok) setLoadError("Could not load ledger data")
+        if (!balRes.ok || !txRes.ok) setLoadError("The ledger service returned an error. Try again shortly.")
+      } catch (e) {
+        setLoadError(e instanceof Error ? e.message : "request failed")
       } finally {
         setLoading(false)
       }
     }
     loadLedger()
-  }, [selectedMerchantId, skip])
+  }, [selectedMerchantId, skip, reloadKey])
 
   const selectedMerchant = merchants.find((m) => m.id === selectedMerchantId)
 
@@ -201,8 +210,19 @@ export default function LedgerPage() {
           </div>
         </>
       ) : loadError ? (
-        <div className="rounded-xl border border-destructive/50 bg-destructive/10 p-6 text-destructive">
+        <div
+          role="alert"
+          className="rounded-xl border border-destructive/50 bg-destructive/10 p-6 text-destructive"
+        >
           <p className="font-medium">Could not load ledger data</p>
+          <p className="mt-1 text-sm opacity-80">{loadError}</p>
+          <button
+            type="button"
+            onClick={() => setReloadKey((k) => k + 1)}
+            className="mt-4 inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent"
+          >
+            Retry
+          </button>
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-16 text-center">

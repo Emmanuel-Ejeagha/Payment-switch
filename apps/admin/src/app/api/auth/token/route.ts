@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server"
-import { cookies } from "next/headers"
+import { cookies, headers } from "next/headers"
 import { ACCESS_TOKEN_MAX_AGE, REFRESH_TOKEN_MAX_AGE } from "@/lib/auth"
-
-const isSecure = process.env.NODE_ENV === "production"
+import { isSecureRequest, serverApiUrl } from "@/lib/server-url"
 
 async function refresh() {
   const cookieStore = await cookies()
@@ -14,7 +13,7 @@ async function refresh() {
 
   let res: Response
   try {
-    res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/identity/api/v1/auth/refresh`, {
+    res = await fetch(serverApiUrl("/identity/api/v1/auth/refresh"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -35,6 +34,7 @@ async function refresh() {
     return { response: NextResponse.json({ error: "Refresh failed" }, { status: 401 }), ok: false }
   }
 
+  const isSecure = isSecureRequest({ headers: await headers() })
   const response = NextResponse.json({ accessToken: data.accessToken })
   response.cookies.set("access_token", data.accessToken, {
     httpOnly: true,

@@ -14,20 +14,33 @@ function formatAmount(amount: number) {
 export default function SettlementsPage() {
   const [batches, setBatches] = useState<SettlementBatchDto[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [skip, setSkip] = useState(0)
   const take = 10
+  const [reloadKey, setReloadKey] = useState(0)
   const [triggering, setTriggering] = useState(false)
   const [triggerResult, setTriggerResult] = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
-      const params = new URLSearchParams({ skip: String(skip), take: String(take) })
-      const res = await fetch(apiUrl(`/api/proxy/settlement/api/v1/settlement?${params}`))
-      if (res.ok) setBatches(await res.json())
-      setLoading(false)
+      setLoading(true)
+      setLoadError(null)
+      try {
+        const params = new URLSearchParams({ skip: String(skip), take: String(take) })
+        const res = await fetch(apiUrl(`/api/proxy/settlement/api/v1/settlement?${params}`))
+        if (!res.ok) {
+          setLoadError(`The settlement service returned status ${res.status}. Try again shortly.`)
+        } else {
+          setBatches(await res.json())
+        }
+      } catch (e) {
+        setLoadError(e instanceof Error ? e.message : "request failed")
+      } finally {
+        setLoading(false)
+      }
     }
     void load()
-  }, [skip])
+  }, [skip, reloadKey])
 
   const handleTrigger = async () => {
     setTriggering(true)
@@ -85,6 +98,21 @@ export default function SettlementsPage() {
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="h-20 animate-pulse rounded-xl bg-muted" />
           ))}
+        </div>
+      ) : loadError ? (
+        <div
+          role="alert"
+          className="rounded-xl border border-destructive/50 bg-destructive/10 p-6 text-destructive"
+        >
+          <p className="font-medium">Failed to load settlements</p>
+          <p className="mt-1 text-sm opacity-80">{loadError}</p>
+          <button
+            type="button"
+            onClick={() => setReloadKey((k) => k + 1)}
+            className="mt-4 inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent"
+          >
+            Retry
+          </button>
         </div>
       ) : batches.length === 0 ? (
         <div className="flex flex-col items-center rounded-xl border border-dashed py-16 text-center">

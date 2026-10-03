@@ -12,9 +12,17 @@ export default function MerchantsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState("")
+  const [debouncedSearch, setDebouncedSearch] = useState("")
+  const [total, setTotal] = useState<number | null>(null)
   const [statusFilter, setStatusFilter] = useState<string>("All")
   const [skip, setSkip] = useState(0)
   const take = 10
+
+  // Debounce the search box: every keystroke must not become an API call.
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => clearTimeout(timer)
+  }, [search])
 
   useEffect(() => {
     async function load() {
@@ -22,7 +30,7 @@ export default function MerchantsPage() {
       setError(null)
       try {
         const params = new URLSearchParams({ skip: String(skip), take: String(take) })
-        if (search) params.set("search", search)
+        if (debouncedSearch) params.set("search", debouncedSearch)
 
         const res = await fetch(apiUrl(`/api/proxy/merchant/api/v1/merchants?${params}`))
 
@@ -39,6 +47,8 @@ export default function MerchantsPage() {
 
         const data: MerchantDto[] = await res.json()
         setMerchants(data)
+        const totalHeader = res.headers.get("x-total-count")
+        setTotal(totalHeader !== null ? Number(totalHeader) : data.length)
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load merchants")
       } finally {
@@ -47,7 +57,7 @@ export default function MerchantsPage() {
     }
 
     load()
-  }, [skip, search])
+  }, [skip, debouncedSearch])
 
   const filtered = merchants.filter((m) =>
     statusFilter === "All" ? true : m.status === statusFilter,
@@ -67,6 +77,7 @@ export default function MerchantsPage() {
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <input
             placeholder="Search merchants..."
+            aria-label="Search merchants"
             value={search}
             onChange={(e) => { setSearch(e.target.value); setSkip(0) }}
             className="flex h-10 w-full rounded-lg border border-input bg-background pl-10 pr-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
@@ -147,7 +158,7 @@ export default function MerchantsPage() {
 
           <div className="flex items-center justify-between text-sm text-muted-foreground">
             <p>
-              Showing {skip + 1}–{skip + filtered.length}
+              Showing {skip + 1}–{skip + filtered.length} of {total ?? filtered.length}
             </p>
             <div className="flex items-center gap-2">
               <button
