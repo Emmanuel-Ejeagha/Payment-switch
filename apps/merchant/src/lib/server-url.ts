@@ -19,7 +19,7 @@ export function serverApiUrl(path: string): string {
  * locally, and `Secure` cookies over HTTP are silently dropped by browsers
  * (login looks successful, then every authenticated call 401s).
  */
-export function isSecureRequest(request: Request): boolean {
+export function isSecureRequest(request: { headers: Headers }): boolean {
   const proto = request.headers.get("x-forwarded-proto")?.toLowerCase()
   if (proto === "https") return true
   if (proto === "http") return false

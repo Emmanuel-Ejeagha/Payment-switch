@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server"
-import { cookies } from "next/headers"
+import { cookies, headers } from "next/headers"
 import { ACCESS_TOKEN_MAX_AGE, REFRESH_TOKEN_MAX_AGE } from "@/lib/auth"
 import { isSecureRequest, serverApiUrl } from "@/lib/server-url"
 
-async function refresh(request?: Request) {
+async function refresh() {
   const cookieStore = await cookies()
   const refreshToken = cookieStore.get("refresh_token")?.value
 
@@ -34,7 +34,7 @@ async function refresh(request?: Request) {
     return { response: NextResponse.json({ error: "Refresh failed" }, { status: 401 }), ok: false }
   }
 
-  const isSecure = request ? isSecureRequest(request) : process.env.NODE_ENV === "production"
+  const isSecure = isSecureRequest({ headers: await headers() })
   const response = NextResponse.json({ accessToken: data.accessToken })
   response.cookies.set("access_token", data.accessToken, {
     httpOnly: true,
@@ -53,10 +53,10 @@ async function refresh(request?: Request) {
   return { response, ok: true }
 }
 
-export async function GET(request?: Request) {
-  return (await refresh(request)).response
+export async function GET() {
+  return (await refresh()).response
 }
 
-export async function POST(request?: Request) {
-  return (await refresh(request)).response
+export async function POST() {
+  return (await refresh()).response
 }
