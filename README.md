@@ -157,6 +157,46 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 | RabbitMQ mgmt / metrics | `127.0.0.1:15672` / `:15692` (loopback only) |
 | Postgres | `127.0.0.1:5432` (loopback only) |
 
+### Local endpoints (no AWS needed)
+
+If the EC2 instance is stopped, the entire system runs on any machine with Docker —
+no cloud account required. Start the stack as above, then use it exactly like production:
+
+| What | Where (local) |
+|---|---|
+| Merchant portal (register, verify email, dashboard, checkout) | `http://localhost/` |
+| Admin portal (login) | `http://localhost/admin/login` |
+| Identity API + Swagger UI (dev) | `http://127.0.0.1:5146` → `/swagger`, `/health/live` |
+| Merchant API + Swagger UI (dev) | `http://127.0.0.1:5237` → `/swagger`, `/health/live` |
+| Payment API + Swagger UI (dev) | `http://127.0.0.1:5118` → `/swagger`, `/health/live` |
+| Ledger API + Swagger UI (dev) | `http://127.0.0.1:5320` → `/swagger`, `/health/live` |
+| Notification API + Swagger UI (dev) | `http://127.0.0.1:5281` → `/swagger`, `/health/live` |
+| Settlement API + Hangfire (dev, admin-gated) | `http://127.0.0.1:5392` → `/swagger`, `/health/live`, `/hangfire` |
+| RabbitMQ management (user/pass from `.env`) | `http://127.0.0.1:15672` |
+
+First login: use the seeded admin (`SEED_ADMIN_EMAIL`, default `admin@paymentswitch.com`)
+with the `SEED_ADMIN_PASSWORD` from your `.env`. To try the full money flow locally, register a
+merchant account in the portal, verify it, create an API key, and drive the E2E suite
+(`tests/Integration/E2E.IntegrationTests`) — it exercises register → verify → onboard →
+authorize → capture → ledger → notification → settlement against real containers.
+
+Verifying without Resend configured: the verification link is not emailed (nothing leaves your
+machine). Grab the single-use token from the Identity outbox and open the link yourself:
+
+```bash
+docker compose exec -T postgres psql -U paymentswitch -d IdentityDb -t -c \
+  "SELECT \"Payload\"->>'Token' FROM \"OutboxMessages\" WHERE \"EventType\"='EmailVerificationRequestedDomainEvent' ORDER BY \"OccurredOn\" DESC LIMIT 1;"
+# then visit: http://localhost/verify-email?email=<your-email>&token=<token-from-above>
+```
+
+Notes:
+
+- Grafana, Prometheus, Jaeger, and Redis expose no host ports — they are internal-only.
+  Reach them with `docker compose exec` or a temporary `ports:` override, never by publishing
+  them in a shared environment.
+- Verification email is simulated in server logs until `RESEND_API_KEY` (plus a verified sender
+  domain) is configured — see `docs/runbook.md` §7.
+
 ## Configuration
 
 All secrets come from the environment (`.env` locally, gitignored, fail-fast on missing values;
