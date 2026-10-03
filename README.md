@@ -27,6 +27,9 @@ The stack runs on **AWS EC2** via Docker Compose:
 Swagger UI is served in Development only and denied at the edge in production —
 see `docs/prod-exposure.md`. Integrator API docs live in `docs/api-reference.md` and `docs/webhooks.md`.
 
+*(The EC2 instance stops automatically when credits run out, but you can always restart it —
+or run the whole stack locally, see "Local endpoints" below.)*
+
 ## Features
 
 - **Merchant lifecycle** — onboarding with approval workflow (`Pending → Approved/Rejected → Active ⇄ Suspended`),
