@@ -20,6 +20,10 @@ COPY package.json package-lock.json* ./
 COPY --from=deps /app/node_modules ./node_modules
 COPY packages packages
 COPY apps/merchant apps/merchant
+# Dev-only workspace deps (vitest tooling, etc.) nest under the workspace dir
+# rather than hoisting; carry them over so `next build` type-checking resolves
+# exactly like a local install. Runtime is unaffected (standalone output).
+COPY --from=deps /app/apps/merchant/node_modules ./apps/merchant/node_modules
 RUN cd apps/merchant && npm run build
 # Ensure a public dir exists even though these apps ship no static assets.
 RUN mkdir -p apps/merchant/public
