@@ -28,7 +28,10 @@ export async function POST(request: Request) {
   }
 
   const isSecure = isSecureRequest(request)
-  const response = NextResponse.json(data)
+  // Never echo tokens back in the response body: the browser must use the
+  // httpOnly cookies. Returning backend payload verbatim would leak both
+  // access and refresh tokens to page-level JavaScript.
+  const response = NextResponse.json({ ok: true })
   response.cookies.set("access_token", data.accessToken as string, {
     httpOnly: true,
     secure: isSecure,
