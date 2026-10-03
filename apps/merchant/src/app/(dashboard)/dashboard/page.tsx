@@ -44,6 +44,7 @@ export default function MerchantDashboardPage() {
   const [selectedCurrency, setSelectedCurrency] = useState<string>("ALL")
   const [resending, setResending] = useState(false)
   const [resendMsg, setResendMsg] = useState<string | null>(null)
+  const [pollError, setPollError] = useState<string | null>(null)
 
   const allBalances = useMemo(() => {
     if (!merchant || balances.length === 0) return balances
@@ -53,12 +54,17 @@ export default function MerchantDashboardPage() {
 
   const loadData = useCallback(async () => {
     if (!merchant) return
-    const [balanceRes, paymentsRes] = await Promise.all([
-      fetch(`/api/proxy/ledger/api/v1/ledger/balances?merchantId=${merchant.id}`),
-      fetch(`/api/proxy/payment/api/v1/payments?merchantId=${merchant.id}&skip=0&take=5`),
-    ])
-    if (balanceRes.ok) setBalances(await balanceRes.json())
-    if (paymentsRes.ok) setPayments(await paymentsRes.json())
+    try {
+      const [balanceRes, paymentsRes] = await Promise.all([
+        fetch(`/api/proxy/ledger/api/v1/ledger/balances?merchantId=${merchant.id}`),
+        fetch(`/api/proxy/payment/api/v1/payments?merchantId=${merchant.id}&skip=0&take=5`),
+      ])
+      if (balanceRes.ok) setBalances(await balanceRes.json())
+      if (paymentsRes.ok) setPayments(await paymentsRes.json())
+      setPollError(null)
+    } catch {
+      setPollError("Background refresh failed")
+    }
   }, [merchant])
 
   useEffect(() => {
@@ -98,8 +104,20 @@ export default function MerchantDashboardPage() {
 
   useEffect(() => {
     if (!merchant) return
-    const interval = setInterval(loadData, 30000)
-    return () => clearInterval(interval)
+    const tick = () => {
+      // Hidden tabs burn API calls (and token rotations) for nobody.
+      if (document.hidden) return
+      void loadData()
+    }
+    const interval = setInterval(tick, 30000)
+    const onVisibility = () => {
+      if (!document.hidden) void loadData()
+    }
+    document.addEventListener("visibilitychange", onVisibility)
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener("visibilitychange", onVisibility)
+    }
   }, [merchant, loadData])
 
   const allZero = allBalances.every((b) => b.available === 0 && b.pending === 0 && b.reserved === 0)
@@ -197,6 +215,12 @@ export default function MerchantDashboardPage() {
             {resending ? "Sending…" : "Resend email"}
           </button>
         </div>
+      )}
+
+      {pollError && (
+        <p role="status" className="text-xs text-muted-foreground">
+          {pollError} — showing the last loaded data.
+        </p>
       )}
 
       {merchant?.status === "Pending" && (

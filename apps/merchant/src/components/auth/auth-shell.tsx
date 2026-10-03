@@ -48,7 +48,7 @@ export function AuthShell({
           src={image.src}
           alt=""
           fill
-          priority
+          loading="lazy"
           unoptimized
           sizes="55vw"
           className="object-cover opacity-45"

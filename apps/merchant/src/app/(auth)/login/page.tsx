@@ -33,11 +33,17 @@ export default function LoginPage() {
 
   const onSubmit = async (data: LoginForm) => {
     setError(null)
-    const res = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    })
+    let res: Response
+    try {
+      res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      })
+    } catch {
+      setError("Network error. Check your connection and try again.")
+      return
+    }
 
     if (!res.ok) {
       const body = await res.json()

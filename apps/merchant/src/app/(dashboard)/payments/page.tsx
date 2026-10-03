@@ -13,6 +13,7 @@ import {
   Card,
   CardHeader,
   EmptyState,
+  ErrorPanel,
   Field,
   Input,
   Modal,
@@ -34,6 +35,7 @@ export default function PaymentsPage() {
   const { merchant, loading: merchantLoading } = useMerchant()
   const [payments, setPayments] = useState<PaymentIntentDto[]>([])
   const [dataReady, setDataReady] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [showCreate, setShowCreate] = useState(false)
   const loading = merchantLoading || (merchant !== null && !dataReady)
 
@@ -45,9 +47,14 @@ export default function PaymentsPage() {
     async function load() {
       try {
         const paymentsRes = await fetch(`/api/proxy/payment/api/v1/payments?merchantId=${m.id}&skip=0&take=10`)
-        if (!cancelled && paymentsRes.ok) setPayments(await paymentsRes.json())
+        if (cancelled) return
+        if (!paymentsRes.ok) {
+          setLoadError(`The request failed with status ${paymentsRes.status}. Try again shortly.`)
+        } else {
+          setPayments(await paymentsRes.json())
+        }
       } catch {
-        /* ignore */
+        if (!cancelled) setLoadError("The request could not reach the server. Check your connection and retry.")
       } finally {
         if (!cancelled) setDataReady(true)
       }
@@ -78,6 +85,8 @@ export default function PaymentsPage() {
         />
         {loading ? (
           <TableSkeleton rows={6} columns={6} />
+        ) : loadError ? (
+          <ErrorPanel title="Failed to load payments" message={loadError} />
         ) : payments.length === 0 ? (
           <EmptyState
             icon={CreditCard}
