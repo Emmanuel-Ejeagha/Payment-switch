@@ -294,6 +294,9 @@ services:
     restart: always
     environment:
       - NEXT_PUBLIC_API_URL=${FRONTEND_BASE_URL:-http://localhost}
+      # Server-side service origin for Next.js Route Handlers (localhost inside
+      # a container is the app itself, not nginx).
+      - INTERNAL_API_URL=http://nginx
     depends_on:
       - identity-api
       - merchant-api
@@ -313,6 +316,9 @@ services:
     restart: always
     environment:
       - NEXT_PUBLIC_API_URL=${FRONTEND_BASE_URL:-http://localhost}
+      # Server-side service origin for Next.js Route Handlers (localhost inside
+      # a container is the app itself, not nginx).
+      - INTERNAL_API_URL=http://nginx
     depends_on:
       - identity-api
       - merchant-api
