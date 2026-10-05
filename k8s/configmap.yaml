@@ -20,6 +20,9 @@ data:
   Resend__TimeoutSeconds: "30"
   EmailVerification__ResendCooldownSeconds: "60"
   Sms__Enabled: "false"
+  Retention__CleanupIntervalMinutes: "60"
+  Retention__BatchSize: "100"
+  Retention__MessageRetentionDays: "7"
   # Frontend API base URL (inlined at build time, also injected at runtime so
   # the Next.js server-side API proxy reaches the right origin). HTTPS in prod.
   NEXT_PUBLIC_API_URL: "http://localhost"

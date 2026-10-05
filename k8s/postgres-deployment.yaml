@@ -17,6 +17,8 @@ metadata:
   namespace: payment-switch
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: postgres
