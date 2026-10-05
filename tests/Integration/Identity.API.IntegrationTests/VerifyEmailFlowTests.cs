@@ -85,7 +85,7 @@ public class VerifyEmailFlowTests : IClassFixture<IdentityApiFactory>
         var response = await _client.PostAsJsonAsync("/api/v1/auth/verify-email", new
         {
             Email = email,
-            Token = "9F86D081884C7D659A2FEAA0C55AD015A3BF4F1B2B0B822CD15D6C15B0F00A08"
+            Token = new string('0', 64) // Deliberately all-zeros: an invalid-token fixture, never a real token.
         });
 
         Assert.Equal(System.Net.HttpStatusCode.BadRequest, response.StatusCode);

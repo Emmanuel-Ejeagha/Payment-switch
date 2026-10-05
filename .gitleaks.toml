@@ -1,0 +1,14 @@
+# Gitleaks allowlist for values that are provably NOT secrets.
+# The scanner runs over full git history, so historical dummy/test fixtures
+# must be allowlisted even after the current tree stops using them.
+
+[allowlist]
+description = "Known dummy and test-fixture values (never real credentials)"
+regexes = [
+  # Sequential hex dummy formerly used for helm lint/render-only --set flags
+  # (never deployed; deploy sources Jwt__Secret elsewhere).
+  '''0123456789abcdef0123456789abcdef''',
+  # SHA-256 of the empty string: the most famous hash value in existence,
+  # formerly used as an invalid-token test fixture.
+  '''9F86D081884C7D659A2FEAA0C55AD015A3BF4F1B2B0B822CD15D6C15B0F00A08''',
+]
