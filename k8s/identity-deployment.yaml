@@ -27,7 +27,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: identity-api
-          image: paymentswitch-identity:latest
+          image: paymentswitch/identity-api:latest
           env:
             - name: ConnectionStrings__IdentityDb
               valueFrom:

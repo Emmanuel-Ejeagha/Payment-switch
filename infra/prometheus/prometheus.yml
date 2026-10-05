@@ -11,24 +11,31 @@ alerting:
 
 scrape_configs:
   - job_name: identity
+    metrics_path: /metrics
     static_configs:
       - targets: ["identity-api:8080"]
   - job_name: merchant
+    metrics_path: /metrics
     static_configs:
       - targets: ["merchant-api:8080"]
   - job_name: payment
+    metrics_path: /metrics
     static_configs:
       - targets: ["payment-api:8080"]
   - job_name: ledger
+    metrics_path: /metrics
     static_configs:
       - targets: ["ledger-api:8080"]
   - job_name: notification
+    metrics_path: /metrics
     static_configs:
       - targets: ["notification-api:8080"]
   - job_name: settlement
+    metrics_path: /metrics
     static_configs:
       - targets: ["settlement-api:8080"]
   - job_name: rabbitmq
+    metrics_path: /metrics
     scrape_interval: 15s
     static_configs:
       - targets: ["rabbitmq:15692"]

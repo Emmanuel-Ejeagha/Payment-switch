@@ -242,14 +242,16 @@ spec:
             httpGet:
               path: {{ $svc.probes.livenessPath }}
               port: {{ $svc.containerPort }}
-            initialDelaySeconds: 15
-            periodSeconds: 10
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 5
           readinessProbe:
             httpGet:
               path: {{ $svc.probes.readinessPath }}
               port: {{ $svc.containerPort }}
-            initialDelaySeconds: 10
-            periodSeconds: 5
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 5
 ---
 {{- end }}
 {{- end }}

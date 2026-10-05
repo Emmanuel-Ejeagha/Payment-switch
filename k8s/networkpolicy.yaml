@@ -16,8 +16,10 @@ metadata:
   namespace: payment-switch
 spec:
   podSelector:
-    matchLabels:
-      app.kubernetes.io/part-of: payment-switch
+    matchExpressions:
+      - key: app
+        operator: In
+        values: [identity-api, merchant-api, payment-api, ledger-api, notification-api, settlement-api, merchant-web, admin-web]
   policyTypes:
     - Ingress
     - Egress
@@ -99,10 +101,10 @@ spec:
           port: 4317
         - protocol: TCP
           port: 4318
-    # SMTP outbound (TLS)
+    # SMTP outbound (TLS) — ipBlock must stand alone in its peer entry
+    # (mixing ipBlock with pod/namespace selectors is rejected by validation).
     - to:
-        - namespaceSelector: {}
-          ipBlock:
+        - ipBlock:
             cidr: 0.0.0.0/0
       ports:
         - protocol: TCP
@@ -124,8 +126,10 @@ spec:
   ingress:
     - from:
         - podSelector:
-            matchLabels:
-              app.kubernetes.io/part-of: payment-switch
+            matchExpressions:
+              - key: app
+                operator: In
+                values: [identity-api, merchant-api, payment-api, ledger-api, notification-api, settlement-api, merchant-web, admin-web]
       ports:
         - protocol: TCP
           port: 5432
@@ -144,8 +148,10 @@ spec:
   ingress:
     - from:
         - podSelector:
-            matchLabels:
-              app.kubernetes.io/part-of: payment-switch
+            matchExpressions:
+              - key: app
+                operator: In
+                values: [identity-api, merchant-api, payment-api, ledger-api, notification-api, settlement-api, merchant-web, admin-web]
       ports:
         - protocol: TCP
           port: 5672
@@ -153,3 +159,31 @@ spec:
           port: 15672
         - protocol: TCP
           port: 15692
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-observability
+  namespace: payment-switch
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values: [prometheus, grafana, alertmanager]
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchExpressions:
+              - key: app
+                operator: In
+                values: [identity-api, merchant-api, payment-api, ledger-api, notification-api, settlement-api, merchant-web, admin-web]
+      ports:
+        - protocol: TCP
+          port: 9090
+        - protocol: TCP
+          port: 3000
+        - protocol: TCP
+          port: 9093
