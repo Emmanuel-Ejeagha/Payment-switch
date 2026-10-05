@@ -27,7 +27,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: merchant-api
-          image: paymentswitch-merchant:latest
+          image: paymentswitch/merchant-api:latest
           env:
             - name: ConnectionStrings__MerchantDb
               valueFrom:

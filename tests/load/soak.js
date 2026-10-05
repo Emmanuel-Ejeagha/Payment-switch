@@ -9,8 +9,8 @@ import { createConfirmCapture } from './lib/payment-flow.js';
  * threshold for the whole run, and the error rate must stay ~0.
  *
  * Run:
- *   PAYMENT_BASE_URL=http://localhost:8080 \
- *   MERCHANT_BASE_URL=http://localhost:8080 \
+ *   PAYMENT_BASE_URL=http://localhost/payment \
+ *   MERCHANT_BASE_URL=http://localhost/identity \
  *   API_KEY=sk_test_... MERCHANT_EMAIL=... MERCHANT_PASSWORD=... \
  *   k6 run tests/load/soak.js
  */

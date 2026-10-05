@@ -16,10 +16,15 @@ services:
       - ./infra/postgres/init-multiple-databases.sql:/docker-entrypoint-initdb.d/init-multiple-databases.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U paymentswitch"]
-      interval: 5s
+      interval: 10s
       timeout: 5s
       retries: 10
       start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
     networks:
       - paymentswitch-network
 
@@ -28,6 +33,17 @@ services:
     restart: always
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
     networks:
       - paymentswitch-network
 
@@ -41,8 +57,20 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:?Set RABBITMQ_DEFAULT_USER in .env}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:?Set RABBITMQ_DEFAULT_PASS in .env}
+      RABBITMQ_ENABLED_PLUGINS: rabbitmq_prometheus
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
     networks:
       - paymentswitch-network
 
@@ -51,6 +79,17 @@ services:
     restart: always
     environment:
       - COLLECTOR_OTLP_ENABLED=true
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:16686/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
     networks:
       - paymentswitch-network
 
@@ -61,6 +100,17 @@ services:
       - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
       - ./infra/prometheus/alerts.yml:/etc/prometheus/alerts.yml
       - prometheus_data:/prometheus
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:9090/-/healthy || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 1G
     networks:
       - paymentswitch-network
 
@@ -72,6 +122,17 @@ services:
       - "--storage.path=/alertmanager"
     volumes:
       - ./infra/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:9093/-/healthy || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 256M
     networks:
       - paymentswitch-network
 
@@ -86,6 +147,17 @@ services:
       - ./infra/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
       - ./infra/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
       - ./infra/grafana/provisioning/dashboards:/var/lib/grafana/dashboards
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
     networks:
       - paymentswitch-network
 
@@ -125,7 +197,18 @@ services:
       postgres:
         condition: service_healthy
       rabbitmq:
-        condition: service_started
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
     networks:
       - paymentswitch-network
 
@@ -154,7 +237,18 @@ services:
       postgres:
         condition: service_healthy
       rabbitmq:
-        condition: service_started
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
     networks:
       - paymentswitch-network
 
@@ -183,7 +277,18 @@ services:
       postgres:
         condition: service_healthy
       rabbitmq:
-        condition: service_started
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
     networks:
       - paymentswitch-network
 
@@ -211,7 +316,18 @@ services:
       postgres:
         condition: service_healthy
       rabbitmq:
-        condition: service_started
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
     networks:
       - paymentswitch-network
 
@@ -252,7 +368,18 @@ services:
       postgres:
         condition: service_healthy
       rabbitmq:
-        condition: service_started
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
     networks:
       - paymentswitch-network
 
@@ -281,7 +408,18 @@ services:
       postgres:
         condition: service_healthy
       rabbitmq:
-        condition: service_started
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
     networks:
       - paymentswitch-network
 
@@ -298,12 +436,29 @@ services:
       # a container is the app itself, not nginx).
       - INTERNAL_API_URL=http://nginx
     depends_on:
-      - identity-api
-      - merchant-api
-      - payment-api
-      - ledger-api
-      - notification-api
-      - settlement-api
+      identity-api:
+        condition: service_healthy
+      merchant-api:
+        condition: service_healthy
+      payment-api:
+        condition: service_healthy
+      ledger-api:
+        condition: service_healthy
+      notification-api:
+        condition: service_healthy
+      settlement-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
     networks:
       - paymentswitch-network
 
@@ -320,12 +475,29 @@ services:
       # a container is the app itself, not nginx).
       - INTERNAL_API_URL=http://nginx
     depends_on:
-      - identity-api
-      - merchant-api
-      - payment-api
-      - ledger-api
-      - notification-api
-      - settlement-api
+      identity-api:
+        condition: service_healthy
+      merchant-api:
+        condition: service_healthy
+      payment-api:
+        condition: service_healthy
+      ledger-api:
+        condition: service_healthy
+      notification-api:
+        condition: service_healthy
+      settlement-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3001/api/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
     networks:
       - paymentswitch-network
 
@@ -334,23 +506,69 @@ services:
     restart: always
     volumes:
       - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      # Dev mode: plain HTTP on :80. For production TLS, mount the tls mode
-      # instead (see docs/tls.md):
-      #   - ./infra/nginx/tls:/etc/nginx/tls:ro
+      # Dev mode: plain HTTP on :80. For production TLS, use the prod overlay
+      # (see docs/tls.md) which publishes :443 and mounts the real certs:
+      #   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
       # and drop fullchain.pem + privkey.pem into ./infra/nginx/tls/certs.
       - ./infra/nginx/http:/etc/nginx/tls:ro
     ports:
       - "80:80"
-      - "443:443"
     depends_on:
-      - identity-api
-      - merchant-api
-      - payment-api
-      - ledger-api
-      - notification-api
-      - settlement-api
-      - merchant-web
-      - admin-web
+      identity-api:
+        condition: service_healthy
+      merchant-api:
+        condition: service_healthy
+      payment-api:
+        condition: service_healthy
+      ledger-api:
+        condition: service_healthy
+      notification-api:
+        condition: service_healthy
+      settlement-api:
+        condition: service_healthy
+      merchant-web:
+        condition: service_healthy
+      admin-web:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost/identity/health/live || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+    networks:
+      - paymentswitch-network
+
+  # Nightly Postgres backup job (Step 10.1): runs infra/backup/pg-backup.sh
+  # on a 24h loop against the healthy postgres service; artifacts land in the
+  # pgbackups volume (see docs/runbook.md "Backups").
+  backup:
+    image: postgres:16-alpine
+    restart: always
+    command: ["sh", "-c", "while true; do /scripts/pg-backup.sh; sleep 86400; done"]
+    environment:
+      PGHOST: postgres
+      PGPORT: 5432
+      PGUSER: paymentswitch
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      BACKUP_DIR: /backups
+      KEEP_DAILY: 14
+    volumes:
+      - ./infra/backup/pg-backup.sh:/scripts/pg-backup.sh:ro
+      - pgbackups:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 256M
     networks:
       - paymentswitch-network
 
@@ -360,6 +578,7 @@ volumes:
   rabbitmq_data:
   prometheus_data:
   grafana_data:
+  pgbackups:
 
 networks:
   paymentswitch-network:

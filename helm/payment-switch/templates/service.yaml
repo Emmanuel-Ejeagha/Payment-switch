@@ -12,7 +12,7 @@ spec:
   selector:
     app: {{ $svc.name }}
   ports:
-    - port: 80
+    - port: 8080
       targetPort: {{ $svc.containerPort }}
       protocol: TCP
       name: http

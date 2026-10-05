@@ -27,7 +27,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: notification-api
-          image: paymentswitch-notification:latest
+          image: paymentswitch/notification-api:latest
           env:
             - name: ConnectionStrings__NotificationDb
               valueFrom:
@@ -75,6 +75,8 @@ spec:
                 secretKeyRef:
                   name: payment-switch-secret
                   key: RabbitMQ__Password
+            - name: Retention__BusinessRetentionDays
+              value: "90"
             - name: Smtp__Host
               valueFrom:
                 configMapKeyRef:

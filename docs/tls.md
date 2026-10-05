@@ -33,7 +33,14 @@ mode folders are committed:
      infra/nginx/tls/certs/privkey.pem
    ```
 
-4. Switch nginx to TLS mode in `docker-compose.yml` and restart:
+4. Switch nginx to TLS mode with the prod overlay and restart:
+
+   ```bash
+   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d nginx
+   ```
+
+   (`docker-compose.prod.yml` mounts `./infra/nginx/tls:/etc/nginx/tls:ro` and
+   publishes `443:443`; the base file stays HTTP-only on `:80`.)
 
    ```yaml
    volumes:
@@ -47,8 +54,8 @@ mode folders are committed:
 5. Verify:
 
    ```bash
-   curl -I https://paymentswitch.example.com/merchant/api/v1/health
-   curl -I http://paymentswitch.example.com/merchant/api/v1/health   # expect 301
+   curl -I https://paymentswitch.example.com/merchant/health/live
+   curl -I http://paymentswitch.example.com/merchant/health/live   # expect 301
    curl -I https://paymentswitch.example.com/                         # merchant portal
    curl -I https://paymentswitch.example.com/admin/login              # admin portal
    ```

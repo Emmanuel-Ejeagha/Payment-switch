@@ -12,6 +12,15 @@ chart (`helm/payment-switch`) are **implemented and CI-tested but are not the
 live production runtime**. Treat them as the target platform for a future
 migration; verify them against a staging cluster before relying on them.
 
+## Image naming convention
+
+All images — k8s manifests (`k8s/*-deployment.yaml`), the Helm chart
+(`helm/payment-switch/values.yaml` repositories), and CI
+(`.github/workflows/ci-cd.yml`) — use the single convention
+`paymentswitch/<name>:latest` (e.g. `paymentswitch/payment-api:latest`),
+tagged per-build as `paymentswitch/<name>:<sha>`. Rollback re-pins via
+`kubectl set image` (see below).
+
 ## Prerequisites
 
 - Kubernetes cluster (v1.29+)
