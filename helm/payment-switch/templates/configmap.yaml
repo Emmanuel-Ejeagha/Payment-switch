@@ -20,4 +20,7 @@ data:
   Resend__FromName: {{ .Values.config.resend.fromName | quote }}
   Resend__TimeoutSeconds: {{ .Values.config.resend.timeoutSeconds | quote }}
   Sms__Enabled: {{ .Values.config.sms.enabled | quote }}
+  Retention__CleanupIntervalMinutes: {{ .Values.config.retention.cleanupIntervalMinutes | quote }}
+  Retention__BatchSize: {{ .Values.config.retention.batchSize | quote }}
+  Retention__MessageRetentionDays: {{ .Values.config.retention.messageRetentionDays | quote }}
   NEXT_PUBLIC_API_URL: {{ .Values.config.frontend.apiUrl | quote }}

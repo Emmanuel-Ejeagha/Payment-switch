@@ -41,17 +41,20 @@ spec:
               value: {{ .Values.config.postgres.userName | quote }}
             - name: POSTGRES_PASSWORD
               value: {{ .Values.config.postgres.password | quote }}
-            - name: POSTGRES_MULTIPLE_DATABASES
-              value: "IdentityDb,MerchantDb,PaymentDb,LedgerDb,NotificationDb,SettlementDb"
           resources:
             {{- toYaml .Values.infrastructure.postgres.resources | nindent 12 }}
           volumeMounts:
             - name: postgres-storage
               mountPath: /var/lib/postgresql/data
+            - name: postgres-init
+              mountPath: /docker-entrypoint-initdb.d
       volumes:
         - name: postgres-storage
           persistentVolumeClaim:
             claimName: postgres-pvc
+        - name: postgres-init
+          configMap:
+            name: postgres-init
 ---
 apiVersion: v1
 kind: Service

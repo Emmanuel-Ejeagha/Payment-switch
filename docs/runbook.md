@@ -52,8 +52,8 @@ the stack consistent. For zero-downtime deployment of a single service,
 ### Verifying a deploy
 
 ```bash
-curl -fsS http://localhost/identity/api/v1/health/live
-curl -fsS http://localhost/merchant/api/v1/health/ready
+curl -fsS http://localhost/identity/health/live
+curl -fsS http://localhost/merchant/health/ready
 curl -I http://localhost/            # merchant portal
 curl -I http://localhost/admin/login # admin portal
 ```
@@ -65,11 +65,12 @@ TLS terminates at nginx (see `docs/tls.md`):
 1. Obtain certs with certbot: `sudo certbot certonly --standalone -d <domain>`.
 2. Copy `fullchain.pem` + `privkey.pem` into `infra/nginx/tls/certs/`
    (gitignored).
-3. Switch nginx to TLS mode in `docker-compose.yml` (mount
-   `./infra/nginx/tls:/etc/nginx/tls:ro`) and `docker compose up -d nginx`.
+3. Switch nginx to TLS mode with the prod overlay (`docker-compose.prod.yml`,
+   which mounts `./infra/nginx/tls:/etc/nginx/tls:ro` and publishes `443:443`)
+   and `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d nginx`.
 4. Confirm the redirect + HSTS:
    ```bash
-   curl -I http://<domain>/identity/api/v1/health   # 301 -> https
+   curl -I http://<domain>/identity/health/live   # 301 -> https
    curl -I https://<domain>/                        # 200
    ```
 
@@ -106,6 +107,19 @@ Restore:
 ```bash
 gunzip -c backup.sql.gz | docker compose exec -T postgres psql -U paymentswitch -d postgres
 ```
+
+### Nightly backup job (`backup` service)
+
+The `backup` compose service runs `infra/backup/pg-backup.sh` nightly against
+`postgres`, writing per-database dumps plus globals and a `SHA256SUMS`
+manifest into the `pgbackups` volume (`/backups`). Off-host copies (S3) are
+the operator's second tier.
+
+### Restore drill
+
+Prove restores with `infra/backup/restore-drill.sh` (scratch container only,
+never the live volume). It restores every database and checks core tables.
+Record each drill result and any real restore in the ops log.
 
 ### RabbitMQ / Prometheus / Grafana
 

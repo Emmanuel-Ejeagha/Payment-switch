@@ -19,7 +19,7 @@ env vars.
 
 ```bash
 docker run --rm -i -v "$PWD/tests/load:/load" \
-  -e PAYMENT_BASE_URL=http://localhost:8080 -e MERCHANT_BASE_URL=http://localhost:8080 \
+  -e PAYMENT_BASE_URL=http://localhost/payment -e MERCHANT_BASE_URL=http://localhost/identity \
   -e API_KEY=sk_test_... -e MERCHANT_EMAIL=load-owner@example.com -e MERCHANT_PASSWORD='...' \
   grafana/k6 run /load/create-intent-capture.js
 ```

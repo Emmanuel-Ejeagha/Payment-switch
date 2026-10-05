@@ -1,4 +1,5 @@
 ﻿using System.Globalization;
+using BuildingBlocks.Shared.Auth;
 using BuildingBlocks.Shared.Paging;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -28,9 +29,10 @@ public class SettlementController : BaseApiController
     }
 
     /// <summary>
-    /// Get a settlement batch by ID.
+    /// Get a settlement batch by ID (Admin and Support).
     /// </summary>
     [HttpGet("{id:guid}")]
+    [Authorize(Roles = RolePolicies.ReadOnly)]
     [ProducesResponseType(typeof(SettlementBatchDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(
@@ -42,9 +44,10 @@ public class SettlementController : BaseApiController
     }
 
     /// <summary>
-    /// List settlement batches with optional date filters.
+    /// List settlement batches with optional date filters (Admin and Support).
     /// </summary>
     [HttpGet]
+    [Authorize(Roles = RolePolicies.ReadOnly)]
     [ProducesResponseType(typeof(List<SettlementBatchDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> List(
         [FromQuery] DateTime? from,

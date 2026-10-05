@@ -1,4 +1,5 @@
 ﻿using System.Globalization;
+using BuildingBlocks.Shared.Auth;
 using BuildingBlocks.Shared.Paging;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -13,9 +14,10 @@ namespace Notification.API.Controllers;
 public class NotificationsController : BaseApiController
 {
     /// <summary>
-    /// Get a single notification by ID (Admin only).
+    /// Get a single notification by ID (Admin and Support).
     /// </summary>
     [HttpGet("{id:guid}")]
+    [Authorize(Roles = RolePolicies.ReadOnly)]
     [ProducesResponseType(typeof(NotificationDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(
@@ -27,9 +29,10 @@ public class NotificationsController : BaseApiController
     }
 
     /// <summary>
-    /// List notifications with optional filters (Admin only).
+    /// List notifications with optional filters (Admin and Support).
     /// </summary>
     [HttpGet]
+    [Authorize(Roles = RolePolicies.ReadOnly)]
     [ProducesResponseType(typeof(List<NotificationDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> List(
         [FromQuery] string? recipient,
