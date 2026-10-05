@@ -22,6 +22,8 @@ spec:
             - containerPort: {{ .Values.infrastructure.rabbitmq.managementPort }}
             - containerPort: {{ .Values.infrastructure.rabbitmq.prometheusPort }}
           env:
+            - name: RABBITMQ_ENABLED_PLUGINS
+              value: "rabbitmq_prometheus"
             - name: RABBITMQ_DEFAULT_USER
               valueFrom:
                 secretKeyRef:
