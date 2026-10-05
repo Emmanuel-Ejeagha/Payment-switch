@@ -1,10 +1,13 @@
+using BuildingBlocks.Shared.ValueObjects;
 using Payment.Domain.ValueObjects;
 
 namespace Payment.Infrastructure.Services.Gateways;
 
 public class GatewayRouter
 {
-    private const long HighValueMinorThreshold = 500_00;
+    // Compared in MAJOR units: raw minor-unit comparison misroutes 3-decimal
+    // currencies (KWD 100.000 = 100_000 minor looks >= 500_00 minor).
+    private const decimal HighValueMajorThreshold = 500m;
 
     public IReadOnlyList<GatewayProviderEntry> Resolve(Money amount, CardDetails? cardDetails, IReadOnlyCollection<GatewayProviderEntry> providers)
     {
@@ -24,7 +27,8 @@ public class GatewayRouter
 
     private static string SelectPreferredProvider(Money amount, CardDetails? cardDetails)
     {
-        if (amount.Amount >= HighValueMinorThreshold)
+        var major = CurrencyInfo.Lookup(amount.Currency).ToMajorUnits(amount.Amount);
+        if (major >= HighValueMajorThreshold)
             return "stripe";
 
         var brand = cardDetails?.Brand?.ToLowerInvariant();
