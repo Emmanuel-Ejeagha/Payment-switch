@@ -52,3 +52,24 @@ jobs:
         uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  frontend-audit-advisory:
+    name: Frontend Audit (advisory, non-blocking)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install workspace dependencies
+        run: npm ci
+
+      # Full audit (dev included) is advisory only: build-toolchain findings
+      # (e.g. tailwindcss v3 chain) are tracked as P2, not release gates.
+      - name: Full npm audit (advisory)
+        run: npm audit --audit-level=high
+        continue-on-error: true

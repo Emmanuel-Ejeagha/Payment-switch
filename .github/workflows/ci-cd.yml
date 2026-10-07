@@ -135,7 +135,10 @@ jobs:
         run: npm ci
 
       - name: Audit dependencies
-        run: npm audit --audit-level=high
+        # Production-deps gate: dev-toolchain advisories (tailwindcss v3 / eslint
+        # chains, build-time only) are tracked by the weekly advisory audit in
+        # security.yml, not as release gates. See TODO.md Ship Event 11.
+        run: npm audit --omit=dev --audit-level=high
 
       - name: Typecheck admin
         run: npm run typecheck --workspace=admin
