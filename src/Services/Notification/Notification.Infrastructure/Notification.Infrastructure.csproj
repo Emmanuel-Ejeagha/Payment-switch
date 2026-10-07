@@ -8,10 +8,10 @@
     <!-- 4.11.0 carried moderate advisories in MailKit (GHSA-9j88-vvj5-vhgr) and its
          MimeKit dependency (GHSA-g7hc-96xr-gvvx). -->
     <PackageReference Include="MailKit" Version="4.17.0" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.9" />
-    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.9" />
-    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.9" />
-    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="10.0.9" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="10.0.12" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.2" />
     <PackageReference Include="RabbitMQ.Client" Version="7.2.1" />
     <PackageReference Include="Google.Protobuf" Version="3.36.2" />
