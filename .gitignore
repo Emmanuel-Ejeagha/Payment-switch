@@ -30,7 +30,6 @@ Thumbs.db
 
 *.env
 appsettings.Development.json
-/.env.example
 
 # Local environment overrides for the Next.js apps
 .env*.local
