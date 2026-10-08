@@ -35,8 +35,10 @@ export default function DashboardPage() {
           setUser(await userRes.json())
         } else if (userRes.status === 401) {
           // No usable session (middleware skips the exact basePath root,
-          // so this page enforces auth itself).
-          router.push(apiUrl("/login"))
+          // so this page enforces auth itself). NOTE: router.push applies
+          // basePath itself — pass the bare path or it doubles to
+          // /admin/admin/login.
+          router.push("/login")
           return
         }
 

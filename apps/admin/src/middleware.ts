@@ -31,6 +31,10 @@ export async function middleware(request: NextRequest) {
 
   if (publicPaths.includes(pathname)) {
     if (accessToken && !isExpired(accessToken)) {
+      // NOTE: server-side redirects need the literal path WITH basePath.
+      // Next.js does not prepend basePath to middleware redirect Locations
+      // (verified live: bare "/login" arrives without prefix), while the
+      // client router DOES prepend it — so router.push must use bare paths.
       return NextResponse.redirect(new URL(`${BASE_PATH}/`, request.url))
     }
     return NextResponse.next()
