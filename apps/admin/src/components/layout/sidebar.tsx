@@ -64,37 +64,60 @@ export function Sidebar({ open, onClose }: SidebarProps) {
   const [showNotifications, setShowNotifications] = useState(false)
 
   useEffect(() => {
-    const conn = new signalR.HubConnectionBuilder()
-      .withUrl(
-        `${process.env.NEXT_PUBLIC_API_URL}/notification/hubs/payment-notifications`,
-        {
-          withCredentials: false,
-          accessTokenFactory: getAccessToken,
-        }
-      )
-      .withAutomaticReconnect()
-      .configureLogging(signalR.LogLevel.Warning)
-      .build()
+    let cancelled = false
+    let conn: signalR.HubConnection | null = null
 
-    conn.on("PaymentEvent", (event: PaymentEvent) => {
-      setEvents((prev) => [event, ...prev])
-    })
+    async function init() {
+      // No refresh session (logged out or expired everywhere): realtime is
+      // unavailable. Stay quiet instead of spamming negotiation failures and
+      // retry storms for a non-critical enhancement (merchant parity).
+      try {
+        await getAccessToken()
+      } catch {
+        if (!cancelled) setConnected(false)
+        return
+      }
+      if (cancelled) return
 
-    conn.onreconnecting(() => setConnected(false))
-    conn.onreconnected(() => setConnected(true))
-    conn.onclose(() => setConnected(false))
+      conn = new signalR.HubConnectionBuilder()
+        .withUrl(
+          `${process.env.NEXT_PUBLIC_API_URL}/notification/hubs/payment-notifications`,
+          {
+            withCredentials: false,
+            accessTokenFactory: getAccessToken,
+          }
+        )
+        .withAutomaticReconnect()
+        .configureLogging(signalR.LogLevel.Warning)
+        .build()
 
-    async function start() {
+      conn.on("PaymentEvent", (event: PaymentEvent) => {
+        if (!cancelled) setEvents((prev) => [event, ...prev])
+      })
+
+      conn.onreconnecting(() => {
+        if (!cancelled) setConnected(false)
+      })
+      conn.onreconnected(() => {
+        if (!cancelled) setConnected(true)
+      })
+      conn.onclose(() => {
+        if (!cancelled) setConnected(false)
+      })
+
       try {
         await conn.start()
-        setConnected(true)
+        if (!cancelled) setConnected(true)
       } catch {
-        setConnected(false)
+        if (!cancelled) setConnected(false)
       }
     }
-    start()
+    init()
 
-    return () => { conn.stop() }
+    return () => {
+      cancelled = true
+      conn?.stop()
+    }
   }, [])
 
   const handleLogout = async () => {
