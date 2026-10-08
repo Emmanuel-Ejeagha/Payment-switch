@@ -40,6 +40,9 @@ RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
 # runtime only ever runs `node server.js`, so drop npm entirely: smaller
 # image and no dead vulnerable surface for Trivy to flag.
 RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
+# Pull latest patched Alpine packages at build time so image scans stay clean
+# on fixed CVEs without waiting for a new node base tag.
+RUN apk upgrade --no-cache
 COPY --from=builder /app/apps/merchant/.next/standalone ./
 COPY --from=builder /app/apps/merchant/.next/static ./apps/merchant/.next/static
 COPY --from=builder /app/apps/merchant/public ./apps/merchant/public
