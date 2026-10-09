@@ -1,10 +1,18 @@
 import type { Metadata, Viewport } from "next"
-import { Inter } from "next/font/google"
+import localFont from "next/font/local"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 
-const inter = Inter({
-  subsets: ["latin"],
+// Self-hosted Inter (latin 400/500/600/700) so production Docker builds never
+// depend on fonts.googleapis.com egress. Same files Google serves; swap the
+// variable or add weights under ./fonts if the design needs more.
+const inter = localFont({
+  src: [
+    { path: "./fonts/inter-latin-400-normal.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/inter-latin-500-normal.woff2", weight: "500", style: "normal" },
+    { path: "./fonts/inter-latin-600-normal.woff2", weight: "600", style: "normal" },
+    { path: "./fonts/inter-latin-700-normal.woff2", weight: "700", style: "normal" },
+  ],
   display: "swap",
   variable: "--font-sans",
 })
