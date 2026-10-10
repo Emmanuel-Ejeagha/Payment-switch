@@ -187,7 +187,7 @@ export default function RegisterPage() {
         // The identity account exists, so signing in works — /onboarding lets them
         // retry the merchant profile instead of stranding them here.
         setError(
-          "Account created, but merchant setup did not finish. Sign in to complete it.",
+          "Account created, but merchant setup did not finish. Verify your email to continue.",
         );
         return;
       }
