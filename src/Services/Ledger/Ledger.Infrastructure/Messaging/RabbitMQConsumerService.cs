@@ -92,6 +92,9 @@ public class RabbitMQConsumerService : BackgroundService
         _connection = await factory.CreateConnectionAsync(cancellationToken);
         _channel = await _connection.CreateChannelAsync(cancellationToken: cancellationToken);
 
+        // Declare the source exchange before binding: binding to a never-declared
+        // exchange 404s and crash-loops the consumer (no broker history to rely on).
+        await _channel.ExchangeDeclareAsync(_sourceExchange, ExchangeType.Topic, durable: true, cancellationToken: cancellationToken);
         await _channel.ExchangeDeclareAsync(_retryExchange, ExchangeType.Topic, durable: true, cancellationToken: cancellationToken);
         await _channel.ExchangeDeclareAsync(_dlxExchange, ExchangeType.Topic, durable: true, cancellationToken: cancellationToken);
 
