@@ -538,7 +538,7 @@ services:
       admin-web:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost/identity/health/live || exit 1"]
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1/identity/health/live || exit 1"]
       interval: 15s
       timeout: 10s
       retries: 3
