@@ -90,14 +90,16 @@ public partial class DeploymentResilienceTests
     }
 
     [Theory]
-    [InlineData("merchant", "3000")]
-    [InlineData("admin", "3001")]
-    public void FrontendDockerfile_HasHealthcheckOnAppPort(string app, string port)
+    [InlineData("merchant", "3000", "/api/health")]
+    [InlineData("admin", "3001", "/admin/api/health")]
+    public void FrontendDockerfile_HasHealthcheckOnAppPort(string app, string port, string path)
     {
         var dockerfile = Read($"apps/{app}/Dockerfile");
 
         Assert.Contains("HEALTHCHECK", dockerfile);
-        Assert.Contains($"http://localhost:{port}/api/health", dockerfile);
+        // IPv4 loopback: Alpine resolves localhost to ::1 while Next listens on
+        // IPv4 only; admin needs its basePath prefix to hit the route.
+        Assert.Contains($"http://127.0.0.1:{port}{path}", dockerfile);
     }
 
     [Theory]

@@ -36,6 +36,9 @@ public static class OpenTelemetryExtensions
             {
                 metrics.AddAspNetCoreInstrumentation();
                 metrics.AddMeter("PaymentSwitch");
+                // Without an exporter the mapped /metrics endpoint serves an
+                // empty 200 (observed on all APIs): nothing flows to Prometheus.
+                metrics.AddPrometheusExporter();
             });
     }
 }
