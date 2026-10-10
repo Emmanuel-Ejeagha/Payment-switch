@@ -36,8 +36,21 @@ export function Modal({
   const panelRef = useRef<HTMLDivElement>(null)
   const titleId = useId()
   const descriptionId = useId()
+  // Latest onClose without re-subscribing: parents routinely pass inline
+  // callbacks, and re-running this effect per keystroke yanks focus back to
+  // the first field (typing lockout). Focus moves exactly once, on mount.
+  const onCloseRef = useRef(onClose)
+  const mountedRef = useRef(false)
+
+  // Keep the ref current without re-subscribing the focus effect: this runs
+  // after every render but performs no focus management itself.
+  useEffect(() => {
+    onCloseRef.current = onClose
+  })
 
   useEffect(() => {
+    if (mountedRef.current) return
+    mountedRef.current = true
     const previouslyFocused = document.activeElement as HTMLElement | null
 
     const focusable = () =>
@@ -52,7 +65,7 @@ export function Modal({
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.stopPropagation()
-        onClose()
+        onCloseRef.current()
         return
       }
       if (event.key !== "Tab") return
@@ -78,7 +91,9 @@ export function Modal({
       document.body.style.overflow = overflow
       previouslyFocused?.focus?.()
     }
-  }, [onClose])
+    // Intentionally mount-only: onClose flows through onCloseRef so inline
+    // parent callbacks never re-trigger focus management.
+  }, [])
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto p-0 sm:items-center sm:p-4">
