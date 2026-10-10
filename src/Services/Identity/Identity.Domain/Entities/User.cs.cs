@@ -254,25 +254,6 @@ public class User : AggregateRoot
             token.Revoke();
     }
 
-    /// <summary>
-    /// Rotation with linkage: revokes the old token pointing at its replacement
-    /// so a concurrent request racing the same refresh token can converge
-    /// instead of triggering theft revocation.
-    /// </summary>
-    public TokenValue RotateRefreshToken(string oldTokenHash, string newTokenHash, DateTime expiresAt)
-    {
-        var token = _refreshTokens.FirstOrDefault(t => t.Value == oldTokenHash);
-        token?.RotateTo(newTokenHash);
-        return AddRefreshToken(newTokenHash, expiresAt);
-    }
-
-    /// <summary>
-    /// Seconds after rotation during which presenting the just-replaced token
-    /// converges to a fresh pair instead of revoking all sessions. Covers the
-    /// middleware/client/proxy concurrent-refresh race, not real theft.
-    /// </summary>
-    public const int RefreshReuseGraceSeconds = 60;
-
     public void RevokeAllRefreshTokens()
     {
         foreach (var token in _refreshTokens)

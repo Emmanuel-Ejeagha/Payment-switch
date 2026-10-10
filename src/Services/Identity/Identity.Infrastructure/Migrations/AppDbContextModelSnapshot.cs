@@ -17,7 +17,7 @@ namespace Identity.Infrastructure.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.12")
+                .HasAnnotation("ProductVersion", "10.0.9")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -185,12 +185,6 @@ namespace Identity.Infrastructure.Migrations
 
                             b1.Property<bool>("IsRevoked")
                                 .HasColumnType("boolean");
-
-                            b1.Property<string>("ReplacedByHash")
-                                .HasColumnType("text");
-
-                            b1.Property<DateTime?>("RevokedAtUtc")
-                                .HasColumnType("timestamp with time zone");
 
                             b1.Property<Guid>("UserId")
                                 .HasColumnType("uuid");

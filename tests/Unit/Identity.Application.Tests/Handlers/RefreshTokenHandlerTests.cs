@@ -144,52 +144,6 @@ public class RefreshTokenHandlerTests
     }
 
     [Fact]
-    public async Task Handle_RacedTokenWithinGrace_ShouldConvergeWithoutRevokingAll()
-    {
-        // Arrange: first rotation links old -> replacement; the loser presents old.
-        var user = CreateUserWithRefreshToken("racer_token");
-        user.AddRefreshToken("hash-other_session", DateTime.UtcNow.AddDays(1));
-        user.RotateRefreshToken("hash-racer_token", "hash-replacement", DateTime.UtcNow.AddDays(7));
-        var command = new RefreshTokenCommand("racer_token");
-        SetupValidatorSuccess(command);
-        _userRepositoryMock.Setup(r => r.FindByRefreshTokenAsync("hash-racer_token", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(user);
-        _tokenServiceMock.Setup(t => t.GenerateAccessToken(user)).Returns("converged_access");
-        _tokenServiceMock.Setup(t => t.GenerateRefreshToken()).Returns("converged_refresh");
-        _unitOfWorkMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(1);
-
-        // Act
-        var result = await _handler.Handle(command);
-
-        // Assert: converged, other session untouched.
-        Assert.True(result.IsSuccess);
-        Assert.Equal("converged_access", result.Value!.AccessToken);
-        Assert.False(user.RefreshTokens.First(t => t.Value == "hash-other_session").IsRevoked);
-        Assert.Contains(user.RefreshTokens, t => t.Value == "hash-converged_refresh");
-    }
-
-    [Fact]
-    public async Task Handle_RacedTokenWithMissingReplacement_ShouldDetectReuseAndRevokeAll()
-    {
-        // Arrange: link points at a replacement that no longer exists (pruned).
-        var user = CreateUserWithRefreshToken("stale_token");
-        user.RotateRefreshToken("hash-stale_token", "hash-gone", DateTime.UtcNow.AddDays(7));
-        user.RevokeRefreshToken("hash-gone");
-        var command = new RefreshTokenCommand("stale_token");
-        SetupValidatorSuccess(command);
-        _userRepositoryMock.Setup(r => r.FindByRefreshTokenAsync("hash-stale_token", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(user);
-
-        // Act
-        var result = await _handler.Handle(command);
-
-        // Assert
-        Assert.True(result.IsFailure);
-        Assert.Equal("Identity.RefreshTokenReuseDetected", result.Errors[0].Code);
-    }
-
-    [Fact]
     public async Task Handle_TokenNotFound_ShouldReturnFailure()
     {
         // Arrange
