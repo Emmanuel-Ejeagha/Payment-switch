@@ -1,6 +1,9 @@
 using Grpc.Core;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 namespace BuildingBlocks.Shared.Auth;
 
 public static class ServiceTokenExtensions
@@ -36,6 +39,29 @@ public static class ServiceTokenExtensions
         };
 
         services.AddSingleton(new ServiceTokenProvider(options));
+
+        // Register the matching validation handler. Minting without validation
+        // leaves every ServiceOnly endpoint rejecting service tokens (they fail
+        // signature checks against the user-JWT scheme), so both halves live
+        // behind this one call.
+        services.AddAuthentication()
+            .AddJwtBearer(ServiceTokenOptions.AuthenticationScheme, bearer =>
+            {
+                bearer.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuer = true,
+                    ValidateAudience = true,
+                    ValidateLifetime = true,
+                    ValidateIssuerSigningKey = true,
+                    ValidAlgorithms = new[] { SecurityAlgorithms.HmacSha256 },
+                    ValidIssuer = options.Issuer,
+                    ValidAudience = options.Audience,
+                    IssuerSigningKeys = new[]
+                    {
+                        new SymmetricSecurityKey(Encoding.UTF8.GetBytes(options.Secret))
+                    }
+                };
+            });
         return services;
     }
 

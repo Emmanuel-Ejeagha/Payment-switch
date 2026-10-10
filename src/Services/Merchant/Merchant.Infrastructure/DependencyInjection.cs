@@ -1,4 +1,5 @@
-﻿using BuildingBlocks.Shared.Configuration;
+﻿using BuildingBlocks.Shared.Auth;
+using BuildingBlocks.Shared.Configuration;
 using Merchant.Infrastructure.Messaging;
 using Merchant.Infrastructure.Outbox;
 using Merchant.Infrastructure.Persistence;
@@ -30,6 +31,7 @@ public static class DependencyInjection
 
         services.AddScoped<IMerchantRepository, MerchantRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+        services.AddServiceTokenProvider(configuration, "Merchant");
         services.AddValidatedOptions<RabbitMQSettings>(configuration, "RabbitMQ",
             s => !string.IsNullOrEmpty(s.HostName),
             "RabbitMQ HostName is required");

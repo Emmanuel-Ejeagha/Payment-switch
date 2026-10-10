@@ -17,4 +17,14 @@ public sealed class ServiceTokenOptions
     public const string ClientTypeClaim = "client_type";
 
     public const string ClientTypeService = "service";
+
+    /// <summary>
+    /// Authentication scheme that validates service-to-service JWTs minted by
+    /// <see cref="ServiceTokenProvider"/> (signed with the dedicated
+    /// <c>ServiceToken:Secret</c>). The <c>ServiceOnly</c> authorization policy
+    /// must list this scheme explicitly: without it, service tokens are
+    /// evaluated against the user-JWT scheme, fail signature validation, and
+    /// every service-to-service call 401s.
+    /// </summary>
+    public const string AuthenticationScheme = "ServiceToken";
 }

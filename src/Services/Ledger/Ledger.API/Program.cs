@@ -77,7 +77,8 @@ builder.Services.AddPaymentSwitchJwtBearer(builder.Configuration);
 builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy(AuthPolicies.ServiceOnly, policy =>
-        policy.RequireClaim(ServiceTokenOptions.ClientTypeClaim, ServiceTokenOptions.ClientTypeService));
+        policy.AddAuthenticationSchemes(ServiceTokenOptions.AuthenticationScheme)
+            .RequireClaim(ServiceTokenOptions.ClientTypeClaim, ServiceTokenOptions.ClientTypeService));
 });
 
 builder.Services.AddPaymentSwitchCors(builder.Configuration);

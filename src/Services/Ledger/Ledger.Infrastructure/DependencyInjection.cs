@@ -1,4 +1,5 @@
-﻿using BuildingBlocks.Shared.Configuration;
+﻿using BuildingBlocks.Shared.Auth;
+using BuildingBlocks.Shared.Configuration;
 using BuildingBlocks.Shared.Retention;
 using Ledger.Application.Interfaces;
 using Ledger.Application.Options;
@@ -31,6 +32,7 @@ public static class DependencyInjection
 
         services.AddScoped<ILedgerAccountRepository, LedgerAccountRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+        services.AddServiceTokenProvider(configuration, "Ledger");
         services.AddScoped<IDailyPayoutQuery, DailyPayoutQuery>();
         services.AddScoped<IReconciliationService, ReconciliationService>();
         services.AddScoped<IReconciliationReportRepository, ReconciliationReportRepository>();

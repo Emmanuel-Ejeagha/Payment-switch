@@ -230,6 +230,7 @@ services:
       - RunMigrations=true
       - ConnectionStrings__MerchantDb=Host=postgres;Database=MerchantDb;Username=paymentswitch;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       - Jwt__Secret=${JWT_SECRET:?Set JWT_SECRET in .env}
+      - ServiceToken__Secret=${SERVICE_TOKEN_SECRET:?Set SERVICE_TOKEN_SECRET in .env}
       - Jwt__PreviousSecret=${JWT_PREVIOUS_SECRET:-}
       - Jwt__Issuer=IdentityService
       - Jwt__Audience=PaymentSwitch
@@ -310,6 +311,7 @@ services:
       - RunMigrations=true
       - ConnectionStrings__LedgerDb=Host=postgres;Database=LedgerDb;Username=paymentswitch;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       - Jwt__Secret=${JWT_SECRET:?Set JWT_SECRET in .env}
+      - ServiceToken__Secret=${SERVICE_TOKEN_SECRET:?Set SERVICE_TOKEN_SECRET in .env}
       - Jwt__PreviousSecret=${JWT_PREVIOUS_SECRET:-}
       - Jwt__Issuer=IdentityService
       - Jwt__Audience=PaymentSwitch
