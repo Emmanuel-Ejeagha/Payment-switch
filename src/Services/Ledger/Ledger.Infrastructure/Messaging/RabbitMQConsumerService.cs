@@ -224,30 +224,34 @@ public class RabbitMQConsumerService : BackgroundService
                 if (createResult.IsFailure)
                     return createResult;
                 var reserveHandler = scope.ServiceProvider.GetRequiredService<ReserveFundsHandler>();
+                // Qualify the shared outbox CorrelationId per event type: all events of one
+                // payment carry the same id, but the journal CorrelationId is unique, so a
+                // verbatim pass-through makes the capture collide with its own reserve and
+                // roll back while being misreported as an idempotent duplicate.
                 return await reserveHandler.Handle(
                     new ReserveFundsCommand(authEvent.MerchantId, authEvent.Amount.Amount, authEvent.Amount.Currency,
-                        correlationId ?? $"PaymentAuth:{authEvent.IntentId}", authEvent.OccurredOn), cancellationToken);
+                        correlationId is null ? $"PaymentAuth:{authEvent.IntentId}" : $"{correlationId}:authorized", authEvent.OccurredOn), cancellationToken);
 
             case "PaymentCapturedDomainEvent":
                 var captureEvent = JsonSerializer.Deserialize<PaymentCapturedEvent>(body)!;
                 var captureHandler = scope.ServiceProvider.GetRequiredService<CaptureFundsHandler>();
                 return await captureHandler.Handle(
                     new CaptureFundsCommand(captureEvent.MerchantId, captureEvent.Amount.Amount, captureEvent.Amount.Currency,
-                        correlationId ?? $"PaymentCapt:{captureEvent.IntentId}", captureEvent.OccurredOn), cancellationToken);
+                        correlationId is null ? $"PaymentCapt:{captureEvent.IntentId}" : $"{correlationId}:captured", captureEvent.OccurredOn), cancellationToken);
 
             case "PaymentRefundedDomainEvent":
                 var refundEvent = JsonSerializer.Deserialize<PaymentRefundedEvent>(body)!;
                 var refundHandler = scope.ServiceProvider.GetRequiredService<RefundFundsHandler>();
                 return await refundHandler.Handle(
                     new RefundFundsCommand(refundEvent.MerchantId, refundEvent.Amount.Amount, refundEvent.Amount.Currency,
-                        correlationId ?? $"PaymentRef:{refundEvent.IntentId}", refundEvent.OccurredOn), cancellationToken);
+                        correlationId is null ? $"PaymentRef:{refundEvent.IntentId}" : $"{correlationId}:refunded", refundEvent.OccurredOn), cancellationToken);
 
             case "PaymentVoidedDomainEvent":
                 var voidEvent = JsonSerializer.Deserialize<PaymentVoidedEvent>(body)!;
                 var releaseHandler = scope.ServiceProvider.GetRequiredService<ReleaseFundsHandler>();
                 return await releaseHandler.Handle(
                     new ReleaseFundsCommand(voidEvent.MerchantId, voidEvent.Amount.Amount, voidEvent.Amount.Currency,
-                        correlationId ?? $"PaymentVoid:{voidEvent.IntentId}", voidEvent.OccurredOn), cancellationToken);
+                        correlationId is null ? $"PaymentVoid:{voidEvent.IntentId}" : $"{correlationId}:voided", voidEvent.OccurredOn), cancellationToken);
 
             default:
                 _logger.LogWarning("Unknown event type: {EventType}", eventType);
