@@ -13,7 +13,7 @@ vi.mocked(headers)
 function mockCookies(refreshToken?: string) {
   mockedCookies.mockResolvedValue({
     get: (name: string) =>
-      name === "refresh_token" && refreshToken ? { value: refreshToken } : undefined,
+      name === "admin_refresh_token" && refreshToken ? { value: refreshToken } : undefined,
   } as never)
 }
 
@@ -33,8 +33,8 @@ describe("GET /api/auth/token", () => {
     const res = await GET()
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({ accessToken: "new-access" })
-    expect(res.headers.getSetCookie().join(";")).toContain("access_token=new-access")
-    expect(res.headers.getSetCookie().join(";")).toContain("refresh_token=new-refresh")
+    expect(res.headers.getSetCookie().join(";")).toContain("admin_access_token=new-access")
+    expect(res.headers.getSetCookie().join(";")).toContain("admin_refresh_token=new-refresh")
   })
 
   it("returns 401 instead of crashing when identity answers non-JSON", async () => {

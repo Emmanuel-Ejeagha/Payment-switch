@@ -32,14 +32,14 @@ export async function POST(request: Request) {
   // httpOnly cookies. Returning backend payload verbatim would leak both
   // access and refresh tokens to page-level JavaScript.
   const response = NextResponse.json({ ok: true })
-  response.cookies.set("access_token", data.accessToken as string, {
+  response.cookies.set("merchant_access_token", data.accessToken as string, {
     httpOnly: true,
     secure: isSecure,
     sameSite: "lax",
     path: "/",
     maxAge: 60 * 60,
   })
-  response.cookies.set("refresh_token", data.refreshToken as string, {
+  response.cookies.set("merchant_refresh_token", data.refreshToken as string, {
     httpOnly: true,
     secure: isSecure,
     sameSite: "lax",

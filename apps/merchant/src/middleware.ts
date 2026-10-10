@@ -16,8 +16,8 @@ function isExpired(token: string): boolean {
 }
 
 export async function middleware(request: NextRequest) {
-  const accessToken = request.cookies.get("access_token")?.value
-  const refreshToken = request.cookies.get("refresh_token")?.value
+  const accessToken = request.cookies.get("merchant_access_token")?.value
+  const refreshToken = request.cookies.get("merchant_refresh_token")?.value
   const { pathname } = request.nextUrl
 
   // "/" is the public landing page. It must match exactly — a startsWith("/")

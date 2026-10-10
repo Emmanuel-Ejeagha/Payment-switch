@@ -43,14 +43,14 @@ export async function POST(request: Request) {
 
   const isSecure = isSecureRequest(request)
   const response = NextResponse.json({ ok: true })
-  response.cookies.set("access_token", data.accessToken as string, {
+  response.cookies.set("admin_access_token", data.accessToken as string, {
     httpOnly: true,
     secure: isSecure,
     sameSite: "lax",
     path: "/",
     maxAge: ACCESS_TOKEN_MAX_AGE,
   })
-  response.cookies.set("refresh_token", data.refreshToken as string, {
+  response.cookies.set("admin_refresh_token", data.refreshToken as string, {
     httpOnly: true,
     secure: isSecure,
     sameSite: "lax",

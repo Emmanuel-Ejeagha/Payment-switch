@@ -25,8 +25,8 @@ function isExpired(token: string): boolean {
 }
 
 export async function middleware(request: NextRequest) {
-  const accessToken = request.cookies.get("access_token")?.value
-  const refreshToken = request.cookies.get("refresh_token")?.value
+  const accessToken = request.cookies.get("admin_access_token")?.value
+  const refreshToken = request.cookies.get("admin_refresh_token")?.value
   const pathname = stripBasePath(request.nextUrl.pathname)
 
   if (publicPaths.includes(pathname)) {

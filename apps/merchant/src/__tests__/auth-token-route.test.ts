@@ -13,7 +13,7 @@ vi.mocked(headers)
 function mockCookies(refreshToken?: string) {
   mockedCookies.mockResolvedValue({
     get: (name: string) =>
-      name === "refresh_token" && refreshToken ? { value: refreshToken } : undefined,
+      name === "merchant_refresh_token" && refreshToken ? { value: refreshToken } : undefined,
   } as never)
 }
 

@@ -34,8 +34,8 @@ describe("POST /api/auth/login", () => {
     expect(body).not.toHaveProperty("accessToken")
     expect(body).not.toHaveProperty("refresh_token")
     const cookies = res.headers.getSetCookie().join(";")
-    expect(cookies).toContain("access_token=access-123")
-    expect(cookies).toContain("refresh_token=refresh-123")
+    expect(cookies).toContain("merchant_access_token=access-123")
+    expect(cookies).toContain("merchant_refresh_token=refresh-123")
     expect(cookies).toContain("HttpOnly")
   })
 

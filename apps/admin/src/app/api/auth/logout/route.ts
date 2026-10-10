@@ -4,8 +4,8 @@ import { isSecureRequest, serverApiUrl } from "@/lib/server-url"
 
 export async function POST() {
   const cookieStore = await cookies()
-  const accessToken = cookieStore.get("access_token")?.value
-  const refreshToken = cookieStore.get("refresh_token")?.value
+  const accessToken = cookieStore.get("admin_access_token")?.value
+  const refreshToken = cookieStore.get("admin_refresh_token")?.value
 
   // Revoke the server-side refresh token so it cannot be used after sign-out.
   if (accessToken && refreshToken) {
@@ -25,14 +25,14 @@ export async function POST() {
 
   const isSecure = isSecureRequest({ headers: await headers() })
   const response = NextResponse.json({ ok: true })
-  response.cookies.set("access_token", "", {
+  response.cookies.set("admin_access_token", "", {
     httpOnly: true,
     secure: isSecure,
     sameSite: "lax",
     path: "/",
     maxAge: 0,
   })
-  response.cookies.set("refresh_token", "", {
+  response.cookies.set("admin_refresh_token", "", {
     httpOnly: true,
     secure: isSecure,
     sameSite: "lax",

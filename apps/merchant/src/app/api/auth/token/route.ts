@@ -4,8 +4,8 @@ import { isSecureRequest, serverApiUrl } from "@/lib/server-url"
 
 async function refresh() {
   const cookieStore = await cookies()
-  const accessToken = cookieStore.get("access_token")?.value
-  const refreshToken = cookieStore.get("refresh_token")?.value
+  const accessToken = cookieStore.get("merchant_access_token")?.value
+  const refreshToken = cookieStore.get("merchant_refresh_token")?.value
 
   if (!refreshToken) {
     return { response: NextResponse.json({ error: "No refresh token" }, { status: 401 }), ok: false }
@@ -27,14 +27,14 @@ async function refresh() {
 
   const isSecure = isSecureRequest({ headers: await headers() })
   const response = NextResponse.json({ accessToken: data.accessToken })
-  response.cookies.set("access_token", data.accessToken, {
+  response.cookies.set("merchant_access_token", data.accessToken, {
     httpOnly: true,
     secure: isSecure,
     sameSite: "lax",
     path: "/",
     maxAge: 60 * 15,
   })
-  response.cookies.set("refresh_token", data.refreshToken, {
+  response.cookies.set("merchant_refresh_token", data.refreshToken, {
     httpOnly: true,
     secure: isSecure,
     sameSite: "lax",

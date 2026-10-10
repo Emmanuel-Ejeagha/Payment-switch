@@ -34,8 +34,8 @@ async function handler(request: NextRequest, { params }: { params: Promise<{ pat
     }
     return undefined
   }
-  const initialAccessToken = cookieValue("access_token")
-  const refreshToken = cookieValue("refresh_token")
+  const initialAccessToken = cookieValue("merchant_access_token")
+  const refreshToken = cookieValue("merchant_refresh_token")
 
   const body = request.method === "GET" || request.method === "HEAD" ? undefined : await request.text()
 
@@ -74,7 +74,7 @@ async function handler(request: NextRequest, { params }: { params: Promise<{ pat
     if (rotated.ok) {
       const setCookies = rotated.headers.getSetCookie()
       const newToken = setCookies
-        .find(c => c.startsWith("access_token="))
+        .find(c => c.startsWith("merchant_access_token="))
         ?.split(";")[0]
         .split("=")
         .slice(1)

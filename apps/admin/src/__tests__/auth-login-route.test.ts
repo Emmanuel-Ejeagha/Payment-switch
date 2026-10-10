@@ -38,8 +38,8 @@ describe("POST /api/auth/login", () => {
     expect(body).toEqual({ ok: true })
     expect(body).not.toHaveProperty("refreshToken")
     const cookies = res.headers.getSetCookie().join(";")
-    expect(cookies).toContain("access_token=access-admin")
-    expect(cookies).toContain("refresh_token=refresh-admin")
+    expect(cookies).toContain("admin_access_token=access-admin")
+    expect(cookies).toContain("admin_refresh_token=refresh-admin")
     expect(cookies).toContain("HttpOnly")
   })
 

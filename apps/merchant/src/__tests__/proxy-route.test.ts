@@ -36,7 +36,7 @@ describe("proxy hardening", () => {
     fetchMock.mockResolvedValue(new Response(JSON.stringify({ ok: 1 }), { status: 200, headers: { "content-type": "application/json" } }))
 
     const req = makeRequest(["payment", "api", "v1", "test"], {
-      cookie: "access_token=a=b=c; refresh_token=r=x=y",
+      cookie: "merchant_access_token=a=b=c; merchant_refresh_token=r=x=y",
       "content-type": "application/json",
     })
     await GET(req, { params: Promise.resolve({ path: ["payment", "api", "v1", "test"] }) })
@@ -51,7 +51,7 @@ describe("proxy hardening", () => {
     fetchMock.mockResolvedValue(new Response("{}", { status: 200, headers: { "content-type": "application/json" } }))
 
     const req = makeRequest(["payment", "api", "v1", "test"], {
-      cookie: "access_token=tok",
+      cookie: "merchant_access_token=tok",
       accept: "application/json",
       "accept-language": "en-US",
       host: "evil.com",
@@ -72,7 +72,7 @@ describe("proxy hardening", () => {
     fetchMock.mockResolvedValue(new Response("{}", { status: 200 }))
 
     const req = makeRequest(["payment", "api", "v1", "test"], {
-      cookie: "access_token=cookieTok",
+      cookie: "merchant_access_token=cookieTok",
       authorization: "Bearer incoming",
     })
     await GET(req, { params: Promise.resolve({ path: ["payment", "api", "v1", "test"] }) })
@@ -91,7 +91,7 @@ describe("proxy hardening", () => {
     )
 
     const req = makeRequest(["payment", "api", "v1", "payments"], {
-      cookie: "access_token=tok",
+      cookie: "merchant_access_token=tok",
     })
     const res = await GET(req, { params: Promise.resolve({ path: ["payment", "api", "v1", "payments"] }) })
 
@@ -103,7 +103,7 @@ describe("proxy hardening", () => {
     const fetchMock = vi.mocked(fetch)
     fetchMock.mockResolvedValue(new Response(null, { status: 204 }))
 
-    const req = makeRequest(["payment", "api", "v1", "test"], { cookie: "access_token=tok" })
+    const req = makeRequest(["payment", "api", "v1", "test"], { cookie: "merchant_access_token=tok" })
     const res = await GET(req, { params: Promise.resolve({ path: ["payment", "api", "v1", "test"] }) })
 
     expect(res.status).toBe(204)
@@ -111,7 +111,7 @@ describe("proxy hardening", () => {
     expect(res.headers.get("content-type")).toBeNull()
   })
 
-  it("retries 401 when only refresh_token present (no access_token)", async () => {
+  it("retries 401 when only merchant_refresh_token present (no merchant_access_token)", async () => {
     const fetchMock = vi.mocked(fetch)
     fetchMock
       .mockResolvedValueOnce(new Response("unauthorized", { status: 401 }))
@@ -119,12 +119,12 @@ describe("proxy hardening", () => {
 
     const fakeRefresh = new Response(null, {
       status: 200,
-      headers: { "set-cookie": "access_token=newTok; Path=/; HttpOnly" },
+      headers: { "set-cookie": "merchant_access_token=newTok; Path=/; HttpOnly" },
     })
     mockedRefresh.mockResolvedValue(fakeRefresh as unknown as never)
 
     const req = makeRequest(["payment", "api", "v1", "test"], {
-      cookie: "refresh_token=refreshOnly",
+      cookie: "merchant_refresh_token=refreshOnly",
     })
     const res = await GET(req, { params: Promise.resolve({ path: ["payment", "api", "v1", "test"] }) })
 
@@ -137,7 +137,7 @@ describe("proxy hardening", () => {
     fetchMock.mockResolvedValue(new Response("unauthorized", { status: 401 }))
 
     const req = makeRequest(["payment", "api", "v1", "test"], {
-      cookie: "access_token=tok",
+      cookie: "merchant_access_token=tok",
     })
     const res = await GET(req, { params: Promise.resolve({ path: ["payment", "api", "v1", "test"] }) })
 
