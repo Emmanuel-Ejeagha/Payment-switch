@@ -36,7 +36,17 @@ export function Modal({
   const panelRef = useRef<HTMLDivElement>(null)
   const titleId = useId()
   const descriptionId = useId()
+  // The parent re-renders (and recreates onClose) on every keystroke, so the
+  // Escape handler must always call the latest onClose without re-running
+  // focus management. A ref keeps the listener stable.
+  const onCloseRef = useRef(onClose)
+  useEffect(() => {
+    onCloseRef.current = onClose
+  })
 
+  // Focus management runs ONCE per mount: move focus in on open, restore it
+  // on close. (A previous version re-ran this on [onClose] and yanked focus
+  // back to the close button after every keystroke.)
   useEffect(() => {
     const previouslyFocused = document.activeElement as HTMLElement | null
 
@@ -49,14 +59,28 @@ export function Modal({
 
     focusable()[0]?.focus()
 
+    const { overflow } = document.body.style
+    document.body.style.overflow = "hidden"
+
+    return () => {
+      document.body.style.overflow = overflow
+      previouslyFocused?.focus?.()
+    }
+  }, [])
+
+  useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.stopPropagation()
-        onClose()
+        onCloseRef.current()
         return
       }
       if (event.key !== "Tab") return
-      const items = focusable()
+      const items = Array.from(
+        panelRef.current?.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ) ?? [],
+      ).filter((el) => el.offsetParent !== null)
       if (items.length === 0) return
       const first = items[0]
       const last = items[items.length - 1]
@@ -70,15 +94,11 @@ export function Modal({
     }
 
     document.addEventListener("keydown", onKeyDown)
-    const { overflow } = document.body.style
-    document.body.style.overflow = "hidden"
 
     return () => {
       document.removeEventListener("keydown", onKeyDown)
-      document.body.style.overflow = overflow
-      previouslyFocused?.focus?.()
     }
-  }, [onClose])
+  }, [])
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto p-0 sm:items-center sm:p-4">
