@@ -14,6 +14,13 @@ ledger tie-out, real-time merchant notifications, and transactional email verifi
 > (tested, observable, documented, reproducibly deployable). It is not a licensed financial
 > institution, and no claim is made about PCI, SOC 2, or other regulatory compliance.
 
+## Demo
+
+![Merchant portal landing page — hero, feature nav, and signup calls to action](demoImage.png)
+
+*Merchant portal landing page (local Docker stack): marketing hero with hosted checkout, payment
+links, subscriptions, signed webhooks, and daily settlement messaging.*
+
 ## Live Deployment
 
 The stack runs on **AWS EC2** via Docker Compose:
